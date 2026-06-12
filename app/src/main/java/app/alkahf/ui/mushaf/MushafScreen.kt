@@ -473,13 +473,14 @@ private fun AyatBody(
                 .pointerInput(hideMode, groupText) {
                     detectTapGestures(
                         onTap = { position ->
-                            if (!hideMode) return@detectTapGestures
                             val span = spanAt(layoutResult.value, groupText, position)
                                 ?: return@detectTapGestures
-                            val revealed = revealedByAyah[span.ayahId] ?: 0
+                            // In reader mode every word is visible, so any tap
+                            // marks; in hide mode only revealed words can be
+                            // marked — tapping concealed text reveals instead.
+                            val revealed =
+                                if (hideMode) revealedByAyah[span.ayahId] ?: 0 else Int.MAX_VALUE
                             if (span.wordIndex < revealed) {
-                                // Manual marking: tapping a revealed word
-                                // toggles its stumble mark.
                                 onToggleStumble(WordStumble(span.ayahId, span.wordIndex))
                             } else {
                                 session.revealNextWord(span.ayahId)

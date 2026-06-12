@@ -133,7 +133,16 @@ fun ReviewScreen(onBack: () -> Unit = {}) {
         )
 
         when {
-            !fullyRevealed -> RevealHintDock()
+            !fullyRevealed -> RevealDock(
+                onStumble = {
+                    stumbleTarget(portion, revealedCounts)?.let { target ->
+                        if (target !in stumbles) stumbles.add(target)
+                    }
+                },
+                onRevealAll = {
+                    portion.ayahs.forEach { revealedCounts[it.id] = it.words.size }
+                },
+            )
             grade == null -> GradingDock(
                 portion = portion,
                 stumbleCount = stumbles.size,
@@ -458,18 +467,55 @@ private fun spanAt(
     return passage.spans.firstOrNull { !it.isMarker && offset in it.start until it.end }
 }
 
+private fun stumbleTarget(
+    portion: ReviewPortion,
+    revealedCounts: Map<Int, Int>,
+): WordStumble? =
+    portion.ayahs.lastOrNull { (revealedCounts[it.id] ?: 0) > 0 }
+        ?.let { WordStumble(it.id, (revealedCounts[it.id] ?: 1) - 1) }
+
 @Composable
-private fun RevealHintDock() {
-    Text(
-        text = "Recite from memory · tap to reveal · long-press reveals the ayah · tap a revealed word to mark a stumble",
-        fontSize = 12.sp,
-        fontWeight = FontWeight.SemiBold,
-        color = AlkahfColors.InkSecondary,
-        textAlign = TextAlign.Center,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(start = 24.dp, top = 14.dp, end = 24.dp, bottom = 16.dp),
-    )
+private fun RevealDock(onStumble: () -> Unit, onRevealAll: () -> Unit) {
+    Column(Modifier.padding(start = 18.dp, top = 14.dp, end = 18.dp, bottom = 10.dp)) {
+        Text(
+            text = "Tap a word to reveal · long-press for the full ayah",
+            fontSize = 12.5.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = AlkahfColors.InkSecondary,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth().padding(bottom = 11.dp),
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+            Surface(
+                onClick = onStumble,
+                shape = RoundedCornerShape(16.dp),
+                color = AlkahfColors.StumbleBg,
+                border = BorderStroke(1.5.dp, AlkahfColors.StumbleBorder),
+                modifier = Modifier.height(56.dp),
+            ) {
+                Box(Modifier.padding(horizontal = 18.dp), contentAlignment = Alignment.Center) {
+                    Text(
+                        text = "Stumble",
+                        fontSize = 14.5.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = AlkahfColors.StumbleInk,
+                    )
+                }
+            }
+            Button(
+                onClick = onRevealAll,
+                modifier = Modifier.weight(1f).height(56.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = AlkahfColors.Accent,
+                    contentColor = AlkahfColors.OnAccent,
+                ),
+            ) {
+                Text(text = "Reveal all", fontSize = 15.5.sp, fontWeight = FontWeight.SemiBold)
+            }
+        }
+        Spacer(Modifier.height(9.dp))
+    }
 }
 
 @Composable
