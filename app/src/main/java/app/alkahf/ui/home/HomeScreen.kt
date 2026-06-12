@@ -67,10 +67,11 @@ fun HomeScreen(
     state: HomeUiState = HomeUiState(),
     onOpenMushaf: () -> Unit = {},
     onOpenLoop: () -> Unit = {},
+    onOpenReview: () -> Unit = {},
 ) {
     Scaffold(
         containerColor = AlkahfColors.Paper,
-        bottomBar = { AlkahfBottomNav(onOpenMushaf) },
+        bottomBar = { AlkahfBottomNav(onOpenMushaf, onOpenReview) },
     ) { innerPadding ->
         Column(
             modifier = Modifier
@@ -82,7 +83,7 @@ fun HomeScreen(
         ) {
             HomeHeader(state)
             SabaqCard(state, onOpenMushaf)
-            MurajaahCard(state)
+            MurajaahCard(state, onOpenReview)
             ResumeDrillCard(state, onOpenLoop)
             ThisWeekCard(state)
             Spacer(Modifier.height(3.dp))
@@ -328,7 +329,7 @@ private fun ActionRow(onOpenMushaf: () -> Unit) {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun MurajaahCard(state: HomeUiState) {
+private fun MurajaahCard(state: HomeUiState, onOpenReview: () -> Unit) {
     Surface(
         shape = RoundedCornerShape(24.dp),
         color = AlkahfColors.Surface,
@@ -396,7 +397,7 @@ private fun MurajaahCard(state: HomeUiState) {
                 }
             }
             Button(
-                onClick = { /* TODO: open review queue self-test flow */ },
+                onClick = onOpenReview,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 12.dp)
@@ -564,7 +565,7 @@ private fun ThisWeekCard(state: HomeUiState) {
 private data class NavDestination(val label: String, val icon: ImageVector)
 
 @Composable
-private fun AlkahfBottomNav(onOpenMushaf: () -> Unit) {
+private fun AlkahfBottomNav(onOpenMushaf: () -> Unit, onOpenReview: () -> Unit) {
     val destinations = listOf(
         NavDestination("Today", Icons.Outlined.Home),
         NavDestination("Mushaf", Icons.AutoMirrored.Outlined.MenuBook),
@@ -579,7 +580,12 @@ private fun AlkahfBottomNav(onOpenMushaf: () -> Unit) {
                 val selected = index == 0
                 NavigationBarItem(
                     selected = selected,
-                    onClick = { if (destination.label == "Mushaf") onOpenMushaf() },
+                    onClick = {
+                        when (destination.label) {
+                            "Mushaf" -> onOpenMushaf()
+                            "Review" -> onOpenReview()
+                        }
+                    },
                     icon = {
                         Icon(
                             imageVector = destination.icon,

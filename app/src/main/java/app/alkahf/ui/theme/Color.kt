@@ -68,4 +68,12 @@ object AlkahfColors {
     val DashedLink = Color(0xFFD7CDB8)
     val QueuedNumeral = Color(0xFFB7AD99)
     val ProgressTrack = Color(0xFFE0D7C5)
+
+    // Review screen tokens (design_handoff_review/README.md).
+    val ForgotInk = Color(0xFFA05544)
+    val ForgotHint = Color(0xFFC09183)
+    val ForgotBorder = Color(0xFFDEC4BC)
+    val ForgotBg = Color(0xFFF8ECE8)
+    val HesitantHint = Color(0xFFC9A36B)
+    val PerfectHint = Color(0xFFBCD6CC)
 }

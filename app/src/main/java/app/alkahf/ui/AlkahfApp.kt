@@ -9,8 +9,9 @@ import androidx.compose.runtime.setValue
 import app.alkahf.ui.home.HomeScreen
 import app.alkahf.ui.loop.LoopPlayerScreen
 import app.alkahf.ui.mushaf.MushafScreen
+import app.alkahf.ui.review.ReviewScreen
 
-private enum class AlkahfDestination { Home, Mushaf, Loop }
+private enum class AlkahfDestination { Home, Mushaf, Loop, Review }
 
 @Composable
 fun AlkahfApp() {
@@ -19,6 +20,7 @@ fun AlkahfApp() {
         AlkahfDestination.Home -> HomeScreen(
             onOpenMushaf = { destination = AlkahfDestination.Mushaf },
             onOpenLoop = { destination = AlkahfDestination.Loop },
+            onOpenReview = { destination = AlkahfDestination.Review },
         )
         AlkahfDestination.Mushaf -> {
             BackHandler { destination = AlkahfDestination.Home }
@@ -27,6 +29,10 @@ fun AlkahfApp() {
         AlkahfDestination.Loop -> {
             BackHandler { destination = AlkahfDestination.Home }
             LoopPlayerScreen(onBack = { destination = AlkahfDestination.Home })
+        }
+        AlkahfDestination.Review -> {
+            BackHandler { destination = AlkahfDestination.Home }
+            ReviewScreen(onBack = { destination = AlkahfDestination.Home })
         }
     }
 }
