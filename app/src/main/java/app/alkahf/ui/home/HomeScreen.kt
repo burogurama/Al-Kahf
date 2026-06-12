@@ -66,6 +66,7 @@ import java.util.Locale
 fun HomeScreen(
     state: HomeUiState = HomeUiState(),
     onOpenMushaf: () -> Unit = {},
+    onOpenSabaq: () -> Unit = {},
     onOpenLoop: () -> Unit = {},
     onOpenReview: () -> Unit = {},
 ) {
@@ -82,7 +83,7 @@ fun HomeScreen(
             verticalArrangement = Arrangement.spacedBy(9.dp),
         ) {
             HomeHeader(state)
-            SabaqCard(state, onOpenMushaf)
+            SabaqCard(state, onOpenSabaq)
             MurajaahCard(state, onOpenReview)
             ResumeDrillCard(state, onOpenLoop)
             ThisWeekCard(state)

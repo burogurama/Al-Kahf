@@ -62,7 +62,15 @@ fun Int.toArabicIndic(): String =
 class QuranRepository(context: Context) {
     private val quranDao = QuranDatabase.open(context).quranDao()
     private val userDao = UserDatabase.open(context).userDao()
+    private val prefs = context.getSharedPreferences("alkahf_prefs", Context.MODE_PRIVATE)
     private var cachedBasmala: String? = null
+
+    /** Last page open in the Mushaf, so reading resumes where the user left off. */
+    var lastMushafPage: Int?
+        get() = prefs.getInt(KEY_LAST_MUSHAF_PAGE, 0).takeIf { it in 1..PAGE_COUNT }
+        set(value) {
+            prefs.edit().putInt(KEY_LAST_MUSHAF_PAGE, value ?: 0).apply()
+        }
 
     suspend fun firstPageOfSurah(surah: Int): Int = quranDao.firstPageOfSurah(surah)
 
@@ -178,5 +186,6 @@ class QuranRepository(context: Context) {
 
     companion object {
         const val PAGE_COUNT = 604
+        private const val KEY_LAST_MUSHAF_PAGE = "last_mushaf_page"
     }
 }

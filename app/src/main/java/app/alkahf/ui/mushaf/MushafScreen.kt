@@ -53,6 +53,7 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -97,6 +98,9 @@ private data class PageSpan(
 
 private data class GroupText(val annotated: AnnotatedString, val spans: List<PageSpan>)
 
+/** First-launch fallback before any page has been read: the current sabaq surah. */
+private const val DEFAULT_SURAH = 18
+
 /** Hide/reveal progress and stumbles for one page's self-test. */
 class SelfTestSession(val page: MushafPage) {
     val revealedCounts = mutableStateMapOf<Int, Int>()
@@ -129,7 +133,7 @@ class SelfTestSession(val page: MushafPage) {
 
 @Composable
 fun MushafScreen(
-    startSurah: Int = 18,
+    startSurah: Int? = null,
     onBack: () -> Unit = {},
 ) {
     val context = LocalContext.current
@@ -137,8 +141,11 @@ fun MushafScreen(
     val scope = rememberCoroutineScope()
     var hideMode by remember { mutableStateOf(true) }
 
+    // A surah target (e.g. the sabaq) wins; otherwise resume the last page read.
     val startPage by produceState<Int?>(initialValue = null) {
-        value = repository.firstPageOfSurah(startSurah)
+        value = startSurah?.let { repository.firstPageOfSurah(it) }
+            ?: repository.lastMushafPage
+            ?: repository.firstPageOfSurah(DEFAULT_SURAH)
     }
     val initialPage = startPage
     if (initialPage == null) {
@@ -153,6 +160,12 @@ fun MushafScreen(
     val sessions = remember { mutableStateMapOf<Int, SelfTestSession>() }
     val currentPageNumber = pagerState.currentPage + 1
     val currentSession = sessions[currentPageNumber]
+
+    LaunchedEffect(pagerState) {
+        snapshotFlow { pagerState.currentPage }.collect { page ->
+            repository.lastMushafPage = page + 1
+        }
+    }
 
     Column(Modifier.fillMaxSize().background(AlkahfColors.Paper)) {
         MushafTopBar(
