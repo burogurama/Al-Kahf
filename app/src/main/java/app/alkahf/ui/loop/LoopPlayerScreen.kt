@@ -12,6 +12,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -38,10 +40,14 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -64,6 +70,7 @@ import androidx.compose.ui.unit.sp
 import androidx.media3.exoplayer.ExoPlayer
 import app.alkahf.AlkahfApplication
 import app.alkahf.audio.LoopMode
+import app.alkahf.data.SurahOption
 import app.alkahf.data.audio.AudioStore
 import app.alkahf.data.toArabicIndic
 import app.alkahf.ui.theme.AlkahfColors
@@ -73,13 +80,14 @@ import app.alkahf.ui.theme.KfgqpcHafs
 fun LoopPlayerScreen(onBack: () -> Unit = {}) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val repository = remember { (context.applicationContext as AlkahfApplication).repository }
     val controller = remember {
-        val app = context.applicationContext as AlkahfApplication
         LoopController(
-            repository = app.repository,
+            repository = repository,
             audioStore = AudioStore(context.applicationContext),
             player = ExoPlayer.Builder(context).build(),
             scope = scope,
+            initialPreset = repository.loopPreset,
         )
     }
     DisposableEffect(Unit) {
@@ -87,6 +95,25 @@ fun LoopPlayerScreen(onBack: () -> Unit = {}) {
         onDispose { controller.release() }
     }
     val state by controller.state.collectAsState()
+    var showEditor by remember { mutableStateOf(false) }
+    val surahs by produceState(initialValue = emptyList<SurahOption>()) {
+        value = repository.surahOptions()
+    }
+
+    if (showEditor && surahs.isNotEmpty()) {
+        BackHandler { showEditor = false }
+        PresetEditor(
+            initial = state.toPreset(),
+            surahs = surahs,
+            onSave = { preset ->
+                repository.loopPreset = preset
+                controller.applyPreset(preset)
+                showEditor = false
+            },
+            onDismiss = { showEditor = false },
+        )
+        return
+    }
 
     Column(
         Modifier
@@ -95,19 +122,19 @@ fun LoopPlayerScreen(onBack: () -> Unit = {}) {
             .statusBarsPadding()
             .navigationBarsPadding(),
     ) {
-        LoopTopBar(state, onBack)
+        LoopTopBar(state, onBack, onOpenEditor = { showEditor = true })
         Column(Modifier.fillMaxSize().padding(start = 20.dp, end = 20.dp, top = 6.dp)) {
             ChainCard(state, controller)
             AyahCard(state, Modifier.weight(1f).padding(top = 11.dp))
             ProgressSection(state)
             TransportRow(state, controller)
-            PresetStrip(state, controller)
+            PresetStrip(state, onOpenEditor = { showEditor = true })
         }
     }
 }
 
 @Composable
-private fun LoopTopBar(state: LoopUiState, onBack: () -> Unit) {
+private fun LoopTopBar(state: LoopUiState, onBack: () -> Unit, onOpenEditor: () -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -132,7 +159,7 @@ private fun LoopTopBar(state: LoopUiState, onBack: () -> Unit) {
                 color = AlkahfColors.InkFooter,
             )
             Text(
-                text = "Sūrat ${state.surahLatin.ifEmpty { "…" }} · Ḥuṣarī",
+                text = "Sūrat ${state.surahLatin.ifEmpty { "…" }} · ${state.reciterName}",
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Bold,
                 color = AlkahfColors.Ink,
@@ -141,7 +168,7 @@ private fun LoopTopBar(state: LoopUiState, onBack: () -> Unit) {
             )
         }
         Box(
-            modifier = Modifier.size(40.dp).clickable { /* TODO: preset editor */ },
+            modifier = Modifier.size(40.dp).clickable(onClick = onOpenEditor),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
@@ -287,6 +314,7 @@ private fun Modifier.stepperBorder(): Modifier =
         )
     }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun NodeTrack(state: LoopUiState) {
     val inChain: (Int) -> Boolean = { ayah ->
@@ -296,21 +324,25 @@ private fun NodeTrack(state: LoopUiState) {
         }
     }
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
-        Row(
+        FlowRow(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically,
+            verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             (state.rangeStart..state.rangeEnd).forEach { ayah ->
                 if (ayah != state.rangeStart) {
-                    LinkBar(solid = inChain(ayah) && inChain(ayah - 1))
+                    Box(Modifier.height(40.dp), contentAlignment = Alignment.Center) {
+                        LinkBar(solid = inChain(ayah) && inChain(ayah - 1))
+                    }
                 }
-                AyahNode(
-                    number = ayah,
-                    built = inChain(ayah),
-                    sounding = ayah == state.currentAyah &&
-                        (state.phase == LoopPhase.PLAYING || state.phase == LoopPhase.GAP),
-                )
+                Box(Modifier.height(40.dp), contentAlignment = Alignment.Center) {
+                    AyahNode(
+                        number = ayah,
+                        built = inChain(ayah),
+                        sounding = ayah == state.currentAyah &&
+                            (state.phase == LoopPhase.PLAYING || state.phase == LoopPhase.GAP),
+                    )
+                }
             }
         }
     }
@@ -713,15 +745,15 @@ private fun SquareControl(
 }
 
 @Composable
-private fun PresetStrip(state: LoopUiState, controller: LoopController) {
+private fun PresetStrip(state: LoopUiState, onOpenEditor: () -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(top = 14.dp, bottom = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        PresetCard("PER ĀYAH", "${state.perAyah}×", Modifier.weight(1f), controller::cyclePerAyah)
-        PresetCard("PER CHAIN", "${state.perChain}×", Modifier.weight(1f), controller::cyclePerChain)
-        PresetCard("GAP", formatMultiplier(state.gapMultiplier), Modifier.weight(1f), controller::cycleGap)
-        PresetCard("SPEED", "${state.speed}×", Modifier.weight(1f), controller::cycleSpeed)
+        PresetCard("PER ĀYAH", "${state.perAyah}×", Modifier.weight(1f), onOpenEditor)
+        PresetCard("PER CHAIN", "${state.perChain}×", Modifier.weight(1f), onOpenEditor)
+        PresetCard("GAP", formatMultiplier(state.gapMultiplier), Modifier.weight(1f), onOpenEditor)
+        PresetCard("SPEED", "${state.speed}×", Modifier.weight(1f), onOpenEditor)
     }
 }
 

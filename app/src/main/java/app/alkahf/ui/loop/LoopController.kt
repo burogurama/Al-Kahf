@@ -7,6 +7,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import app.alkahf.audio.LoopMode
 import app.alkahf.audio.LoopSequencer
 import app.alkahf.audio.LoopStep
+import app.alkahf.data.LoopPreset
 import app.alkahf.data.PageAyah
 import app.alkahf.data.QuranRepository
 import app.alkahf.data.audio.AudioStore
@@ -42,10 +43,27 @@ data class LoopUiState(
     val positionMs: Long = 0,
     val durationMs: Long = 0,
     val highlightIndex: Int = -1,
+    val surah: Int = 18,
     val surahLatin: String = "",
+    val surahAyahCount: Int = 110,
+    val reciterPath: String = AudioStore.DEFAULT_RECITER,
+    val reciterName: String = "Ḥuṣarī",
     val ayahs: Map<Int, PageAyah> = emptyMap(),
     val errorMessage: String? = null,
-)
+) {
+    fun toPreset(): LoopPreset = LoopPreset(
+        surah = surah,
+        surahNameLatin = surahLatin,
+        ayahFrom = rangeStart,
+        ayahTo = rangeEnd,
+        reciterPath = reciterPath,
+        reciterName = reciterName,
+        perAyah = perAyah,
+        perChain = perChain,
+        gapMultiplier = gapMultiplier,
+        speed = speed,
+    )
+}
 
 /**
  * Drives a drill session: expands the configuration via [LoopSequencer] and
@@ -58,15 +76,39 @@ class LoopController(
     private val audioStore: AudioStore,
     private val player: ExoPlayer,
     private val scope: CoroutineScope,
-    private val surah: Int = 18,
+    initialPreset: LoopPreset? = null,
 ) {
-    private val _state = MutableStateFlow(LoopUiState())
+    private val _state = MutableStateFlow(
+        initialPreset?.let { applyPresetTo(LoopUiState(), it) } ?: LoopUiState(),
+    )
     val state: StateFlow<LoopUiState> = _state.asStateFlow()
 
     private var steps: List<LoopStep> = emptyList()
     private var stepIndex = 0
     private var jumpTarget: Int? = null
     private var sessionJob: Job? = null
+    private var loadedSurah = -1
+
+    fun applyPreset(preset: LoopPreset) {
+        _state.update { applyPresetTo(it, preset) }
+        player.setPlaybackSpeed(preset.speed)
+        start()
+    }
+
+    private fun applyPresetTo(base: LoopUiState, preset: LoopPreset): LoopUiState = base.copy(
+        surah = preset.surah,
+        surahLatin = preset.surahNameLatin,
+        rangeStart = preset.ayahFrom,
+        rangeEnd = preset.ayahTo,
+        reciterPath = preset.reciterPath,
+        reciterName = preset.reciterName,
+        perAyah = preset.perAyah,
+        perChain = preset.perChain,
+        gapMultiplier = preset.gapMultiplier,
+        speed = preset.speed,
+        isPaused = false,
+        errorMessage = null,
+    )
 
     fun start() {
         sessionJob?.cancel()
@@ -111,7 +153,8 @@ class LoopController(
 
     fun adjustRangeEnd(delta: Int) {
         val current = _state.value
-        val newEnd = (current.rangeEnd + delta).coerceIn(current.rangeStart, MAX_RANGE_END)
+        val maxEnd = minOf(current.rangeStart + MAX_SPAN - 1, current.surahAyahCount)
+        val newEnd = (current.rangeEnd + delta).coerceIn(current.rangeStart, maxEnd)
         if (newEnd == current.rangeEnd) return
         _state.update { it.copy(rangeEnd = newEnd, isPaused = false) }
         start()
@@ -143,10 +186,19 @@ class LoopController(
     }
 
     private suspend fun runSession() {
-        if (_state.value.ayahs.isEmpty()) {
-            val ayahs = repository.ayahsForRange(surah, 1, MAX_RANGE_END).associateBy { it.number }
+        if (loadedSurah != _state.value.surah) {
+            val surah = _state.value.surah
+            val ayahs = repository.ayahsForRange(surah, 1, 300).associateBy { it.number }
             val latin = repository.surahNameLatin(surah)
-            _state.update { it.copy(ayahs = ayahs, surahLatin = latin) }
+            _state.update {
+                it.copy(
+                    ayahs = ayahs,
+                    surahLatin = latin,
+                    surahAyahCount = ayahs.size,
+                    rangeEnd = it.rangeEnd.coerceAtMost(ayahs.size),
+                )
+            }
+            loadedSurah = surah
         }
         val config = _state.value
         steps = LoopSequencer.steps(
@@ -200,7 +252,7 @@ class LoopController(
     private suspend fun downloadStep(step: LoopStep): File? {
         _state.update { it.copy(phase = LoopPhase.PREPARING) }
         return try {
-            audioStore.ayahFile(surah, step.ayah)
+            audioStore.ayahFile(_state.value.surah, step.ayah, _state.value.reciterPath)
         } catch (e: IOException) {
             _state.update {
                 it.copy(
@@ -268,7 +320,7 @@ class LoopController(
     }
 
     companion object {
-        const val MAX_RANGE_END = 6
+        const val MAX_SPAN = 20
         private const val GAP_TICK_MS = 100L
         private val PER_AYAH_OPTIONS = listOf(2, 3, 5, 7)
         private val PER_CHAIN_OPTIONS = listOf(3, 5, 7)

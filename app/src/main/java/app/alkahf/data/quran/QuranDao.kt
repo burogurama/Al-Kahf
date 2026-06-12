@@ -22,6 +22,9 @@ interface QuranDao {
 
     @Query("SELECT id, page, juz FROM ayahs")
     suspend fun ayahLocations(): List<AyahLocation>
+
+    @Query("SELECT * FROM surahs ORDER BY number")
+    suspend fun allSurahs(): List<SurahEntity>
 }
 
 /** Minimal projection for whole-mushaf aggregations (Progress screen). */

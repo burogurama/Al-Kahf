@@ -4,10 +4,14 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
+import app.alkahf.AlkahfApplication
 import app.alkahf.ui.components.AlkahfTab
 import app.alkahf.ui.home.HomeScreen
+import app.alkahf.ui.home.HomeUiState
 import app.alkahf.ui.loop.LoopPlayerScreen
 import app.alkahf.ui.mushaf.MushafScreen
 import app.alkahf.ui.progress.ProgressScreen
@@ -25,8 +29,19 @@ fun AlkahfApp() {
     // (from the Progress map); both null means resume the last page read.
     var mushafTargetSurah by rememberSaveable { mutableStateOf<Int?>(null) }
     var mushafTargetPage by rememberSaveable { mutableStateOf<Int?>(null) }
+    val repository = (LocalContext.current.applicationContext as AlkahfApplication).repository
     when (destination) {
         AlkahfDestination.Home -> HomeScreen(
+            state = remember(destination) {
+                repository.loopPreset?.let { preset ->
+                    HomeUiState(
+                        drillPresetTitle =
+                            "${preset.reciterName} · ${preset.surahNameLatin} ${preset.ayahFrom}–${preset.ayahTo}",
+                        drillPresetDetail =
+                            "Cumulative chain · ${preset.perAyah}× each · ${preset.perChain}× chain",
+                    )
+                } ?: HomeUiState()
+            },
             onOpenMushaf = {
                 mushafTargetSurah = null
                 mushafTargetPage = null

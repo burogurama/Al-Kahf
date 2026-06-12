@@ -78,6 +78,23 @@ data class ProgressSnapshot(
     val totalPracticeMs: Long,
 )
 
+/** Saved drill configuration for the loop player. */
+data class LoopPreset(
+    val surah: Int,
+    val surahNameLatin: String,
+    val ayahFrom: Int,
+    val ayahTo: Int,
+    val reciterPath: String,
+    val reciterName: String,
+    val perAyah: Int,
+    val perChain: Int,
+    val gapMultiplier: Float,
+    val speed: Float,
+)
+
+/** A surah picker entry. */
+data class SurahOption(val number: Int, val nameLatin: String, val ayahCount: Int)
+
 /** A portion due for murājaʿah, with its text loaded for the self-test. */
 data class ReviewPortion(
     val id: Long,
@@ -141,6 +158,42 @@ class QuranRepository(context: Context) {
             groups = groups,
         )
     }
+
+    /** Last saved loop preset, or null before the user ever saves one. */
+    var loopPreset: LoopPreset?
+        get() {
+            if (!prefs.contains("preset_surah")) return null
+            return LoopPreset(
+                surah = prefs.getInt("preset_surah", 18),
+                surahNameLatin = prefs.getString("preset_surah_name", "Al-Kahf") ?: "Al-Kahf",
+                ayahFrom = prefs.getInt("preset_from", 1),
+                ayahTo = prefs.getInt("preset_to", 5),
+                reciterPath = prefs.getString("preset_reciter_path", "Husary_128kbps") ?: "Husary_128kbps",
+                reciterName = prefs.getString("preset_reciter_name", "Ḥuṣarī") ?: "Ḥuṣarī",
+                perAyah = prefs.getInt("preset_per_ayah", 3),
+                perChain = prefs.getInt("preset_per_chain", 5),
+                gapMultiplier = prefs.getFloat("preset_gap", 1.5f),
+                speed = prefs.getFloat("preset_speed", 1.0f),
+            )
+        }
+        set(value) {
+            if (value == null) return
+            prefs.edit()
+                .putInt("preset_surah", value.surah)
+                .putString("preset_surah_name", value.surahNameLatin)
+                .putInt("preset_from", value.ayahFrom)
+                .putInt("preset_to", value.ayahTo)
+                .putString("preset_reciter_path", value.reciterPath)
+                .putString("preset_reciter_name", value.reciterName)
+                .putInt("preset_per_ayah", value.perAyah)
+                .putInt("preset_per_chain", value.perChain)
+                .putFloat("preset_gap", value.gapMultiplier)
+                .putFloat("preset_speed", value.speed)
+                .apply()
+        }
+
+    suspend fun surahOptions(): List<SurahOption> =
+        quranDao.allSurahs().map { SurahOption(it.number, it.nameLatin, it.ayahCount) }
 
     suspend fun ayahsForRange(surah: Int, from: Int, to: Int): List<PageAyah> =
         quranDao.ayahRange(surah, from, to).map { ayah ->
