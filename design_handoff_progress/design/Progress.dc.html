@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Amiri+Quran&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body { background: #E7E1D4; font-family: 'Hanken Grotesk', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+    .scr { scrollbar-width: none; }
+    .scr::-webkit-scrollbar { display: none; }
+  </style>
+</helmet>
+
+<div style="min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 28px; background: radial-gradient(120% 90% at 50% 0%, #EDE7DB 0%, #E4DDCF 60%, #DED6C6 100%);">
+  <div style="width: 412px; height: 892px; background: #14110D; border-radius: 46px; padding: 11px; box-shadow: 0 40px 90px rgba(40,34,22,0.30), 0 8px 24px rgba(40,34,22,0.16);">
+    <div style="width: 100%; height: 100%; background: #F5F0E6; border-radius: 36px; overflow: hidden; display: flex; flex-direction: column; position: relative;">
+
+      <!-- STATUS BAR -->
+      <div style="height: 44px; flex: 0 0 44px; display: flex; align-items: center; justify-content: space-between; padding: 0 24px 0 28px;">
+        <span style="font-size: 14px; font-weight: 600; color: #2A2620; letter-spacing: 0.2px;">9:41</span>
+        <div style="position: absolute; left: 50%; top: 11px; transform: translateX(-50%); width: 22px; height: 22px; border-radius: 50%; background: #14110D;"></div>
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <svg width="17" height="12" viewBox="0 0 17 12"><rect x="0" y="7" width="2.6" height="5" rx="0.8" fill="#2A2620"/><rect x="4" y="5" width="2.6" height="7" rx="0.8" fill="#2A2620"/><rect x="8" y="2.5" width="2.6" height="9.5" rx="0.8" fill="#2A2620"/><rect x="12" y="0" width="2.6" height="12" rx="0.8" fill="#2A2620"/></svg>
+          <svg width="16" height="12" viewBox="0 0 16 12"><path d="M8 11.2 0.6 3.9a10.4 10.4 0 0 1 14.8 0L8 11.2Z" fill="#2A2620"/></svg>
+          <svg width="22" height="12" viewBox="0 0 22 12"><rect x="0.5" y="0.5" width="18" height="11" rx="3" fill="none" stroke="#2A2620" stroke-opacity="0.5"/><rect x="2" y="2" width="13.5" height="8" rx="1.6" fill="#2A2620"/><rect x="19.5" y="4" width="1.6" height="4" rx="0.8" fill="#2A2620" fill-opacity="0.5"/></svg>
+        </div>
+      </div>
+
+      <!-- SCROLL -->
+      <div class="scr" style="flex: 1; overflow: auto; display: flex; flex-direction: column;">
+
+        <!-- HEADER -->
+        <div style="padding: 10px 22px 4px; display: flex; align-items: flex-end; justify-content: space-between;">
+          <div>
+            <div style="font-size: 31px; font-weight: 700; color: #2A2620; letter-spacing: -0.5px; line-height: 1.1;">Progress</div>
+            <div style="font-size: 13px; color: #A39A8B; font-weight: 500; margin-top: 4px; white-space: nowrap;">562 āyāt held in memory</div>
+          </div>
+          <div style="text-align: right;">
+            <div style="font-size: 28px; font-weight: 700; color: #3E7D6E; letter-spacing: -0.5px; line-height: 1;">9.0<span style="font-size: 16px;">%</span></div>
+            <div style="font-size: 11px; font-weight: 600; color: #A39A8B; margin-top: 3px; letter-spacing: 0.3px;">OF THE QURAN</div>
+          </div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 10px; padding: 10px 18px 14px;">
+
+          <!-- MUSHAF MAP -->
+          <div style="background: #FBF7ED; border: 1px solid #ECE3D0; border-radius: 24px; padding: 16px 16px 13px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+              <span style="font-size: 11px; font-weight: 700; letter-spacing: 1.4px; color: #8C8475; white-space: nowrap;">THE MUSHAF · 604 PAGES</span>
+              <span style="font-size: 11.5px; font-weight: 600; color: #A39A8B; white-space: nowrap;">44 memorized</span>
+            </div>
+            <div dir="rtl" style="display: flex; flex-wrap: wrap; gap: 2px;">
+              <sc-for list="{{ pages }}" as="p" hint-placeholder-count="120">
+                <div style="width: 9.9px; height: 9.9px; border-radius: 2.5px; background: {{ p.c }};"></div>
+              </sc-for>
+            </div>
+            <div style="display: flex; align-items: center; gap: 13px; margin-top: 12px; flex-wrap: wrap;">
+              <span style="display: flex; align-items: center; gap: 5px;"><span style="width: 9px; height: 9px; border-radius: 2.5px; background: #2F6055;"></span><span style="font-size: 11px; font-weight: 600; color: #8C8475;">Strong</span></span>
+              <span style="display: flex; align-items: center; gap: 5px;"><span style="width: 9px; height: 9px; border-radius: 2.5px; background: #6FA395;"></span><span style="font-size: 11px; font-weight: 600; color: #8C8475;">Memorized</span></span>
+              <span style="display: flex; align-items: center; gap: 5px;"><span style="width: 9px; height: 9px; border-radius: 2.5px; background: #D8B45A;"></span><span style="font-size: 11px; font-weight: 600; color: #8C8475;">Learning</span></span>
+              <span style="display: flex; align-items: center; gap: 5px;"><span style="width: 9px; height: 9px; border-radius: 2.5px; background: #EAE2D0;"></span><span style="font-size: 11px; font-weight: 600; color: #8C8475; white-space: nowrap;">Not started</span></span>
+            </div>
+          </div>
+
+          <!-- BY JUZ -->
+          <div style="background: #FBF7ED; border: 1px solid #ECE3D0; border-radius: 22px; padding: 15px 18px;">
+            <div style="font-size: 11px; font-weight: 700; letter-spacing: 1.4px; color: #8C8475; margin-bottom: 12px;">BY JUZʼ</div>
+            <div style="display: flex; flex-direction: column; gap: 11px;">
+              <div style="display: flex; align-items: center; gap: 12px;">
+                <span style="flex: 0 0 64px; font-size: 13px; font-weight: 600; color: #4A453C;">Juzʼ 30</span>
+                <div style="flex: 1; height: 7px; border-radius: 4px; background: #EAE2D0; position: relative;"><div style="position: absolute; top: 0; right: 0; height: 100%; width: 100%; border-radius: 4px; background: #2F6055;"></div></div>
+                <span style="flex: 0 0 38px; text-align: right; font-size: 12.5px; font-weight: 700; color: #2F6055;">100%</span>
+              </div>
+              <div style="display: flex; align-items: center; gap: 12px;">
+                <span style="flex: 0 0 64px; font-size: 13px; font-weight: 600; color: #4A453C;">Juzʼ 29</span>
+                <div style="flex: 1; height: 7px; border-radius: 4px; background: #EAE2D0; position: relative;"><div style="position: absolute; top: 0; right: 0; height: 100%; width: 64%; border-radius: 4px; background: #3E7D6E;"></div></div>
+                <span style="flex: 0 0 38px; text-align: right; font-size: 12.5px; font-weight: 700; color: #4A453C;">64%</span>
+              </div>
+              <div style="display: flex; align-items: center; gap: 12px;">
+                <span style="flex: 0 0 64px; font-size: 13px; font-weight: 600; color: #4A453C;">Juzʼ 15</span>
+                <div style="flex: 1; height: 7px; border-radius: 4px; background: #EAE2D0; position: relative;"><div style="position: absolute; top: 0; right: 0; height: 100%; width: 12%; border-radius: 4px; background: #D8B45A;"></div></div>
+                <span style="flex: 0 0 38px; text-align: right; font-size: 12.5px; font-weight: 700; color: #4A453C;">12%</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- ACTIVITY -->
+          <div style="display: flex; gap: 10px;">
+            <div style="flex: 1; background: #FBF7ED; border: 1px solid #ECE3D0; border-radius: 20px; padding: 13px 16px;">
+              <div style="font-size: 22px; font-weight: 700; color: #2A2620; letter-spacing: -0.4px;">12</div>
+              <div style="font-size: 11.5px; font-weight: 600; color: #A39A8B; margin-top: 2px;">day streak</div>
+            </div>
+            <div style="flex: 1; background: #FBF7ED; border: 1px solid #ECE3D0; border-radius: 20px; padding: 13px 16px;">
+              <div style="font-size: 22px; font-weight: 700; color: #2A2620; letter-spacing: -0.4px;">142</div>
+              <div style="font-size: 11.5px; font-weight: 600; color: #A39A8B; margin-top: 2px;">āyāt this week</div>
+            </div>
+            <div style="flex: 1; background: #FBF7ED; border: 1px solid #ECE3D0; border-radius: 20px; padding: 13px 16px;">
+              <div style="font-size: 22px; font-weight: 700; color: #2A2620; letter-spacing: -0.4px;">3.2<span style="font-size: 14px; font-weight: 600;">h</span></div>
+              <div style="font-size: 11.5px; font-weight: 600; color: #A39A8B; margin-top: 2px;">time spent</div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- BOTTOM NAV -->
+      <div style="flex: 0 0 auto; background: #F8F3EA; border-top: 1px solid #EAE3D4; padding: 8px 6px 6px; display: flex;">
+        <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer;">
+          <div style="width: 60px; height: 30px; display: flex; align-items: center; justify-content: center;">
+            <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="#8C8475" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11.5 12 5l8 6.5"/><path d="M6 10.5V19a1 1 0 0 0 1 1h3v-5h4v5h3a1 1 0 0 0 1-1v-8.5"/></svg>
+          </div>
+          <span style="font-size: 11px; font-weight: 600; color: #8C8475;">Today</span>
+        </div>
+        <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer;">
+          <div style="width: 60px; height: 30px; display: flex; align-items: center; justify-content: center;">
+            <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="#8C8475" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6.5C10.5 5.4 8 4.8 6 4.8S2.5 5.5 2.5 5.5v13S4 18 6 18s4.5.6 6 1.7"/><path d="M12 6.5C13.5 5.4 16 4.8 18 4.8s3.5.7 3.5.7v13S20 18 18 18s-4.5.6-6 1.7"/><path d="M12 6.5v13.2"/></svg>
+          </div>
+          <span style="font-size: 11px; font-weight: 600; color: #8C8475;">Mushaf</span>
+        </div>
+        <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer;">
+          <div style="width: 60px; height: 30px; display: flex; align-items: center; justify-content: center;">
+            <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="#8C8475" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 0 1 13.3-6M18 3v4h-4"/><path d="M20 12a8 8 0 0 1-13.3 6M6 21v-4h4"/></svg>
+          </div>
+          <span style="font-size: 11px; font-weight: 600; color: #8C8475;">Review</span>
+        </div>
+        <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer;">
+          <div style="width: 60px; height: 30px; border-radius: 999px; background: #DCEAE3; display: flex; align-items: center; justify-content: center;">
+            <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="#2F6055" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19V13"/><path d="M12 19V6"/><path d="M19 19v-9"/></svg>
+          </div>
+          <span style="font-size: 11px; font-weight: 700; color: #2F6055;">Progress</span>
+        </div>
+        <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer;">
+          <div style="width: 60px; height: 30px; display: flex; align-items: center; justify-content: center;">
+            <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="#8C8475" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v9m0 0-3.5-3.5M12 13l3.5-3.5"/><path d="M4 16v2.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V16"/></svg>
+          </div>
+          <span style="font-size: 11px; font-weight: 600; color: #8C8475;">Library</span>
+        </div>
+      </div>
+
+      <!-- gesture pill -->
+      <div style="flex: 0 0 auto; height: 22px; display: flex; align-items: center; justify-content: center; background: #F8F3EA;">
+        <div style="width: 108px; height: 4px; border-radius: 2px; background: #2A2620; opacity: 0.35;"></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;: {&quot;width&quot;: 472, &quot;height&quot;: 948}}">
+class Component extends DCLogic {
+  renderVals() {
+    const STRONG = "#2F6055", MEM = "#6FA395", LEARN = "#D8B45A", NONE = "#EAE2D0";
+    const pages = [];
+    for (let i = 1; i <= 604; i++) {
+      let c = NONE;
+      if (i === 1) c = STRONG;                      // Al-Fatihah
+      else if (i >= 2 && i <= 4) c = LEARN;         // Al-Baqarah opening
+      else if (i >= 293 && i <= 296) c = LEARN;     // Al-Kahf (current sabaq)
+      else if (i >= 562 && i <= 569) c = MEM;       // Juz 29 (in progress)
+      else if (i >= 570 && i <= 575) c = LEARN;
+      else if (i >= 582 && i <= 593) c = MEM;       // Juz 30
+      else if (i >= 594 && i <= 604) c = STRONG;    // short surahs, solid
+      pages.push({ c });
+    }
+    return { pages };
+  }
+}
+</script>
+</body>
+</html>
