@@ -76,4 +76,7 @@ object AlkahfColors {
     val ForgotBg = Color(0xFFF8ECE8)
     val HesitantHint = Color(0xFFC9A36B)
     val PerfectHint = Color(0xFFBCD6CC)
+
+    // Progress screen tokens (design_handoff_progress/README.md).
+    val MapEmpty = Color(0xFFEAE2D0)
 }

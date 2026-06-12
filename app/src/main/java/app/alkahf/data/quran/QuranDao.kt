@@ -19,4 +19,10 @@ interface QuranDao {
 
     @Query("SELECT * FROM ayahs WHERE surah = :surah AND number BETWEEN :from AND :to ORDER BY id")
     suspend fun ayahRange(surah: Int, from: Int, to: Int): List<AyahEntity>
+
+    @Query("SELECT id, page, juz FROM ayahs")
+    suspend fun ayahLocations(): List<AyahLocation>
 }
+
+/** Minimal projection for whole-mushaf aggregations (Progress screen). */
+data class AyahLocation(val id: Int, val page: Int, val juz: Int)

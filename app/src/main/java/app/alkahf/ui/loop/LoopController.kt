@@ -164,6 +164,11 @@ class LoopController(
                 continue
             }
             if (finishedNaturally) {
+                repository.logPractice(
+                    type = "loop",
+                    ayahCount = 1,
+                    durationMs = _state.value.durationMs,
+                )
                 reciteBackGap()
                 val jumpedInGap = consumeJump()
                 if (jumpedInGap != null) {

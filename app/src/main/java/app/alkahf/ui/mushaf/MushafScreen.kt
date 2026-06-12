@@ -135,6 +135,7 @@ class SelfTestSession(
 @Composable
 fun MushafScreen(
     startSurah: Int? = null,
+    startPage: Int? = null,
     onBack: () -> Unit = {},
 ) {
     val context = LocalContext.current
@@ -142,13 +143,14 @@ fun MushafScreen(
     val scope = rememberCoroutineScope()
     var hideMode by remember { mutableStateOf(true) }
 
-    // A surah target (e.g. the sabaq) wins; otherwise resume the last page read.
-    val startPage by produceState<Int?>(initialValue = null) {
-        value = startSurah?.let { repository.firstPageOfSurah(it) }
+    // An explicit page or surah target wins; otherwise resume the last page read.
+    val resolvedStartPage by produceState<Int?>(initialValue = null) {
+        value = startPage
+            ?: startSurah?.let { repository.firstPageOfSurah(it) }
             ?: repository.lastMushafPage
             ?: repository.firstPageOfSurah(DEFAULT_SURAH)
     }
-    val initialPage = startPage
+    val initialPage = resolvedStartPage
     if (initialPage == null) {
         Box(Modifier.fillMaxSize().background(AlkahfColors.Paper))
         return

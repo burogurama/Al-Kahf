@@ -21,21 +21,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
-import androidx.compose.material.icons.automirrored.outlined.MenuBook
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.outlined.Autorenew
-import androidx.compose.material.icons.outlined.BarChart
-import androidx.compose.material.icons.outlined.Download
-import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -46,7 +36,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -56,6 +45,8 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.alkahf.ui.components.AlkahfBottomNav
+import app.alkahf.ui.components.AlkahfTab
 import app.alkahf.ui.theme.AlkahfColors
 import app.alkahf.ui.theme.AyahTextStyle
 import java.time.LocalDate
@@ -69,10 +60,20 @@ fun HomeScreen(
     onOpenSabaq: () -> Unit = {},
     onOpenLoop: () -> Unit = {},
     onOpenReview: () -> Unit = {},
+    onOpenProgress: () -> Unit = {},
 ) {
     Scaffold(
         containerColor = AlkahfColors.Paper,
-        bottomBar = { AlkahfBottomNav(onOpenMushaf, onOpenReview) },
+        bottomBar = {
+            AlkahfBottomNav(selected = AlkahfTab.TODAY) { tab ->
+                when (tab) {
+                    AlkahfTab.MUSHAF -> onOpenMushaf()
+                    AlkahfTab.REVIEW -> onOpenReview()
+                    AlkahfTab.PROGRESS -> onOpenProgress()
+                    else -> {}
+                }
+            }
+        },
     ) { innerPadding ->
         Column(
             modifier = Modifier
@@ -563,53 +564,3 @@ private fun ThisWeekCard(state: HomeUiState) {
     }
 }
 
-private data class NavDestination(val label: String, val icon: ImageVector)
-
-@Composable
-private fun AlkahfBottomNav(onOpenMushaf: () -> Unit, onOpenReview: () -> Unit) {
-    val destinations = listOf(
-        NavDestination("Today", Icons.Outlined.Home),
-        NavDestination("Mushaf", Icons.AutoMirrored.Outlined.MenuBook),
-        NavDestination("Review", Icons.Outlined.Autorenew),
-        NavDestination("Progress", Icons.Outlined.BarChart),
-        NavDestination("Library", Icons.Outlined.Download),
-    )
-    Column {
-        HorizontalDivider(thickness = 1.dp, color = AlkahfColors.CardBorder)
-        NavigationBar(containerColor = AlkahfColors.NavSurface) {
-            destinations.forEachIndexed { index, destination ->
-                val selected = index == 0
-                NavigationBarItem(
-                    selected = selected,
-                    onClick = {
-                        when (destination.label) {
-                            "Mushaf" -> onOpenMushaf()
-                            "Review" -> onOpenReview()
-                        }
-                    },
-                    icon = {
-                        Icon(
-                            imageVector = destination.icon,
-                            contentDescription = destination.label,
-                            modifier = Modifier.size(23.dp),
-                        )
-                    },
-                    label = {
-                        Text(
-                            text = destination.label,
-                            fontSize = 11.sp,
-                            fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
-                        )
-                    },
-                    colors = NavigationBarItemDefaults.colors(
-                        indicatorColor = AlkahfColors.AccentTint,
-                        selectedIconColor = AlkahfColors.AccentDeep,
-                        selectedTextColor = AlkahfColors.AccentDeep,
-                        unselectedIconColor = AlkahfColors.InkMuted,
-                        unselectedTextColor = AlkahfColors.InkMuted,
-                    ),
-                )
-            }
-        }
-    }
-}

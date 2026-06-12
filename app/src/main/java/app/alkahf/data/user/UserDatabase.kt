@@ -32,6 +32,27 @@ data class RevealStateEntity(
     @ColumnInfo(name = "revealed_count") val revealedCount: Int,
 )
 
+/**
+ * Memorization state of one ayah: 1 learning, 2 memorized, 3 strong.
+ * Ayat with no row are not started.
+ */
+@Entity(tableName = "ayah_states")
+data class AyahStateEntity(
+    @PrimaryKey @ColumnInfo(name = "ayah_id") val ayahId: Int,
+    val state: Int,
+)
+
+/** One unit of practice (a graded review, a loop play) for activity stats. */
+@Entity(tableName = "practice_events")
+data class PracticeEventEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val type: String,
+    @ColumnInfo(name = "ayah_count") val ayahCount: Int,
+    @ColumnInfo(name = "duration_ms") val durationMs: Long,
+    @ColumnInfo(name = "epoch_day") val epochDay: Long,
+    @ColumnInfo(name = "created_at") val createdAt: Long,
+)
+
 /** A memorized portion tracked by the spaced-repetition scheduler. */
 @Entity(tableName = "review_portions")
 data class ReviewPortionEntity(
@@ -74,11 +95,35 @@ interface UserDao {
 
     @Query("UPDATE review_portions SET interval_days = :intervalDays, due_epoch_day = :dueEpochDay WHERE id = :id")
     suspend fun updateSchedule(id: Long, intervalDays: Int, dueEpochDay: Long)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertAyahStates(states: List<AyahStateEntity>)
+
+    @Query("SELECT * FROM ayah_states")
+    suspend fun allAyahStates(): List<AyahStateEntity>
+
+    @Insert
+    suspend fun addPracticeEvent(event: PracticeEventEntity)
+
+    @Query("SELECT DISTINCT epoch_day FROM practice_events ORDER BY epoch_day DESC")
+    suspend fun practiceDays(): List<Long>
+
+    @Query("SELECT COALESCE(SUM(ayah_count), 0) FROM practice_events WHERE epoch_day >= :sinceDay")
+    suspend fun ayahCountSince(sinceDay: Long): Int
+
+    @Query("SELECT COALESCE(SUM(duration_ms), 0) FROM practice_events")
+    suspend fun totalPracticeMs(): Long
 }
 
 @Database(
-    entities = [StumbleEntity::class, ReviewPortionEntity::class, RevealStateEntity::class],
-    version = 3,
+    entities = [
+        StumbleEntity::class,
+        ReviewPortionEntity::class,
+        RevealStateEntity::class,
+        AyahStateEntity::class,
+        PracticeEventEntity::class,
+    ],
+    version = 4,
     exportSchema = false,
 )
 abstract class UserDatabase : RoomDatabase() {
