@@ -133,16 +133,7 @@ fun ReviewScreen(onBack: () -> Unit = {}) {
         )
 
         when {
-            !fullyRevealed -> RevealDock(
-                onStumble = {
-                    stumbleTarget(portion, revealedCounts)?.let { target ->
-                        if (target !in stumbles) stumbles.add(target)
-                    }
-                },
-                onRevealAll = {
-                    portion.ayahs.forEach { revealedCounts[it.id] = it.words.size }
-                },
-            )
+            !fullyRevealed -> RevealHintDock()
             grade == null -> GradingDock(
                 portion = portion,
                 stumbleCount = stumbles.size,
@@ -171,13 +162,6 @@ fun ReviewScreen(onBack: () -> Unit = {}) {
 
 private fun minutesLabel(remainingPortions: Int): String =
     "${(remainingPortions * MINUTES_PER_PORTION + 0.5f).toInt().coerceAtLeast(1)} min"
-
-private fun stumbleTarget(
-    portion: ReviewPortion,
-    revealedCounts: Map<Int, Int>,
-): WordStumble? =
-    portion.ayahs.lastOrNull { (revealedCounts[it.id] ?: 0) > 0 }
-        ?.let { WordStumble(it.id, (revealedCounts[it.id] ?: 1) - 1) }
 
 @Composable
 private fun ReviewTopBar(subtitle: String, onBack: () -> Unit) {
@@ -256,7 +240,7 @@ private fun QueueStrip(total: Int, currentIndex: Int, surahLatin: String) {
 private fun PassageCard(
     portion: ReviewPortion,
     revealedCounts: MutableMap<Int, Int>,
-    stumbles: List<WordStumble>,
+    stumbles: MutableList<WordStumble>,
     fullyRevealed: Boolean,
     modifier: Modifier = Modifier,
 ) {
@@ -336,7 +320,7 @@ private fun stumbleSummary(count: Int): String = when (count) {
 private fun PassageText(
     portion: ReviewPortion,
     revealedCounts: MutableMap<Int, Int>,
-    stumbles: List<WordStumble>,
+    stumbles: MutableList<WordStumble>,
     modifier: Modifier = Modifier,
 ) {
     val revealedSnapshot = portion.ayahs.associate { it.id to (revealedCounts[it.id] ?: 0) }
@@ -365,7 +349,14 @@ private fun PassageText(
                             val span = spanAt(layoutResult.value, passage, position) ?: return@detectTapGestures
                             val ayah = portion.ayahs.first { it.id == span.ayahId }
                             val revealed = revealedCounts[ayah.id] ?: 0
-                            if (revealed < ayah.words.size) revealedCounts[ayah.id] = revealed + 1
+                            if (span.wordIndex < revealed) {
+                                // Manual marking: tapping a revealed word
+                                // toggles its stumble mark.
+                                val mark = WordStumble(span.ayahId, span.wordIndex)
+                                if (!stumbles.remove(mark)) stumbles.add(mark)
+                            } else if (revealed < ayah.words.size) {
+                                revealedCounts[ayah.id] = revealed + 1
+                            }
                         },
                         onLongPress = { position ->
                             val span = spanAt(layoutResult.value, passage, position) ?: return@detectTapGestures
@@ -468,47 +459,17 @@ private fun spanAt(
 }
 
 @Composable
-private fun RevealDock(onStumble: () -> Unit, onRevealAll: () -> Unit) {
-    Column(Modifier.padding(start = 18.dp, top = 14.dp, end = 18.dp, bottom = 10.dp)) {
-        Text(
-            text = "Tap a word to reveal · long-press for the full ayah",
-            fontSize = 12.5.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = AlkahfColors.InkSecondary,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth().padding(bottom = 11.dp),
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-            Surface(
-                onClick = onStumble,
-                shape = RoundedCornerShape(16.dp),
-                color = AlkahfColors.StumbleBg,
-                border = BorderStroke(1.5.dp, AlkahfColors.StumbleBorder),
-                modifier = Modifier.height(56.dp),
-            ) {
-                Box(Modifier.padding(horizontal = 18.dp), contentAlignment = Alignment.Center) {
-                    Text(
-                        text = "Stumble",
-                        fontSize = 14.5.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = AlkahfColors.StumbleInk,
-                    )
-                }
-            }
-            Button(
-                onClick = onRevealAll,
-                modifier = Modifier.weight(1f).height(56.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = AlkahfColors.Accent,
-                    contentColor = AlkahfColors.OnAccent,
-                ),
-            ) {
-                Text(text = "Reveal all", fontSize = 15.5.sp, fontWeight = FontWeight.SemiBold)
-            }
-        }
-        Spacer(Modifier.height(9.dp))
-    }
+private fun RevealHintDock() {
+    Text(
+        text = "Recite from memory · tap to reveal · long-press reveals the ayah · tap a revealed word to mark a stumble",
+        fontSize = 12.sp,
+        fontWeight = FontWeight.SemiBold,
+        color = AlkahfColors.InkSecondary,
+        textAlign = TextAlign.Center,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 24.dp, top = 14.dp, end = 24.dp, bottom = 16.dp),
+    )
 }
 
 @Composable

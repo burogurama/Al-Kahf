@@ -7,6 +7,7 @@ import androidx.room.Database
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.Insert
+import androidx.room.OnConflictStrategy
 import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.Room
@@ -22,6 +23,13 @@ data class StumbleEntity(
     @ColumnInfo(name = "ayah_id") val ayahId: Int,
     @ColumnInfo(name = "word_index") val wordIndex: Int,
     @ColumnInfo(name = "created_at") val createdAt: Long,
+)
+
+/** How many words of an ayah are revealed in the Mushaf self-test (resumable). */
+@Entity(tableName = "reveal_states")
+data class RevealStateEntity(
+    @PrimaryKey @ColumnInfo(name = "ayah_id") val ayahId: Int,
+    @ColumnInfo(name = "revealed_count") val revealedCount: Int,
 )
 
 /** A memorized portion tracked by the spaced-repetition scheduler. */
@@ -43,6 +51,18 @@ interface UserDao {
     @Query("SELECT * FROM stumbles WHERE ayah_id IN (:ayahIds)")
     suspend fun stumblesForAyahs(ayahIds: List<Int>): List<StumbleEntity>
 
+    @Query("DELETE FROM stumbles WHERE ayah_id = :ayahId AND word_index = :wordIndex")
+    suspend fun deleteStumble(ayahId: Int, wordIndex: Int)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertRevealState(state: RevealStateEntity)
+
+    @Query("SELECT * FROM reveal_states WHERE ayah_id IN (:ayahIds)")
+    suspend fun revealStatesForAyahs(ayahIds: List<Int>): List<RevealStateEntity>
+
+    @Query("DELETE FROM reveal_states WHERE ayah_id IN (:ayahIds)")
+    suspend fun clearRevealStates(ayahIds: List<Int>)
+
     @Query("SELECT * FROM review_portions WHERE due_epoch_day <= :today ORDER BY id")
     suspend fun duePortions(today: Long): List<ReviewPortionEntity>
 
@@ -57,8 +77,8 @@ interface UserDao {
 }
 
 @Database(
-    entities = [StumbleEntity::class, ReviewPortionEntity::class],
-    version = 2,
+    entities = [StumbleEntity::class, ReviewPortionEntity::class, RevealStateEntity::class],
+    version = 3,
     exportSchema = false,
 )
 abstract class UserDatabase : RoomDatabase() {

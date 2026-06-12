@@ -6,7 +6,6 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -29,15 +28,11 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowLeft
-import androidx.compose.material.icons.outlined.Flag
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
@@ -58,7 +53,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -101,8 +95,15 @@ private data class GroupText(val annotated: AnnotatedString, val spans: List<Pag
 /** First-launch fallback before any page has been read: the current sabaq surah. */
 private const val DEFAULT_SURAH = 18
 
-/** Hide/reveal progress and stumbles for one page's self-test. */
-class SelfTestSession(val page: MushafPage) {
+/**
+ * Hide/reveal progress and stumbles for one page's self-test. Reveal changes
+ * are reported through [onRevealChanged] so they persist and the test resumes
+ * where it was left.
+ */
+class SelfTestSession(
+    val page: MushafPage,
+    private val onRevealChanged: (ayahId: Int, revealedCount: Int) -> Unit,
+) {
     val revealedCounts = mutableStateMapOf<Int, Int>()
     val stumbles = mutableStateListOf<WordStumble>()
 
@@ -114,21 +115,21 @@ class SelfTestSession(val page: MushafPage) {
     fun revealNextWord(ayahId: Int) {
         val ayah = page.ayahs.first { it.id == ayahId }
         val revealed = revealedCounts.getOrDefault(ayahId, 0)
-        if (revealed < ayah.words.size) revealedCounts[ayahId] = revealed + 1
+        if (revealed < ayah.words.size) {
+            revealedCounts[ayahId] = revealed + 1
+            onRevealChanged(ayahId, revealed + 1)
+        }
     }
 
     fun revealAyah(ayahId: Int) {
-        revealedCounts[ayahId] = page.ayahs.first { it.id == ayahId }.words.size
+        val size = page.ayahs.first { it.id == ayahId }.words.size
+        revealedCounts[ayahId] = size
+        onRevealChanged(ayahId, size)
     }
 
-    fun revealCurrentAyah() {
-        currentAyah?.let { revealedCounts[it.id] = it.words.size }
+    fun resetReveals() {
+        revealedCounts.clear()
     }
-
-    /** The word the Stumble button applies to: the most recently revealed word. */
-    fun stumbleTarget(): WordStumble? =
-        page.ayahs.lastOrNull { revealedOf(it) > 0 }
-            ?.let { WordStumble(it.id, revealedOf(it) - 1) }
 }
 
 @Composable
@@ -167,13 +168,39 @@ fun MushafScreen(
         }
     }
 
+    val persistReveal: (Int, Int) -> Unit = remember {
+        { ayahId, count -> scope.launch { repository.saveRevealState(ayahId, count) } }
+    }
+    val toggleStumble: (SelfTestSession, WordStumble) -> Unit = remember {
+        { session, mark ->
+            if (session.stumbles.remove(mark)) {
+                scope.launch { repository.removeStumble(mark) }
+            } else {
+                session.stumbles.add(mark)
+                scope.launch { repository.addStumble(mark) }
+            }
+        }
+    }
+
     Column(Modifier.fillMaxSize().background(AlkahfColors.Paper)) {
         MushafTopBar(
             title = currentSession?.page?.primarySurahLatin ?: "",
             location = currentSession?.page?.let { "Juzʼ ${it.juz} · Page ${it.number}" } ?: "",
             hideMode = hideMode,
             onBack = onBack,
-            onToggleHideMode = { hideMode = !hideMode },
+            onToggleHideMode = {
+                val turningOn = !hideMode
+                hideMode = turningOn
+                // Re-entering hide mode starts a fresh self-test on this page.
+                if (turningOn) {
+                    currentSession?.let { session ->
+                        session.resetReveals()
+                        scope.launch {
+                            repository.clearRevealStates(session.page.ayahs.map { it.id })
+                        }
+                    }
+                }
+            },
         )
         // RTL pager: swiping toward the right turns to the next page, as in a
         // physical mushaf. Page content restores LTR for its own chrome.
@@ -189,23 +216,14 @@ fun MushafScreen(
                         hideMode = hideMode,
                         session = sessions[pageIndex + 1],
                         onSessionReady = { sessions[pageIndex + 1] = it },
+                        persistReveal = persistReveal,
+                        onToggleStumble = toggleStumble,
                     )
                 }
             }
         }
         if (hideMode) {
-            SelfTestDock(
-                session = currentSession,
-                onReveal = { currentSession?.revealCurrentAyah() },
-                onStumble = {
-                    val session = currentSession ?: return@SelfTestDock
-                    val target = session.stumbleTarget() ?: return@SelfTestDock
-                    if (target !in session.stumbles) {
-                        session.stumbles.add(target)
-                        scope.launch { repository.addStumble(target) }
-                    }
-                },
-            )
+            SelfTestDock(session = currentSession)
         }
     }
 }
@@ -313,12 +331,15 @@ private fun MushafPageView(
     hideMode: Boolean,
     session: SelfTestSession?,
     onSessionReady: (SelfTestSession) -> Unit,
+    persistReveal: (Int, Int) -> Unit,
+    onToggleStumble: (SelfTestSession, WordStumble) -> Unit,
 ) {
     LaunchedEffect(pageNumber) {
         if (session == null) {
             val page = repository.page(pageNumber)
-            val newSession = SelfTestSession(page)
+            val newSession = SelfTestSession(page, persistReveal)
             newSession.stumbles.addAll(repository.stumblesForPage(page))
+            newSession.revealedCounts.putAll(repository.revealStates(page.ayahs.map { it.id }))
             onSessionReady(newSession)
         }
     }
@@ -339,7 +360,9 @@ private fun MushafPageView(
         ) {
             Column {
                 session.page.groups.forEach { group ->
-                    PageGroupView(group, hideMode, session)
+                    PageGroupView(group, hideMode, session) { mark ->
+                        onToggleStumble(session, mark)
+                    }
                 }
             }
             PageFooter(session.page)
@@ -352,6 +375,7 @@ private fun PageGroupView(
     group: PageGroup,
     hideMode: Boolean,
     session: SelfTestSession,
+    onToggleStumble: (WordStumble) -> Unit,
 ) {
     if (group.showSurahHeader) {
         SurahHeaderBand(group)
@@ -368,7 +392,7 @@ private fun PageGroupView(
                 .padding(top = 12.dp, bottom = 10.dp),
         )
     }
-    AyatBody(group, hideMode, session)
+    AyatBody(group, hideMode, session, onToggleStumble)
 }
 
 @Composable
@@ -424,6 +448,7 @@ private fun AyatBody(
     group: PageGroup,
     hideMode: Boolean,
     session: SelfTestSession,
+    onToggleStumble: (WordStumble) -> Unit,
 ) {
     val revealedByAyah = group.ayahs.associate { it.id to session.revealedOf(it) }
     val groupText = remember(revealedByAyah, hideMode) {
@@ -451,7 +476,14 @@ private fun AyatBody(
                             if (!hideMode) return@detectTapGestures
                             val span = spanAt(layoutResult.value, groupText, position)
                                 ?: return@detectTapGestures
-                            session.revealNextWord(span.ayahId)
+                            val revealed = revealedByAyah[span.ayahId] ?: 0
+                            if (span.wordIndex < revealed) {
+                                // Manual marking: tapping a revealed word
+                                // toggles its stumble mark.
+                                onToggleStumble(WordStumble(span.ayahId, span.wordIndex))
+                            } else {
+                                session.revealNextWord(span.ayahId)
+                            }
                         },
                         onLongPress = { position ->
                             if (!hideMode) return@detectTapGestures
@@ -590,11 +622,7 @@ private fun PageFooter(page: MushafPage) {
 }
 
 @Composable
-private fun SelfTestDock(
-    session: SelfTestSession?,
-    onReveal: () -> Unit,
-    onStumble: () -> Unit,
-) {
+private fun SelfTestDock(session: SelfTestSession?) {
     Column(Modifier.fillMaxWidth().background(AlkahfColors.NavSurface)) {
         HorizontalDivider(thickness = 1.dp, color = AlkahfColors.DockBorder)
         Column(
@@ -626,72 +654,15 @@ private fun SelfTestDock(
                 )
             }
             Text(
-                text = "Tap a word to reveal · long-press for the full ayah",
+                text = "Tap to reveal · long-press reveals the ayah · tap a revealed word to mark a stumble",
                 fontSize = 11.5.sp,
                 fontWeight = FontWeight.Medium,
                 color = AlkahfColors.InkFaint,
                 textAlign = TextAlign.Center,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 2.dp, bottom = 11.dp),
+                    .padding(top = 2.dp, bottom = 2.dp),
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Surface(
-                    onClick = onStumble,
-                    shape = RoundedCornerShape(15.dp),
-                    color = AlkahfColors.StumbleBg,
-                    border = BorderStroke(1.5.dp, AlkahfColors.StumbleBorder),
-                    modifier = Modifier.height(52.dp),
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 18.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.Flag,
-                            contentDescription = null,
-                            tint = AlkahfColors.StumbleInk,
-                            modifier = Modifier.size(18.dp),
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            text = "Stumble",
-                            fontSize = 14.5.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = AlkahfColors.StumbleInk,
-                        )
-                    }
-                }
-                Button(
-                    onClick = onReveal,
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(52.dp)
-                        .shadow(
-                            elevation = 4.dp,
-                            shape = RoundedCornerShape(15.dp),
-                            ambientColor = AlkahfColors.Accent.copy(alpha = 0.28f),
-                            spotColor = AlkahfColors.Accent.copy(alpha = 0.28f),
-                        ),
-                    shape = RoundedCornerShape(15.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = AlkahfColors.Accent,
-                        contentColor = AlkahfColors.OnAccent,
-                    ),
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Visibility,
-                        contentDescription = null,
-                        modifier = Modifier.size(19.dp),
-                    )
-                    Spacer(Modifier.width(9.dp))
-                    Text(
-                        text = "Reveal next ayah",
-                        fontSize = 15.5.sp,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                }
-            }
         }
     }
 }

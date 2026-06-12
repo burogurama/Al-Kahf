@@ -4,6 +4,7 @@ import android.content.Context
 import app.alkahf.data.quran.QuranDatabase
 import app.alkahf.data.review.ReviewGrade
 import app.alkahf.data.review.ReviewScheduler
+import app.alkahf.data.user.RevealStateEntity
 import app.alkahf.data.user.ReviewPortionEntity
 import app.alkahf.data.user.StumbleEntity
 import app.alkahf.data.user.UserDatabase
@@ -134,6 +135,21 @@ class QuranRepository(context: Context) {
                 createdAt = System.currentTimeMillis(),
             ),
         )
+    }
+
+    suspend fun removeStumble(stumble: WordStumble) {
+        userDao.deleteStumble(stumble.ayahId, stumble.wordIndex)
+    }
+
+    suspend fun revealStates(ayahIds: List<Int>): Map<Int, Int> =
+        userDao.revealStatesForAyahs(ayahIds).associate { it.ayahId to it.revealedCount }
+
+    suspend fun saveRevealState(ayahId: Int, revealedCount: Int) {
+        userDao.upsertRevealState(RevealStateEntity(ayahId, revealedCount))
+    }
+
+    suspend fun clearRevealStates(ayahIds: List<Int>) {
+        userDao.clearRevealStates(ayahIds)
     }
 
     suspend fun dueReviewPortions(): List<ReviewPortion> {
