@@ -1,0 +1,22 @@
+package app.alkahf.data.quran
+
+import androidx.room.Dao
+import androidx.room.Query
+
+@Dao
+interface QuranDao {
+    @Query("SELECT * FROM ayahs WHERE page = :page ORDER BY id")
+    suspend fun ayahsOnPage(page: Int): List<AyahEntity>
+
+    @Query("SELECT * FROM surahs WHERE number = :number")
+    suspend fun surah(number: Int): SurahEntity
+
+    @Query("SELECT MIN(page) FROM ayahs WHERE surah = :surah")
+    suspend fun firstPageOfSurah(surah: Int): Int
+
+    @Query("SELECT text FROM ayahs WHERE id = 1001")
+    suspend fun basmala(): String
+
+    @Query("SELECT * FROM ayahs WHERE surah = :surah AND number BETWEEN :from AND :to ORDER BY id")
+    suspend fun ayahRange(surah: Int, from: Int, to: Int): List<AyahEntity>
+}

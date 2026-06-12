@@ -1,0 +1,63 @@
+package app.alkahf.ui.theme
+
+import androidx.compose.material3.Typography
+import androidx.compose.ui.text.ExperimentalTextApi
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontVariation
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
+import app.alkahf.R
+
+@OptIn(ExperimentalTextApi::class)
+private fun hanken(weight: FontWeight) = Font(
+    resId = R.font.hanken_grotesk,
+    weight = weight,
+    variationSettings = FontVariation.Settings(FontVariation.weight(weight.weight)),
+)
+
+val HankenGrotesk = FontFamily(
+    hanken(FontWeight.Normal),
+    hanken(FontWeight.Medium),
+    hanken(FontWeight.SemiBold),
+    hanken(FontWeight.Bold),
+)
+
+val AmiriQuran = FontFamily(
+    Font(R.font.amiri_quran, weight = FontWeight.Normal),
+)
+
+/** KFGQPC Uthmanic Script HAFS — the product's mushaf font (handoff target). */
+val KfgqpcHafs = FontFamily(
+    Font(R.font.kfgqpc_hafs, weight = FontWeight.Normal),
+)
+
+val AlkahfTypography = Typography().run {
+    copy(
+        displayLarge = displayLarge.copy(fontFamily = HankenGrotesk),
+        displayMedium = displayMedium.copy(fontFamily = HankenGrotesk),
+        displaySmall = displaySmall.copy(fontFamily = HankenGrotesk),
+        headlineLarge = headlineLarge.copy(fontFamily = HankenGrotesk),
+        headlineMedium = headlineMedium.copy(fontFamily = HankenGrotesk),
+        headlineSmall = headlineSmall.copy(fontFamily = HankenGrotesk),
+        titleLarge = titleLarge.copy(fontFamily = HankenGrotesk),
+        titleMedium = titleMedium.copy(fontFamily = HankenGrotesk),
+        titleSmall = titleSmall.copy(fontFamily = HankenGrotesk),
+        bodyLarge = bodyLarge.copy(fontFamily = HankenGrotesk),
+        bodyMedium = bodyMedium.copy(fontFamily = HankenGrotesk),
+        bodySmall = bodySmall.copy(fontFamily = HankenGrotesk),
+        labelLarge = labelLarge.copy(fontFamily = HankenGrotesk),
+        labelMedium = labelMedium.copy(fontFamily = HankenGrotesk),
+        labelSmall = labelSmall.copy(fontFamily = HankenGrotesk),
+    )
+}
+
+/** Ayah text style per handoff: 25sp, line-height 1.88. */
+val AyahTextStyle = TextStyle(
+    fontFamily = KfgqpcHafs,
+    fontWeight = FontWeight.Normal,
+    fontSize = 25.sp,
+    lineHeight = 47.sp,
+    color = AlkahfColors.Ink,
+)
