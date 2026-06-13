@@ -8,10 +8,17 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.rememberCoroutineScope
 import app.alkahf.AlkahfApplication
+import app.alkahf.data.HomeData
+import app.alkahf.data.LoopPreset
+import app.alkahf.data.MemorizationState
 import app.alkahf.ui.components.AlkahfTab
+import app.alkahf.ui.home.AyahMemorizationState
+import app.alkahf.ui.home.DayActivity
 import app.alkahf.ui.home.HomeScreen
 import app.alkahf.ui.home.HomeUiState
+import app.alkahf.ui.home.WeekDay
 import app.alkahf.ui.library.LibraryScreen
 import app.alkahf.ui.library.ReciterDownloadsScreen
 import app.alkahf.ui.loop.LoopPlayerScreen
@@ -19,15 +26,47 @@ import app.alkahf.ui.mushaf.MushafScreen
 import app.alkahf.ui.progress.ProgressScreen
 import app.alkahf.ui.review.ReviewScreen
 import app.alkahf.ui.tawqit.TawqitTaggingScreen
-import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 
 private enum class AlkahfDestination {
     Home, Mushaf, Loop, Review, Progress, Library, ReciterDownloads, TawqitTagging
 }
 
-/** The current sabaq surah; becomes dynamic once sabaq state is user-configurable. */
-private const val SABAQ_SURAH = 18
+private fun buildHomeUiState(data: HomeData, preset: LoopPreset): HomeUiState {
+    val names = data.review.names
+    return HomeUiState(
+        streakDays = data.streakDays,
+        sabaqReference = data.sabaq.reference,
+        sabaqAyahText = data.sabaq.firstAyahText,
+        sabaqAyahMarker = data.sabaq.firstAyahMarker,
+        sabaqAyahStates = data.sabaq.states.map { it.toHomeState() },
+        reviewPortionCount = data.review.count,
+        reviewEstimatedMinutes = data.review.minutes,
+        reviewPortionNames = names.take(4),
+        reviewOverflowCount = (names.size - 4).coerceAtLeast(0),
+        drillPresetTitle = "${preset.reciterName} · ${preset.surahNameLatin} ${preset.ayahFrom}–${preset.ayahTo}",
+        drillPresetDetail = "Cumulative chain · ${preset.perAyah}× each · ${preset.perChain}× chain",
+        weekSummary = "${data.week.daysPracticed} of 7 days · ${data.week.ayatThisWeek} ayat",
+        weekDays = data.week.dayLetters.mapIndexed { index, letter ->
+            val isToday = index == data.week.dayLetters.lastIndex
+            WeekDay(
+                letter = letter,
+                activity = when {
+                    isToday -> DayActivity.TODAY
+                    data.week.practiced.getOrElse(index) { false } -> DayActivity.PRACTICED
+                    else -> DayActivity.MISSED
+                },
+            )
+        },
+    )
+}
+
+private fun MemorizationState.toHomeState(): AyahMemorizationState = when (this) {
+    MemorizationState.NOT_STARTED -> AyahMemorizationState.NOT_STARTED
+    MemorizationState.LEARNING -> AyahMemorizationState.LEARNING
+    MemorizationState.MEMORIZED -> AyahMemorizationState.MEMORIZED
+    MemorizationState.STRONG -> AyahMemorizationState.STRONG
+}
 
 @Composable
 fun AlkahfApp() {
@@ -63,13 +102,7 @@ fun AlkahfApp() {
 
     val homeState by produceState(initialValue = HomeUiState(), destination) {
         if (destination == AlkahfDestination.Home) {
-            val preset = repository.defaultPreset()
-            value = HomeUiState(
-                drillPresetTitle =
-                    "${preset.reciterName} · ${preset.surahNameLatin} ${preset.ayahFrom}–${preset.ayahTo}",
-                drillPresetDetail =
-                    "Cumulative chain · ${preset.perAyah}× each · ${preset.perChain}× chain",
-            )
+            value = buildHomeUiState(repository.homeData(), repository.defaultPreset())
         }
     }
 
@@ -77,7 +110,7 @@ fun AlkahfApp() {
         AlkahfDestination.Home -> HomeScreen(
             state = homeState,
             onOpenMushaf = { openMushaf(null, null) },
-            onOpenSabaq = { openMushaf(SABAQ_SURAH, null) },
+            onOpenSabaq = { openMushaf(repository.sabaqSurah, null) },
             onOpenLoop = {
                 loopPresetId = null
                 destination = AlkahfDestination.Loop

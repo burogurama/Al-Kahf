@@ -138,6 +138,32 @@ data class DownloadedSurah(
 /** Storage occupied by offline audio vs. total device storage. */
 data class StorageInfo(val usedBytes: Long, val totalBytes: Long)
 
+/** The current sabaq (portion being learned) for the Home hero card. */
+data class SabaqCard(
+    val surah: Int,
+    val reference: String,
+    val firstAyahText: String,
+    val firstAyahMarker: String,
+    val states: List<MemorizationState>,
+)
+
+data class ReviewSummary(val count: Int, val minutes: Int, val names: List<String>)
+
+data class WeekSummary(
+    val dayLetters: List<String>,
+    val practiced: List<Boolean>,
+    val ayatThisWeek: Int,
+    val daysPracticed: Int,
+)
+
+/** Everything the Home/Today dashboard shows, from real local data. */
+data class HomeData(
+    val streakDays: Int,
+    val sabaq: SabaqCard,
+    val review: ReviewSummary,
+    val week: WeekSummary,
+)
+
 enum class TawqitSourceType { IMPORT, RECITER }
 
 /** A Tawqīt timing track aligning an audio source to a portion of the mushaf. */
@@ -188,6 +214,69 @@ class QuranRepository(context: Context) {
         set(value) {
             prefs.edit().putInt(KEY_LAST_MUSHAF_PAGE, value ?: 0).apply()
         }
+
+    /** The surah of the current sabaq (used when opening it in the Mushaf). */
+    val sabaqSurah: Int
+        get() = prefs.getInt(KEY_SABAQ_SURAH, 18)
+
+    fun setSabaq(surah: Int, from: Int, to: Int) {
+        prefs.edit()
+            .putInt(KEY_SABAQ_SURAH, surah)
+            .putInt(KEY_SABAQ_FROM, from)
+            .putInt(KEY_SABAQ_TO, to)
+            .apply()
+    }
+
+    suspend fun homeData(): HomeData {
+        ensureSeeded()
+        val today = LocalDate.now()
+        return HomeData(
+            streakDays = currentStreak(),
+            sabaq = sabaqCard(),
+            review = reviewSummary(),
+            week = weekSummary(today),
+        )
+    }
+
+    private suspend fun sabaqCard(): SabaqCard {
+        val surah = prefs.getInt(KEY_SABAQ_SURAH, 18)
+        val from = prefs.getInt(KEY_SABAQ_FROM, 1)
+        val to = prefs.getInt(KEY_SABAQ_TO, 5)
+        val nameLatin = quranDao.surah(surah).nameLatin
+        val ayahs = ayahsForRange(surah, from, to)
+        val states = userDao.allAyahStates().associate { it.ayahId to it.state }
+        val first = ayahs.first()
+        return SabaqCard(
+            surah = surah,
+            reference = "Sūrat $nameLatin · $from–$to",
+            firstAyahText = first.words.joinToString(" "),
+            firstAyahMarker = first.marker,
+            states = ayahs.map { MemorizationState.of(states[it.id] ?: 0) },
+        )
+    }
+
+    private suspend fun reviewSummary(): ReviewSummary {
+        val due = userDao.duePortions(LocalDate.now().toEpochDay())
+        val names = due.map { quranDao.surah(it.surah).nameLatin }
+        return ReviewSummary(
+            count = due.size,
+            minutes = (due.size * 1.6f + 0.5f).toInt().coerceAtLeast(if (due.isEmpty()) 0 else 1),
+            names = names,
+        )
+    }
+
+    private suspend fun weekSummary(today: LocalDate): WeekSummary {
+        val practicedDays = userDao.practiceDays().toSet()
+        val days = (6 downTo 0).map { today.minusDays(it.toLong()) }
+        val letters = days.map { it.dayOfWeek.getDisplayName(java.time.format.TextStyle.NARROW, java.util.Locale.ENGLISH) }
+        val practiced = days.map { it.toEpochDay() in practicedDays }
+        return WeekSummary(
+            dayLetters = letters,
+            practiced = practiced,
+            ayatThisWeek = userDao.ayahCountSince(today.toEpochDay() - 6),
+            daysPracticed = practiced.count { it },
+        )
+    }
 
     suspend fun firstPageOfSurah(surah: Int): Int = quranDao.firstPageOfSurah(surah)
 
@@ -683,21 +772,28 @@ class QuranRepository(context: Context) {
      */
     private suspend fun seedDefaultPortions() {
         val today = LocalDate.now().toEpochDay()
+        // Five short surahs the user already holds, due for review today.
         val portions = listOf(
             ReviewPortionEntity(surah = 1, ayahFrom = 1, ayahTo = 7, intervalDays = 6, dueEpochDay = today),
             ReviewPortionEntity(surah = 114, ayahFrom = 1, ayahTo = 6, intervalDays = 6, dueEpochDay = today),
             ReviewPortionEntity(surah = 113, ayahFrom = 1, ayahTo = 5, intervalDays = 6, dueEpochDay = today),
             ReviewPortionEntity(surah = 112, ayahFrom = 1, ayahTo = 4, intervalDays = 6, dueEpochDay = today),
-            ReviewPortionEntity(surah = 18, ayahFrom = 1, ayahTo = 5, intervalDays = 6, dueEpochDay = today),
+            ReviewPortionEntity(surah = 108, ayahFrom = 1, ayahTo = 3, intervalDays = 6, dueEpochDay = today),
         )
         userDao.insertPortions(portions)
-        userDao.upsertAyahStates(
-            portions.flatMap { portion ->
-                (portion.ayahFrom..portion.ayahTo).map { ayah ->
-                    AyahStateEntity(portion.surah * 1000 + ayah, MemorizationState.MEMORIZED.value)
-                }
-            },
+        val memorized = portions.flatMap { portion ->
+            (portion.ayahFrom..portion.ayahTo).map { ayah ->
+                AyahStateEntity(portion.surah * 1000 + ayah, MemorizationState.MEMORIZED.value)
+            }
+        }
+        // Sabaq: Al-Kahf 1–5, partway learned (ayat 1–2 held, 3 learning, 4–5 fresh).
+        val sabaq = listOf(
+            AyahStateEntity(18001, MemorizationState.MEMORIZED.value),
+            AyahStateEntity(18002, MemorizationState.MEMORIZED.value),
+            AyahStateEntity(18003, MemorizationState.LEARNING.value),
         )
+        userDao.upsertAyahStates(memorized + sabaq)
+        setSabaq(surah = 18, from = 1, to = 5)
     }
 
     private fun surahMeta(revelationType: String, ayahCount: Int): String {
@@ -734,5 +830,8 @@ class QuranRepository(context: Context) {
         const val TOTAL_AYAH_COUNT = 6236
         private const val KEY_LAST_MUSHAF_PAGE = "last_mushaf_page"
         private const val KEY_ACTIVE_RECITER = "active_reciter"
+        private const val KEY_SABAQ_SURAH = "sabaq_surah"
+        private const val KEY_SABAQ_FROM = "sabaq_from"
+        private const val KEY_SABAQ_TO = "sabaq_to"
     }
 }
