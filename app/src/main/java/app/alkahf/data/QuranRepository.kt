@@ -236,6 +236,13 @@ class QuranRepository(context: Context) {
             prefs.edit().putInt(KEY_LAST_MUSHAF_PAGE, value ?: 0).apply()
         }
 
+    /** Whether the Mushaf was last in hide/self-test mode, so it reopens the same way. */
+    var lastMushafHideMode: Boolean
+        get() = prefs.getBoolean(KEY_LAST_HIDE_MODE, true)
+        set(value) {
+            prefs.edit().putBoolean(KEY_LAST_HIDE_MODE, value).apply()
+        }
+
     /** The surah + ayah range of the current sabaq. */
     val sabaqRange: AyahRange
         get() = AyahRange(
@@ -905,6 +912,7 @@ class QuranRepository(context: Context) {
         const val PAGE_COUNT = 604
         const val TOTAL_AYAH_COUNT = 6236
         private const val KEY_LAST_MUSHAF_PAGE = "last_mushaf_page"
+        private const val KEY_LAST_HIDE_MODE = "last_mushaf_hide_mode"
         private const val KEY_ACTIVE_RECITER = "active_reciter"
         private const val KEY_THEME_MODE = "theme_mode"
         private const val KEY_ARABIC_SIZE = "arabic_size_pt"

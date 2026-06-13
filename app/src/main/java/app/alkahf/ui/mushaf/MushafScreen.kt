@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -51,7 +52,6 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -68,7 +68,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
-import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -90,7 +89,6 @@ import app.alkahf.data.PageAyah
 import app.alkahf.data.PageGroup
 import app.alkahf.data.MemorizationState
 import app.alkahf.data.QuranRepository
-import app.alkahf.data.WordStumble
 import app.alkahf.data.audio.AudioStore
 import app.alkahf.ui.theme.AlkahfColors
 import app.alkahf.ui.theme.KfgqpcHafs
@@ -123,7 +121,6 @@ class SelfTestSession(
     private val onRevealChanged: (ayahId: Int, revealedCount: Int) -> Unit,
 ) {
     val revealedCounts = mutableStateMapOf<Int, Int>()
-    val stumbles = mutableStateListOf<WordStumble>()
     val memStates = mutableStateMapOf<Int, MemorizationState>()
 
     fun revealedOf(ayah: PageAyah): Int = revealedCounts.getOrDefault(ayah.id, 0)
@@ -170,9 +167,11 @@ fun MushafScreen(
             onDispose { view.keepScreenOn = false }
         }
     }
-    // Opening the sabaq lands in reading mode (text shown); plain browsing
-    // starts in hide/self-test mode.
-    var hideMode by remember { mutableStateOf(highlightRange == null) }
+    // Opening the sabaq lands in reading mode (text shown); otherwise reopen
+    // in whichever mode the Mushaf was left in.
+    var hideMode by remember {
+        mutableStateOf(if (highlightRange != null) false else repository.lastMushafHideMode)
+    }
     val highlightIds = remember(highlightRange) { highlightRange?.ayahIds ?: emptySet() }
     val scrollToAyahId = highlightRange?.let { it.surah * 1000 + it.from }
 
@@ -246,18 +245,32 @@ fun MushafScreen(
     val persistReveal: (Int, Int) -> Unit = remember {
         { ayahId, count -> scope.launch { repository.saveRevealState(ayahId, count) } }
     }
-    val toggleStumble: (SelfTestSession, WordStumble) -> Unit = remember {
-        { session, mark ->
-            if (session.stumbles.remove(mark)) {
-                scope.launch { repository.removeStumble(mark) }
-            } else {
-                session.stumbles.add(mark)
-                scope.launch { repository.addStumble(mark) }
-            }
+
+    // Reader-mode selection: a contiguous index range into the current page's
+    // ayat, for marking several at once. Cleared on page change / mode toggle.
+    var selection by remember { mutableStateOf<IntRange?>(null) }
+    LaunchedEffect(currentPageNumber) { selection = null }
+    val selectedIds = currentSession?.page?.ayahs?.let { ayahs ->
+        selection?.let { range -> ayahs.slice(range).map { it.id }.toSet() }
+    } ?: emptySet()
+    var showStateSheet by remember { mutableStateOf(false) }
+
+    val onSelectAyah: (Int) -> Unit = onSelect@{ ayahId ->
+        val ayahs = currentSession?.page?.ayahs ?: return@onSelect
+        val index = ayahs.indexOfFirst { it.id == ayahId }
+        if (index < 0) return@onSelect
+        val sel = selection
+        selection = when {
+            sel == null -> index..index
+            index == sel.first - 1 -> index..sel.last
+            index == sel.last + 1 -> sel.first..index
+            sel.first == sel.last && index == sel.first -> null
+            index == sel.first -> (sel.first + 1)..sel.last
+            index == sel.last -> sel.first..(sel.last - 1)
+            index in sel -> index..index
+            else -> index..index
         }
     }
-    // The ayah whose memorization-state picker is open (medallion tapped).
-    var markingAyah by remember { mutableStateOf<PageAyah?>(null) }
 
     Column(Modifier.fillMaxSize().background(AlkahfColors.Paper)) {
         MushafTopBar(
@@ -274,6 +287,8 @@ fun MushafScreen(
             onToggleHideMode = {
                 val turningOn = !hideMode
                 hideMode = turningOn
+                repository.lastMushafHideMode = turningOn
+                selection = null
                 // Re-entering hide mode starts a fresh self-test on this page.
                 if (turningOn) {
                     currentSession?.let { session ->
@@ -303,11 +318,11 @@ fun MushafScreen(
                         session = sessions[pageIndex + 1],
                         onSessionReady = { sessions[pageIndex + 1] = it },
                         persistReveal = persistReveal,
-                        onToggleStumble = toggleStumble,
-                        onMarkAyah = { markingAyah = it },
+                        onSelectAyah = onSelectAyah,
                         playingAyahId = audioState.currentAyahId,
                         onAudioTap = onAudioTap,
                         highlightIds = highlightIds,
+                        selectedIds = if (pageIndex + 1 == currentPageNumber) selectedIds else emptySet(),
                         scrollToAyahId = scrollToAyahId,
                     )
                 }
@@ -342,23 +357,30 @@ fun MushafScreen(
                 },
                 onStop = audioController::stop,
             )
+            selectedIds.isNotEmpty() -> SelectionDock(
+                count = selectedIds.size,
+                onSetState = { showStateSheet = true },
+                onClear = { selection = null },
+            )
             hideMode -> SelfTestDock(session = currentSession)
         }
     }
 
-    val ayahToMark = markingAyah
     val session = currentSession
-    if (ayahToMark != null && session != null) {
+    if (showStateSheet && session != null && selectedIds.isNotEmpty()) {
+        val currentStates = selectedIds.map { session.memStates[it] ?: MemorizationState.NOT_STARTED }
         MemorizationSheet(
-            ayah = ayahToMark,
-            current = session.memStates[ayahToMark.id] ?: MemorizationState.NOT_STARTED,
-            surahLatin = session.page.groups.first { g -> g.ayahs.any { it.id == ayahToMark.id } }.surahNameLatin,
+            title = if (selectedIds.size == 1) "Mark āyah" else "Mark ${selectedIds.size} āyāt",
+            current = currentStates.distinct().singleOrNull(),
             onPick = { state ->
-                session.memStates[ayahToMark.id] = state
-                scope.launch { repository.setAyahState(ayahToMark.id, state) }
-                markingAyah = null
+                selectedIds.forEach { id ->
+                    session.memStates[id] = state
+                    scope.launch { repository.setAyahState(id, state) }
+                }
+                showStateSheet = false
+                selection = null
             },
-            onDismiss = { markingAyah = null },
+            onDismiss = { showStateSheet = false },
         )
     }
 }
@@ -494,11 +516,11 @@ private fun MushafPageView(
     session: SelfTestSession?,
     onSessionReady: (SelfTestSession) -> Unit,
     persistReveal: (Int, Int) -> Unit,
-    onToggleStumble: (SelfTestSession, WordStumble) -> Unit,
-    onMarkAyah: (PageAyah) -> Unit,
+    onSelectAyah: (Int) -> Unit,
     playingAyahId: Int?,
     onAudioTap: (Int) -> Boolean,
     highlightIds: Set<Int>,
+    selectedIds: Set<Int>,
     scrollToAyahId: Int?,
 ) {
     LaunchedEffect(pageNumber) {
@@ -506,7 +528,6 @@ private fun MushafPageView(
             val page = repository.page(pageNumber)
             val newSession = SelfTestSession(page, persistReveal)
             val ayahIds = page.ayahs.map { it.id }
-            newSession.stumbles.addAll(repository.stumblesForPage(page))
             newSession.revealedCounts.putAll(repository.revealStates(ayahIds))
             newSession.memStates.putAll(repository.ayahStatesForPage(ayahIds))
             onSessionReady(newSession)
@@ -550,9 +571,9 @@ private fun MushafPageView(
                             session = session,
                             playingAyahId = playingAyahId,
                             onAudioTap = onAudioTap,
-                            onMarkAyah = onMarkAyah,
-                            onToggleStumble = { mark -> onToggleStumble(session, mark) },
+                            onSelectAyah = onSelectAyah,
                             highlightIds = highlightIds,
+                            selectedIds = selectedIds,
                         )
                     }
                 }
@@ -569,9 +590,9 @@ private fun PageGroupView(
     session: SelfTestSession,
     playingAyahId: Int?,
     onAudioTap: (Int) -> Boolean,
-    onMarkAyah: (PageAyah) -> Unit,
-    onToggleStumble: (WordStumble) -> Unit,
+    onSelectAyah: (Int) -> Unit,
     highlightIds: Set<Int>,
+    selectedIds: Set<Int>,
 ) {
     if (group.showSurahHeader) {
         SurahHeaderBand(group)
@@ -588,7 +609,7 @@ private fun PageGroupView(
                 .padding(top = 12.dp, bottom = 10.dp),
         )
     }
-    AyatBody(group, hideMode, session, playingAyahId, onAudioTap, onMarkAyah, onToggleStumble, highlightIds)
+    AyatBody(group, hideMode, session, playingAyahId, onAudioTap, onSelectAyah, highlightIds, selectedIds)
 }
 
 @Composable
@@ -646,19 +667,18 @@ private fun AyatBody(
     session: SelfTestSession,
     playingAyahId: Int?,
     onAudioTap: (Int) -> Boolean,
-    onMarkAyah: (PageAyah) -> Unit,
-    onToggleStumble: (WordStumble) -> Unit,
+    onSelectAyah: (Int) -> Unit,
     highlightIds: Set<Int>,
+    selectedIds: Set<Int>,
 ) {
     val revealedByAyah = group.ayahs.associate { it.id to session.revealedOf(it) }
     val memByAyah = group.ayahs.associate { it.id to (session.memStates[it.id] ?: MemorizationState.NOT_STARTED) }
-    val groupText = remember(revealedByAyah, hideMode, playingAyahId, memByAyah, highlightIds) {
-        buildGroupText(group, revealedByAyah, hideMode, playingAyahId, memByAyah, highlightIds)
+    val groupText = remember(revealedByAyah, hideMode, playingAyahId, memByAyah, highlightIds, selectedIds) {
+        buildGroupText(group, revealedByAyah, hideMode, playingAyahId, memByAyah, highlightIds, selectedIds)
     }
     val currentOnAudioTap by rememberUpdatedState(onAudioTap)
-    val currentOnMark by rememberUpdatedState(onMarkAyah)
+    val currentOnSelect by rememberUpdatedState(onSelectAyah)
     val layoutResult = remember { mutableStateOf<TextLayoutResult?>(null) }
-    val stumbleAmber = AlkahfColors.StumbleAmber
     val bodySize = LocalMushafTextSize.current.sp
 
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
@@ -677,73 +697,26 @@ private fun AyatBody(
                 .pointerInput(hideMode, groupText) {
                     detectTapGestures(
                         onTap = { position ->
-                            // Tapping an ayah's end-medallion opens its
-                            // memorization-state picker.
-                            markerAyahIdAt(layoutResult.value, groupText, position)?.let { ayahId ->
-                                group.ayahs.firstOrNull { it.id == ayahId }?.let(currentOnMark)
-                                return@detectTapGestures
-                            }
-                            val span = spanAt(layoutResult.value, groupText, position)
+                            val ayahId = spanAt(layoutResult.value, groupText, position)?.ayahId
+                                ?: markerAyahIdAt(layoutResult.value, groupText, position)
                                 ?: return@detectTapGestures
-                            if (currentOnAudioTap(span.ayahId)) return@detectTapGestures
-                            // In reader mode every word is visible, so any tap
-                            // marks; in hide mode only revealed words can be
-                            // marked — tapping concealed text reveals instead.
-                            val revealed =
-                                if (hideMode) revealedByAyah[span.ayahId] ?: 0 else Int.MAX_VALUE
-                            if (span.wordIndex < revealed) {
-                                onToggleStumble(WordStumble(span.ayahId, span.wordIndex))
+                            if (currentOnAudioTap(ayahId)) return@detectTapGestures
+                            if (hideMode) {
+                                // Reveal the next word of the tapped ayah.
+                                session.revealNextWord(ayahId)
                             } else {
-                                session.revealNextWord(span.ayahId)
+                                // Reading mode: tap selects the ayah for marking.
+                                currentOnSelect(ayahId)
                             }
                         },
                         onLongPress = { position ->
-                            val span = spanAt(layoutResult.value, groupText, position)
+                            if (!hideMode) return@detectTapGestures
+                            val ayahId = spanAt(layoutResult.value, groupText, position)?.ayahId
                                 ?: markerAyahIdAt(layoutResult.value, groupText, position)
-                                    ?.let { id -> groupText.spans.first { it.ayahId == id } }
                                 ?: return@detectTapGestures
-                            if (hideMode) {
-                                // In hide mode, long-press reveals the whole ayah.
-                                session.revealAyah(span.ayahId)
-                            } else {
-                                // In reading mode, long-press marks its memorization state.
-                                group.ayahs.firstOrNull { it.id == span.ayahId }?.let(currentOnMark)
-                            }
+                            session.revealAyah(ayahId)
                         },
                     )
-                }
-                .drawBehind {
-                    val layout = layoutResult.value ?: return@drawBehind
-                    val groupAyahIds = group.ayahs.map { it.id }.toSet()
-                    val visibleStumbles = session.stumbles.filter { stumble ->
-                        stumble.ayahId in groupAyahIds &&
-                            (!hideMode || (revealedByAyah[stumble.ayahId] ?: 0) > stumble.wordIndex)
-                    }
-                    visibleStumbles.forEach { stumble ->
-                        val span = groupText.spans.firstOrNull {
-                            !it.isMarker && it.ayahId == stumble.ayahId && it.wordIndex == stumble.wordIndex
-                        } ?: return@forEach
-                        val bounds = layout.getPathForRange(span.start, span.end).getBounds()
-                        val baseline = layout.getLineBaseline(layout.getLineForOffset(span.start))
-                        val y = baseline + 9.dp.toPx()
-                        drawLine(
-                            color = stumbleAmber,
-                            start = Offset(bounds.left, y),
-                            end = Offset(bounds.right, y),
-                            strokeWidth = 2.dp.toPx(),
-                            cap = StrokeCap.Round,
-                        )
-                    }
-                    visibleStumbles.map { it.ayahId }.distinct().forEach { ayahId ->
-                        val marker = groupText.spans.firstOrNull { it.isMarker && it.ayahId == ayahId }
-                            ?: return@forEach
-                        val bounds = layout.getPathForRange(marker.start, marker.end).getBounds()
-                        drawCircle(
-                            color = stumbleAmber,
-                            radius = 3.dp.toPx(),
-                            center = Offset(bounds.left, bounds.top + 6.dp.toPx()),
-                        )
-                    }
                 },
         )
     }
@@ -782,6 +755,7 @@ private fun buildGroupText(
     playingAyahId: Int? = null,
     memByAyah: Map<Int, MemorizationState> = emptyMap(),
     highlightIds: Set<Int> = emptySet(),
+    selectedIds: Set<Int> = emptySet(),
 ): GroupText {
     val spans = mutableListOf<PageSpan>()
     val annotated = buildAnnotatedString {
@@ -789,6 +763,7 @@ private fun buildGroupText(
             val revealed = revealedByAyah[ayah.id] ?: 0
             val playing = ayah.id == playingAyahId
             val highlighted = ayah.id in highlightIds
+            val selected = ayah.id in selectedIds
             ayah.words.forEachIndexed { wordIndex, word ->
                 val start = length
                 append(word)
@@ -808,6 +783,7 @@ private fun buildGroupText(
                         SpanStyle(
                             color = AlkahfColors.Ink,
                             background = when {
+                                selected -> AlkahfColors.AccentTint
                                 playing -> AlkahfColors.WordHighlightBg
                                 highlighted -> AlkahfColors.SabaqHighlight
                                 else -> Color.Unspecified
@@ -923,10 +899,58 @@ private fun recitingLabel(session: SelfTestSession?): String {
 }
 
 @Composable
+private fun SelectionDock(count: Int, onSetState: () -> Unit, onClear: () -> Unit) {
+    Column(Modifier.fillMaxWidth().background(AlkahfColors.NavSurface)) {
+        HorizontalDivider(thickness = 1.dp, color = AlkahfColors.DockBorder)
+        Row(
+            modifier = Modifier
+                .navigationBarsPadding()
+                .padding(start = 16.dp, top = 12.dp, end = 16.dp, bottom = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "$count āyah${if (count > 1) "āt" else ""} selected",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = AlkahfColors.Ink,
+                modifier = Modifier.weight(1f),
+            )
+            Box(
+                modifier = Modifier.clickable(onClick = onClear).padding(horizontal = 12.dp, vertical = 8.dp),
+            ) {
+                Text(
+                    text = "Clear",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = AlkahfColors.InkMuted,
+                )
+            }
+            Surface(
+                onClick = onSetState,
+                shape = RoundedCornerShape(14.dp),
+                color = AlkahfColors.Accent,
+                modifier = Modifier.height(44.dp),
+            ) {
+                Box(
+                    Modifier.padding(horizontal = 18.dp).fillMaxHeight(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = "Set state",
+                        fontSize = 14.5.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = AlkahfColors.OnAccent,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun MemorizationSheet(
-    ayah: PageAyah,
-    current: MemorizationState,
-    surahLatin: String,
+    title: String,
+    current: MemorizationState?,
     onPick: (MemorizationState) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -957,17 +981,11 @@ private fun MemorizationSheet(
                     Box(Modifier.width(38.dp).height(4.dp).background(AlkahfColors.DashedNode, RoundedCornerShape(2.dp)))
                 }
                 Text(
-                    text = "Mark āyah",
+                    text = title,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                     color = AlkahfColors.Ink,
-                )
-                Text(
-                    text = "Sūrat $surahLatin · āyah ${ayah.number}",
-                    fontSize = 12.5.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = AlkahfColors.InkFaint,
-                    modifier = Modifier.padding(top = 2.dp, bottom = 12.dp),
+                    modifier = Modifier.padding(bottom = 12.dp),
                 )
                 options.forEach { (state, label) ->
                     val selected = state == current
