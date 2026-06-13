@@ -193,7 +193,11 @@ class QuranRepository(context: Context) {
     // --- Active reciter (the voice used by Review and Mushaf listening) ---
 
     val activeReciterPath: String
-        get() = prefs.getString(KEY_ACTIVE_RECITER, RECITERS.first().path) ?: RECITERS.first().path
+        get() {
+            val stored = prefs.getString(KEY_ACTIVE_RECITER, null)
+            // Fall back to a valid reciter if the stored one was removed.
+            return RECITERS.firstOrNull { it.path == stored }?.path ?: RECITERS.first().path
+        }
 
     val activeReciter: Reciter
         get() = RECITERS.firstOrNull { it.path == activeReciterPath } ?: RECITERS.first()

@@ -20,20 +20,15 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.Check
-import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Download
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -45,7 +40,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.alkahf.AlkahfApplication
-import app.alkahf.data.DownloadedSurah
 import app.alkahf.data.LoopPreset
 import app.alkahf.data.QuranRepository
 import app.alkahf.data.ReciterStatus
@@ -54,7 +48,6 @@ import app.alkahf.ui.components.AlkahfBottomNav
 import app.alkahf.ui.components.AlkahfTab
 import app.alkahf.ui.theme.AlkahfColors
 import app.alkahf.ui.theme.AmiriQuran
-import kotlinx.coroutines.launch
 
 @Composable
 fun LibraryScreen(
@@ -65,23 +58,18 @@ fun LibraryScreen(
 ) {
     val context = LocalContext.current
     val repository = remember { (context.applicationContext as AlkahfApplication).repository }
-    val scope = rememberCoroutineScope()
 
     var storage by remember { mutableStateOf<StorageInfo?>(null) }
     var reciters by remember { mutableStateOf<List<ReciterStatus>>(emptyList()) }
     var activeReciterPath by remember { mutableStateOf(repository.activeReciterPath) }
-    var downloads by remember { mutableStateOf<List<DownloadedSurah>>(emptyList()) }
     var presets by remember { mutableStateOf<List<LoopPreset>>(emptyList()) }
-    val surahProgress = remember { mutableStateMapOf<Int, Float>() }
     var refreshKey by remember { mutableStateOf(0) }
 
-    suspend fun reload() {
+    androidx.compose.runtime.LaunchedEffect(refreshKey, activeReciterPath) {
         storage = repository.storageInfo()
         reciters = repository.reciterStatuses()
-        downloads = repository.downloadedSurahs(activeReciterPath)
         presets = repository.presets()
     }
-    androidx.compose.runtime.LaunchedEffect(refreshKey, activeReciterPath) { reload() }
 
     Scaffold(
         containerColor = AlkahfColors.Paper,
@@ -104,31 +92,7 @@ fun LibraryScreen(
                         repository.setActiveReciter(reciter.path)
                         activeReciterPath = reciter.path
                     },
-                    onDownload = { onManageReciter(reciter.path, reciter.displayName) },
-                )
-            }
-            DownloadsCaption(
-                reciterName = activeReciterName(reciters, activeReciterPath),
-                onManage = {
-                    onManageReciter(
-                        activeReciterPath,
-                        reciters.firstOrNull { it.path == activeReciterPath }?.displayName ?: "",
-                    )
-                },
-            )
-            if (downloads.isEmpty()) {
-                EmptyHint("No audio downloaded yet for this reciter")
-            }
-            downloads.forEach { surah ->
-                DownloadRow(
-                    surah = surah,
-                    progress = surahProgress[surah.surah],
-                    onDelete = {
-                        scope.launch {
-                            repository.deleteSurahAudio(activeReciterPath, surah.surah)
-                            refreshKey++
-                        }
-                    },
+                    onManage = { onManageReciter(reciter.path, reciter.displayName) },
                 )
             }
             SectionCaption("DRILL PRESETS")
@@ -140,9 +104,6 @@ fun LibraryScreen(
         }
     }
 }
-
-private fun activeReciterName(reciters: List<ReciterStatus>, path: String): String =
-    reciters.firstOrNull { it.path == path }?.displayName?.uppercase() ?: ""
 
 @Composable
 private fun LibraryHeader() {
@@ -218,45 +179,10 @@ private fun SectionCaption(text: String) {
 }
 
 @Composable
-private fun EmptyHint(text: String) {
-    Text(
-        text = text,
-        fontSize = 12.5.sp,
-        fontWeight = FontWeight.Medium,
-        color = AlkahfColors.InkFaint,
-        modifier = Modifier.padding(start = 4.dp, bottom = 4.dp),
-    )
-}
-
-@Composable
-private fun DownloadsCaption(reciterName: String, onManage: () -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(start = 4.dp, top = 18.dp, bottom = 10.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = "DOWNLOADS · ${reciterName.uppercase()}",
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = 1.4.sp,
-            color = AlkahfColors.InkFooter,
-        )
-        Text(
-            text = "Manage",
-            fontSize = 11.5.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = AlkahfColors.AccentDeep,
-            modifier = Modifier.clickable(onClick = onManage).padding(end = 4.dp),
-        )
-    }
-}
-
-@Composable
 private fun ReciterRow(
     reciter: ReciterStatus,
     onActivate: () -> Unit,
-    onDownload: () -> Unit,
+    onManage: () -> Unit,
 ) {
     Surface(
         onClick = onActivate,
@@ -311,22 +237,31 @@ private fun ReciterRow(
                         modifier = Modifier.padding(horizontal = 11.dp, vertical = 5.dp),
                     )
                 }
-            } else {
-                Surface(
-                    onClick = onDownload,
-                    shape = CircleShape,
-                    color = AlkahfColors.Surface,
-                    border = BorderStroke(1.dp, AlkahfColors.Chevron),
-                    modifier = Modifier.size(36.dp),
+                Box(Modifier.size(8.dp))
+            }
+            Surface(
+                onClick = onManage,
+                shape = RoundedCornerShape(11.dp),
+                color = AlkahfColors.Surface,
+                border = BorderStroke(1.dp, AlkahfColors.Chevron),
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 11.dp, vertical = 7.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Outlined.Download,
-                            contentDescription = "Manage downloads",
-                            tint = AlkahfColors.InkChrome,
-                            modifier = Modifier.size(18.dp),
-                        )
-                    }
+                    Icon(
+                        imageVector = Icons.Outlined.Download,
+                        contentDescription = null,
+                        tint = AlkahfColors.InkChrome,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Text(
+                        text = "Manage",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = AlkahfColors.InkChrome,
+                        modifier = Modifier.padding(start = 5.dp),
+                    )
                 }
             }
         }
@@ -334,75 +269,9 @@ private fun ReciterRow(
 }
 
 private fun reciterSubtitle(reciter: ReciterStatus): String = when {
-    reciter.isActive -> "Murattal · teaching recitation"
     reciter.downloadedSurahs > 0 ->
         "${reciter.downloadedSurahs} of 114 sūrahs · ${formatBytes(reciter.bytes)}"
     else -> "Not downloaded"
-}
-
-@Composable
-private fun DownloadRow(surah: DownloadedSurah, progress: Float?, onDelete: () -> Unit) {
-    val complete = surah.downloadedAyahs >= surah.totalAyahs
-    Surface(
-        shape = RoundedCornerShape(18.dp),
-        color = AlkahfColors.Surface,
-        border = BorderStroke(1.dp, AlkahfColors.CardBorder),
-        modifier = Modifier.fillMaxWidth().padding(bottom = 9.dp),
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 15.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(
-                Modifier.size(40.dp).background(
-                    if (complete) AlkahfColors.AccentTint2 else AlkahfColors.SegmentedTrack,
-                    RoundedCornerShape(11.dp),
-                ),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = if (complete) Icons.Outlined.Check else Icons.Outlined.Download,
-                    contentDescription = null,
-                    tint = if (complete) AlkahfColors.AccentDeep else AlkahfColors.StumbleInk,
-                    modifier = Modifier.size(20.dp),
-                )
-            }
-            Column(Modifier.weight(1f).padding(start = 13.dp)) {
-                Text(
-                    text = "Sūrat ${surah.nameLatin}",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = AlkahfColors.Ink,
-                )
-                Text(
-                    text = if (complete) {
-                        "Downloaded · ${formatBytes(surah.bytes)}"
-                    } else {
-                        "${surah.downloadedAyahs} of ${surah.totalAyahs} āyāt · ${formatBytes(surah.bytes)}"
-                    },
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = AlkahfColors.InkFaint,
-                    maxLines = 1,
-                )
-            }
-            Surface(
-                onClick = onDelete,
-                shape = CircleShape,
-                color = AlkahfColors.Surface,
-                modifier = Modifier.size(36.dp),
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = Icons.Outlined.Delete,
-                        contentDescription = "Delete download",
-                        tint = AlkahfColors.Chevron,
-                        modifier = Modifier.size(19.dp),
-                    )
-                }
-            }
-        }
-    }
 }
 
 @Composable

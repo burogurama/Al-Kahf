@@ -95,7 +95,6 @@ data class Reciter(val path: String, val displayName: String)
 
 val RECITERS = listOf(
     Reciter("Husary_128kbps", "Ḥuṣarī"),
-    Reciter("Alafasy_128kbps", "Alafasy"),
     Reciter("Abdul_Basit_Murattal_192kbps", "Abdul Basit"),
     Reciter("Minshawy_Murattal_128kbps", "Minshawy"),
 )
