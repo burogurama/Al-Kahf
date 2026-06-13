@@ -14,6 +14,9 @@ interface QuranDao {
     @Query("SELECT MIN(page) FROM ayahs WHERE surah = :surah")
     suspend fun firstPageOfSurah(surah: Int): Int
 
+    @Query("SELECT page FROM ayahs WHERE id = :id")
+    suspend fun pageOfAyahId(id: Int): Int
+
     @Query("SELECT text FROM ayahs WHERE id = 1001")
     suspend fun basmala(): String
 

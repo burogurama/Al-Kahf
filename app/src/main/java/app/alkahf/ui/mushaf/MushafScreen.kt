@@ -10,6 +10,8 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -82,6 +84,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.media3.exoplayer.ExoPlayer
 import app.alkahf.AlkahfApplication
+import app.alkahf.data.AyahRange
 import app.alkahf.data.MushafPage
 import app.alkahf.data.PageAyah
 import app.alkahf.data.PageGroup
@@ -149,16 +152,23 @@ class SelfTestSession(
 fun MushafScreen(
     startSurah: Int? = null,
     startPage: Int? = null,
+    highlightRange: AyahRange? = null,
     onBack: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val repository = remember { (context.applicationContext as AlkahfApplication).repository }
     val scope = rememberCoroutineScope()
-    var hideMode by remember { mutableStateOf(true) }
+    // Opening the sabaq lands in reading mode (text shown); plain browsing
+    // starts in hide/self-test mode.
+    var hideMode by remember { mutableStateOf(highlightRange == null) }
+    val highlightIds = remember(highlightRange) { highlightRange?.ayahIds ?: emptySet() }
+    val scrollToAyahId = highlightRange?.let { it.surah * 1000 + it.from }
 
-    // An explicit page or surah target wins; otherwise resume the last page read.
+    // A highlighted range opens on its page; otherwise an explicit page/surah
+    // target wins, then the last page read.
     val resolvedStartPage by produceState<Int?>(initialValue = null) {
-        value = startPage
+        value = highlightRange?.let { repository.pageOfAyah(it.surah, it.from) }
+            ?: startPage
             ?: startSurah?.let { repository.firstPageOfSurah(it) }
             ?: repository.lastMushafPage
             ?: repository.firstPageOfSurah(DEFAULT_SURAH)
@@ -282,6 +292,8 @@ fun MushafScreen(
                         onMarkAyah = { markingAyah = it },
                         playingAyahId = audioState.currentAyahId,
                         onAudioTap = onAudioTap,
+                        highlightIds = highlightIds,
+                        scrollToAyahId = scrollToAyahId,
                     )
                 }
             }
@@ -458,6 +470,7 @@ private fun MushafTopBar(
     }
 }
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 private fun MushafPageView(
     pageNumber: Int,
@@ -470,6 +483,8 @@ private fun MushafPageView(
     onMarkAyah: (PageAyah) -> Unit,
     playingAyahId: Int?,
     onAudioTap: (Int) -> Boolean,
+    highlightIds: Set<Int>,
+    scrollToAyahId: Int?,
 ) {
     LaunchedEffect(pageNumber) {
         if (session == null) {
@@ -487,6 +502,15 @@ private fun MushafPageView(
         return
     }
 
+    val bringIntoView = remember { BringIntoViewRequester() }
+    // The group holding the target ayah scrolls itself into view once.
+    val targetGroup = scrollToAyahId?.let { id ->
+        session.page.groups.firstOrNull { g -> g.ayahs.any { it.id == id } }
+    }
+    LaunchedEffect(targetGroup, session.page.number) {
+        if (targetGroup != null) bringIntoView.bringIntoView()
+    }
+
     BoxWithConstraints(Modifier.fillMaxSize().background(AlkahfColors.PageSurface)) {
         val minHeight = maxHeight
         Column(
@@ -499,15 +523,23 @@ private fun MushafPageView(
         ) {
             Column {
                 session.page.groups.forEach { group ->
-                    PageGroupView(
-                        group = group,
-                        hideMode = hideMode,
-                        session = session,
-                        playingAyahId = playingAyahId,
-                        onAudioTap = onAudioTap,
-                        onMarkAyah = onMarkAyah,
-                        onToggleStumble = { mark -> onToggleStumble(session, mark) },
-                    )
+                    val groupModifier = if (group == targetGroup) {
+                        Modifier.bringIntoViewRequester(bringIntoView)
+                    } else {
+                        Modifier
+                    }
+                    Column(groupModifier) {
+                        PageGroupView(
+                            group = group,
+                            hideMode = hideMode,
+                            session = session,
+                            playingAyahId = playingAyahId,
+                            onAudioTap = onAudioTap,
+                            onMarkAyah = onMarkAyah,
+                            onToggleStumble = { mark -> onToggleStumble(session, mark) },
+                            highlightIds = highlightIds,
+                        )
+                    }
                 }
             }
             PageFooter(session.page)
@@ -524,6 +556,7 @@ private fun PageGroupView(
     onAudioTap: (Int) -> Boolean,
     onMarkAyah: (PageAyah) -> Unit,
     onToggleStumble: (WordStumble) -> Unit,
+    highlightIds: Set<Int>,
 ) {
     if (group.showSurahHeader) {
         SurahHeaderBand(group)
@@ -540,7 +573,7 @@ private fun PageGroupView(
                 .padding(top = 12.dp, bottom = 10.dp),
         )
     }
-    AyatBody(group, hideMode, session, playingAyahId, onAudioTap, onMarkAyah, onToggleStumble)
+    AyatBody(group, hideMode, session, playingAyahId, onAudioTap, onMarkAyah, onToggleStumble, highlightIds)
 }
 
 @Composable
@@ -600,11 +633,12 @@ private fun AyatBody(
     onAudioTap: (Int) -> Boolean,
     onMarkAyah: (PageAyah) -> Unit,
     onToggleStumble: (WordStumble) -> Unit,
+    highlightIds: Set<Int>,
 ) {
     val revealedByAyah = group.ayahs.associate { it.id to session.revealedOf(it) }
     val memByAyah = group.ayahs.associate { it.id to (session.memStates[it.id] ?: MemorizationState.NOT_STARTED) }
-    val groupText = remember(revealedByAyah, hideMode, playingAyahId, memByAyah) {
-        buildGroupText(group, revealedByAyah, hideMode, playingAyahId, memByAyah)
+    val groupText = remember(revealedByAyah, hideMode, playingAyahId, memByAyah, highlightIds) {
+        buildGroupText(group, revealedByAyah, hideMode, playingAyahId, memByAyah, highlightIds)
     }
     val currentOnAudioTap by rememberUpdatedState(onAudioTap)
     val currentOnMark by rememberUpdatedState(onMarkAyah)
@@ -731,12 +765,14 @@ private fun buildGroupText(
     hideMode: Boolean,
     playingAyahId: Int? = null,
     memByAyah: Map<Int, MemorizationState> = emptyMap(),
+    highlightIds: Set<Int> = emptySet(),
 ): GroupText {
     val spans = mutableListOf<PageSpan>()
     val annotated = buildAnnotatedString {
         group.ayahs.forEachIndexed { ayahIndex, ayah ->
             val revealed = revealedByAyah[ayah.id] ?: 0
             val playing = ayah.id == playingAyahId
+            val highlighted = ayah.id in highlightIds
             ayah.words.forEachIndexed { wordIndex, word ->
                 val start = length
                 append(word)
@@ -755,7 +791,11 @@ private fun buildGroupText(
                     } else {
                         SpanStyle(
                             color = AlkahfColors.Ink,
-                            background = if (playing) AlkahfColors.WordHighlightBg else Color.Unspecified,
+                            background = when {
+                                playing -> AlkahfColors.WordHighlightBg
+                                highlighted -> AlkahfColors.SabaqHighlight
+                                else -> Color.Unspecified
+                            },
                         )
                     },
                     start = start,

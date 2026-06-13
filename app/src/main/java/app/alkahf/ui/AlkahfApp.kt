@@ -81,12 +81,15 @@ fun AlkahfApp() {
     var manageReciter by remember { mutableStateOf<app.alkahf.data.ReciterStatus?>(null) }
     // The Tawqīt track being tagged (a fresh draft or an existing track).
     var tawqitDraft by remember { mutableStateOf<app.alkahf.data.TawqitTrack?>(null) }
+    // The sabaq range to highlight + scroll to when the Mushaf opens for it.
+    var mushafHighlight by remember { mutableStateOf<app.alkahf.data.AyahRange?>(null) }
     val repository = (LocalContext.current.applicationContext as AlkahfApplication).repository
     val scope = rememberCoroutineScope()
 
-    fun openMushaf(surah: Int?, page: Int?) {
+    fun openMushaf(surah: Int?, page: Int?, highlight: app.alkahf.data.AyahRange? = null) {
         mushafTargetSurah = surah
         mushafTargetPage = page
+        mushafHighlight = highlight
         destination = AlkahfDestination.Mushaf
     }
 
@@ -110,7 +113,7 @@ fun AlkahfApp() {
         AlkahfDestination.Home -> HomeScreen(
             state = homeState,
             onOpenMushaf = { openMushaf(null, null) },
-            onOpenSabaq = { openMushaf(repository.sabaqSurah, null) },
+            onOpenSabaq = { openMushaf(null, null, highlight = repository.sabaqRange) },
             onOpenLoop = {
                 loopPresetId = null
                 destination = AlkahfDestination.Loop
@@ -124,6 +127,7 @@ fun AlkahfApp() {
             MushafScreen(
                 startSurah = mushafTargetSurah,
                 startPage = mushafTargetPage,
+                highlightRange = mushafHighlight,
                 onBack = { destination = AlkahfDestination.Home },
             )
         }

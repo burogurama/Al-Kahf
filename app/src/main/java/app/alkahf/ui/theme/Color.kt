@@ -86,4 +86,7 @@ object AlkahfColors {
     val WaveformUnplayed = Color(0xFFDAD0BC)
     val TawqitCurrentInk = Color(0xFF1F4F45)
     val TaggedText = Color(0xFF9A917F)
+
+    // Sabaq range highlight on the Mushaf page.
+    val SabaqHighlight = Color(0xFFDDE9E1)
 }

@@ -138,6 +138,11 @@ data class DownloadedSurah(
 /** Storage occupied by offline audio vs. total device storage. */
 data class StorageInfo(val usedBytes: Long, val totalBytes: Long)
 
+/** A surah + ayah range (e.g. the current sabaq). */
+data class AyahRange(val surah: Int, val from: Int, val to: Int) {
+    val ayahIds: Set<Int> get() = (from..to).map { surah * 1000 + it }.toSet()
+}
+
 /** The current sabaq (portion being learned) for the Home hero card. */
 data class SabaqCard(
     val surah: Int,
@@ -215,9 +220,15 @@ class QuranRepository(context: Context) {
             prefs.edit().putInt(KEY_LAST_MUSHAF_PAGE, value ?: 0).apply()
         }
 
-    /** The surah of the current sabaq (used when opening it in the Mushaf). */
-    val sabaqSurah: Int
-        get() = prefs.getInt(KEY_SABAQ_SURAH, 18)
+    /** The surah + ayah range of the current sabaq. */
+    val sabaqRange: AyahRange
+        get() = AyahRange(
+            surah = prefs.getInt(KEY_SABAQ_SURAH, 18),
+            from = prefs.getInt(KEY_SABAQ_FROM, 1),
+            to = prefs.getInt(KEY_SABAQ_TO, 5),
+        )
+
+    suspend fun pageOfAyah(surah: Int, ayah: Int): Int = quranDao.pageOfAyahId(surah * 1000 + ayah)
 
     fun setSabaq(surah: Int, from: Int, to: Int) {
         prefs.edit()
