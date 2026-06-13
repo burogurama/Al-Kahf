@@ -128,12 +128,13 @@ class SelfTestSession(
     val currentAyah: PageAyah?
         get() = page.ayahs.firstOrNull { revealedOf(it) < it.words.size }
 
-    fun revealNextWord(ayahId: Int) {
+    /** Reveals through the tapped word (concealment is prefix-based). */
+    fun revealUpTo(ayahId: Int, wordIndex: Int) {
         val ayah = page.ayahs.first { it.id == ayahId }
-        val revealed = revealedCounts.getOrDefault(ayahId, 0)
-        if (revealed < ayah.words.size) {
-            revealedCounts[ayahId] = revealed + 1
-            onRevealChanged(ayahId, revealed + 1)
+        val target = (wordIndex + 1).coerceIn(1, ayah.words.size)
+        if (target > revealedCounts.getOrDefault(ayahId, 0)) {
+            revealedCounts[ayahId] = target
+            onRevealChanged(ayahId, target)
         }
     }
 
@@ -741,13 +742,19 @@ private fun AyatBody(
                 .pointerInput(hideMode, groupText) {
                     detectTapGestures(
                         onTap = { position ->
-                            val ayahId = spanAt(layoutResult.value, groupText, position)?.ayahId
+                            val span = spanAt(layoutResult.value, groupText, position)
+                            val ayahId = span?.ayahId
                                 ?: markerAyahIdAt(layoutResult.value, groupText, position)
                                 ?: return@detectTapGestures
                             if (currentOnAudioTap(ayahId)) return@detectTapGestures
                             if (hideMode) {
-                                // Reveal the next word of the tapped ayah.
-                                session.revealNextWord(ayahId)
+                                // Reveal through the tapped word (or the whole
+                                // ayah when its medallion is tapped).
+                                if (span != null) {
+                                    session.revealUpTo(span.ayahId, span.wordIndex)
+                                } else {
+                                    session.revealAyah(ayahId)
+                                }
                             } else {
                                 // Reading mode: tap selects the ayah for marking.
                                 currentOnSelect(ayahId)
