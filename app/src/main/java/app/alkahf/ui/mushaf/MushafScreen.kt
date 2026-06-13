@@ -714,15 +714,21 @@ private fun AyatBody(
                         val firstLine = layout.getLineForOffset(start)
                         val lastLine = layout.getLineForOffset((end - 1).coerceAtLeast(start))
                         for (line in firstLine..lastLine) {
-                            val ls = maxOf(start, layout.getLineStart(line))
-                            val le = minOf(end, layout.getLineEnd(line, visibleEnd = true))
+                            val lineStart = layout.getLineStart(line)
+                            val lineEnd = layout.getLineEnd(line, visibleEnd = true)
+                            val ls = maxOf(start, lineStart)
+                            val le = minOf(end, lineEnd)
                             if (le <= ls) continue
                             val b = layout.getPathForRange(ls, le).getBounds()
+                            // Extend to the justified line edge wherever the ayah
+                            // spans that boundary, so the fill doesn't stop short.
+                            val left = if (end >= lineEnd) layout.getLineLeft(line) else b.left
+                            val right = if (start <= lineStart) layout.getLineRight(line) else b.right
                             drawRoundRect(
                                 color = fill,
-                                topLeft = Offset(b.left - padH, b.top - padV),
+                                topLeft = Offset(left - padH, b.top - padV),
                                 size = androidx.compose.ui.geometry.Size(
-                                    b.width + padH * 2,
+                                    (right - left) + padH * 2,
                                     b.height + padV * 2,
                                 ),
                                 cornerRadius = radius,
