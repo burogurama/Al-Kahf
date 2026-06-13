@@ -159,6 +159,9 @@ interface UserDao {
     @Query("SELECT * FROM ayah_states")
     suspend fun allAyahStates(): List<AyahStateEntity>
 
+    @Query("SELECT * FROM ayah_states WHERE ayah_id IN (:ids)")
+    suspend fun ayahStatesIn(ids: List<Int>): List<AyahStateEntity>
+
     @Insert
     suspend fun addPracticeEvent(event: PracticeEventEntity)
 

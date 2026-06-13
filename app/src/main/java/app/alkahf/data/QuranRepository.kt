@@ -632,6 +632,13 @@ class QuranRepository(context: Context) {
     suspend fun revealStates(ayahIds: List<Int>): Map<Int, Int> =
         userDao.revealStatesForAyahs(ayahIds).associate { it.ayahId to it.revealedCount }
 
+    suspend fun ayahStatesForPage(ayahIds: List<Int>): Map<Int, MemorizationState> =
+        userDao.ayahStatesIn(ayahIds).associate { it.ayahId to MemorizationState.of(it.state) }
+
+    suspend fun setAyahState(ayahId: Int, state: MemorizationState) {
+        userDao.upsertAyahStates(listOf(AyahStateEntity(ayahId, state.value)))
+    }
+
     suspend fun saveRevealState(ayahId: Int, revealedCount: Int) {
         userDao.upsertRevealState(RevealStateEntity(ayahId, revealedCount))
     }
