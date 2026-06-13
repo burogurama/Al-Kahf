@@ -251,7 +251,9 @@ fun MushafScreen(
     var selection by remember { mutableStateOf<IntRange?>(null) }
     LaunchedEffect(currentPageNumber) { selection = null }
     val selectedIds = currentSession?.page?.ayahs?.let { ayahs ->
-        selection?.let { range -> ayahs.slice(range).map { it.id }.toSet() }
+        // Bounds-guard: during a page swap the old range may not fit the new page.
+        selection?.takeIf { it.first >= 0 && it.last < ayahs.size }
+            ?.let { range -> ayahs.slice(range).map { it.id }.toSet() }
     } ?: emptySet()
     var showStateSheet by remember { mutableStateOf(false) }
 
