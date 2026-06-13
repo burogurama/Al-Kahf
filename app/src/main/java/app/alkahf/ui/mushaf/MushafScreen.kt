@@ -673,13 +673,19 @@ private fun AyatBody(
 ) {
     val revealedByAyah = group.ayahs.associate { it.id to session.revealedOf(it) }
     val memByAyah = group.ayahs.associate { it.id to (session.memStates[it.id] ?: MemorizationState.NOT_STARTED) }
-    val groupText = remember(revealedByAyah, hideMode, playingAyahId, memByAyah, highlightIds, selectedIds) {
-        buildGroupText(group, revealedByAyah, hideMode, playingAyahId, memByAyah, highlightIds, selectedIds)
+    // Ayat to draw the rounded highlight fill behind: selection, the sabaq
+    // range, and the ayah currently being listened to.
+    val litIds = remember(selectedIds, highlightIds, playingAyahId) {
+        selectedIds + highlightIds + listOfNotNull(playingAyahId)
+    }
+    val groupText = remember(revealedByAyah, hideMode, memByAyah, litIds) {
+        buildGroupText(group, revealedByAyah, hideMode, memByAyah, litIds)
     }
     val currentOnAudioTap by rememberUpdatedState(onAudioTap)
     val currentOnSelect by rememberUpdatedState(onSelectAyah)
     val layoutResult = remember { mutableStateOf<TextLayoutResult?>(null) }
     val bodySize = LocalMushafTextSize.current.sp
+    val fill = AlkahfColors.AyahHighlightFill
 
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
         Text(
@@ -694,6 +700,36 @@ private fun AyatBody(
             onTextLayout = { layoutResult.value = it },
             modifier = Modifier
                 .fillMaxWidth()
+                .drawBehind {
+                    val layout = layoutResult.value ?: return@drawBehind
+                    val padH = 6.dp.toPx()
+                    val padV = 3.dp.toPx()
+                    val radius = androidx.compose.ui.geometry.CornerRadius(8.dp.toPx())
+                    litIds.forEach { ayahId ->
+                        val ayahSpans = groupText.spans.filter { it.ayahId == ayahId }
+                        if (ayahSpans.isEmpty()) return@forEach
+                        val start = ayahSpans.minOf { it.start }
+                        val end = ayahSpans.maxOf { it.end }
+                        // One rounded rect per wrapped line the ayah covers.
+                        val firstLine = layout.getLineForOffset(start)
+                        val lastLine = layout.getLineForOffset((end - 1).coerceAtLeast(start))
+                        for (line in firstLine..lastLine) {
+                            val ls = maxOf(start, layout.getLineStart(line))
+                            val le = minOf(end, layout.getLineEnd(line, visibleEnd = true))
+                            if (le <= ls) continue
+                            val b = layout.getPathForRange(ls, le).getBounds()
+                            drawRoundRect(
+                                color = fill,
+                                topLeft = Offset(b.left - padH, b.top - padV),
+                                size = androidx.compose.ui.geometry.Size(
+                                    b.width + padH * 2,
+                                    b.height + padV * 2,
+                                ),
+                                cornerRadius = radius,
+                            )
+                        }
+                    }
+                }
                 .pointerInput(hideMode, groupText) {
                     detectTapGestures(
                         onTap = { position ->
@@ -752,23 +788,20 @@ private fun buildGroupText(
     group: PageGroup,
     revealedByAyah: Map<Int, Int>,
     hideMode: Boolean,
-    playingAyahId: Int? = null,
     memByAyah: Map<Int, MemorizationState> = emptyMap(),
-    highlightIds: Set<Int> = emptySet(),
-    selectedIds: Set<Int> = emptySet(),
+    litIds: Set<Int> = emptySet(),
 ): GroupText {
     val spans = mutableListOf<PageSpan>()
     val annotated = buildAnnotatedString {
         group.ayahs.forEachIndexed { ayahIndex, ayah ->
             val revealed = revealedByAyah[ayah.id] ?: 0
-            val playing = ayah.id == playingAyahId
-            val highlighted = ayah.id in highlightIds
-            val selected = ayah.id in selectedIds
             ayah.words.forEachIndexed { wordIndex, word ->
                 val start = length
                 append(word)
                 spans += PageSpan(ayah.id, wordIndex, start, length, isMarker = false)
                 val concealed = hideMode && wordIndex >= revealed
+                // The highlight fill is drawn behind the text; the glyph colour
+                // never changes (spec).
                 addStyle(
                     style = if (concealed) {
                         SpanStyle(
@@ -780,15 +813,7 @@ private fun buildGroupText(
                             ),
                         )
                     } else {
-                        SpanStyle(
-                            color = AlkahfColors.Ink,
-                            background = when {
-                                selected -> AlkahfColors.AccentTint
-                                playing -> AlkahfColors.WordHighlightBg
-                                highlighted -> AlkahfColors.SabaqHighlight
-                                else -> Color.Unspecified
-                            },
-                        )
+                        SpanStyle(color = AlkahfColors.Ink)
                     },
                     start = start,
                     end = length,
@@ -798,12 +823,13 @@ private fun buildGroupText(
             val markerStart = length
             append(ayah.marker)
             spans += PageSpan(ayah.id, wordIndex = -1, start = markerStart, end = length, isMarker = true)
-            // In hide mode the medallion tracks reveal state; in reading mode it
-            // shows the ayah's memorization state.
-            val markerColor = if (hideMode) {
-                if (revealed >= ayah.words.size) AlkahfColors.Accent else AlkahfColors.ConcealedMedallion
-            } else {
-                memMedallionColor(memByAyah[ayah.id] ?: MemorizationState.NOT_STARTED)
+            // A lit (selected/sabaq/playing) ayah's medallion shifts to accent.
+            // Otherwise hide mode tracks reveal state; reading mode shows the
+            // ayah's memorization state.
+            val markerColor = when {
+                ayah.id in litIds -> AlkahfColors.AccentDeep
+                hideMode -> if (revealed >= ayah.words.size) AlkahfColors.Accent else AlkahfColors.ConcealedMedallion
+                else -> memMedallionColor(memByAyah[ayah.id] ?: MemorizationState.NOT_STARTED)
             }
             addStyle(style = SpanStyle(color = markerColor), start = markerStart, end = length)
             if (ayahIndex != group.ayahs.lastIndex) append(' ')

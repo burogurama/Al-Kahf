@@ -77,6 +77,7 @@ data class Palette(
     val TawqitCurrentInk: Color,
     val TaggedText: Color,
     val SabaqHighlight: Color,
+    val AyahHighlightFill: Color,
     val PlayTile: Color,
     val PlayTileInk: Color,
 )
@@ -147,6 +148,7 @@ val LightPalette = Palette(
     TawqitCurrentInk = Color(0xFF1F4F45),
     TaggedText = Color(0xFF9A917F),
     SabaqHighlight = Color(0xFFDDE9E1),
+    AyahHighlightFill = Color(0xFFD6E8DF),
     PlayTile = Color(0xFF2A2620),
     PlayTileInk = Color(0xFFF5F0E6),
 )
@@ -217,6 +219,7 @@ val DarkPalette = Palette(
     TawqitCurrentInk = Color(0xFFD8EAE2),
     TaggedText = Color(0xFF6E6655),
     SabaqHighlight = Color(0xFF21342D),
+    AyahHighlightFill = Color(0xFF23362F),
     PlayTile = Color(0xFF2E2A20),
     PlayTileInk = Color(0xFFEDE5D2),
 )
@@ -294,6 +297,7 @@ object AlkahfColors {
     val TawqitCurrentInk get() = palette.value.TawqitCurrentInk
     val TaggedText get() = palette.value.TaggedText
     val SabaqHighlight get() = palette.value.SabaqHighlight
+    val AyahHighlightFill get() = palette.value.AyahHighlightFill
     val PlayTile get() = palette.value.PlayTile
     val PlayTileInk get() = palette.value.PlayTileInk
 }
