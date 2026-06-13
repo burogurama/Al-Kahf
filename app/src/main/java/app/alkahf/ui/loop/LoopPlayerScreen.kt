@@ -537,6 +537,15 @@ private fun ayahCardLabel(state: LoopUiState): String = when (state.phase) {
 @Composable
 private fun AyahText(state: LoopUiState) {
     val ayah = state.ayahs[state.currentAyah] ?: return
+    // Character offset where each word begins, to map a word -> its text line.
+    val wordOffsets = remember(ayah) {
+        var offset = 0
+        ayah.words.map { word ->
+            val start = offset
+            offset += word.length + 1
+            start
+        }
+    }
     val annotated = buildAnnotatedString {
         ayah.words.forEachIndexed { index, word ->
             val style = when {
@@ -554,15 +563,35 @@ private fun AyahText(state: LoopUiState) {
         }
         withStyle(SpanStyle(color = AlkahfColors.ConcealedMedallion)) { append(ayah.marker) }
     }
+    val scrollState = rememberScrollState()
+    val layout = remember { mutableStateOf<androidx.compose.ui.text.TextLayoutResult?>(null) }
+
+    // Follow the recited-word cursor: scroll so its line stays in view.
+    LaunchedEffect(state.highlightIndex, ayah, layout.value) {
+        val textLayout = layout.value ?: return@LaunchedEffect
+        val index = state.highlightIndex
+        if (index < 0 || index >= wordOffsets.size) return@LaunchedEffect
+        val line = textLayout.getLineForOffset(wordOffsets[index])
+        val lineTop = textLayout.getLineTop(line).toInt()
+        val lineBottom = textLayout.getLineBottom(line).toInt()
+        val viewport = scrollState.viewportSize
+        val target = when {
+            viewport == 0 -> lineTop
+            else -> (lineTop + lineBottom) / 2 - viewport / 2
+        }
+        scrollState.animateScrollTo(target.coerceIn(0, scrollState.maxValue))
+    }
+
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
         // Long ayat scroll within the card rather than squeezing the layout.
-        Box(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
+        Box(Modifier.fillMaxWidth().verticalScroll(scrollState)) {
             Text(
                 text = annotated,
                 fontFamily = KfgqpcHafs,
                 fontSize = 28.sp,
                 lineHeight = 55.sp,
                 textAlign = TextAlign.Center,
+                onTextLayout = { layout.value = it },
                 modifier = Modifier.fillMaxWidth().padding(top = 16.dp, start = 4.dp, end = 4.dp),
             )
         }
