@@ -30,6 +30,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -48,32 +49,31 @@ import app.alkahf.data.StorageInfo
 import app.alkahf.ui.components.AlkahfBottomNav
 import app.alkahf.ui.components.AlkahfTab
 import app.alkahf.ui.theme.AlkahfColors
+import kotlinx.coroutines.launch
 import app.alkahf.ui.theme.AmiriQuran
 
 @Composable
 fun LibraryScreen(
     onOpenPreset: (Long) -> Unit = {},
     onNewPreset: () -> Unit = {},
-    onManageReciter: (String, String) -> Unit = { _, _ -> },
-    onOpenTawqit: () -> Unit = {},
+    onManageReciter: (ReciterStatus) -> Unit = {},
     onSelectTab: (AlkahfTab) -> Unit = {},
 ) {
     val context = LocalContext.current
     val repository = remember { (context.applicationContext as AlkahfApplication).repository }
+    val scope = rememberCoroutineScope()
 
     var storage by remember { mutableStateOf<StorageInfo?>(null) }
     var reciters by remember { mutableStateOf<List<ReciterStatus>>(emptyList()) }
     var activeReciterPath by remember { mutableStateOf(repository.activeReciterPath) }
     var presets by remember { mutableStateOf<List<LoopPreset>>(emptyList()) }
-    var tawqitCount by remember { mutableStateOf(0 to 0) } // total to in-progress
+    var showNewReciter by remember { mutableStateOf(false) }
     var refreshKey by remember { mutableStateOf(0) }
 
     androidx.compose.runtime.LaunchedEffect(refreshKey, activeReciterPath) {
         storage = repository.storageInfo()
         reciters = repository.reciterStatuses()
         presets = repository.presets()
-        val tracks = repository.tawqitTracks()
-        tawqitCount = tracks.size to tracks.count { !it.complete }
     }
 
     Scaffold(
@@ -94,18 +94,17 @@ fun LibraryScreen(
                 ReciterRow(
                     reciter = reciter,
                     onActivate = {
-                        repository.setActiveReciter(reciter.path)
-                        activeReciterPath = reciter.path
+                        if (reciter.isImported) {
+                            onManageReciter(reciter)
+                        } else {
+                            repository.setActiveReciter(reciter.key)
+                            activeReciterPath = reciter.key
+                        }
                     },
-                    onManage = { onManageReciter(reciter.path, reciter.displayName) },
+                    onManage = { onManageReciter(reciter) },
                 )
             }
-            SectionCaption("TAWQĪT · AUDIO SYNC")
-            TawqitEntryRow(
-                total = tawqitCount.first,
-                inProgress = tawqitCount.second,
-                onClick = onOpenTawqit,
-            )
+            NewReciterButton { showNewReciter = true }
             SectionCaption("DRILL PRESETS")
             presets.forEach { preset ->
                 PresetRow(preset = preset, onClick = { onOpenPreset(preset.id) })
@@ -114,67 +113,84 @@ fun LibraryScreen(
             Box(Modifier.height(12.dp))
         }
     }
-}
 
-@Composable
-private fun TawqitEntryRow(total: Int, inProgress: Int, onClick: () -> Unit) {
-    Surface(
-        onClick = onClick,
-        shape = RoundedCornerShape(18.dp),
-        color = AlkahfColors.Surface,
-        border = BorderStroke(1.dp, AlkahfColors.CardBorder),
-        modifier = Modifier.fillMaxWidth().padding(bottom = 9.dp),
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 15.dp, vertical = 13.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(
-                Modifier.size(40.dp).background(AlkahfColors.SurfaceHero, RoundedCornerShape(11.dp)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(2.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.height(16.dp),
-                ) {
-                    listOf(7.dp, 13.dp, 16.dp, 10.dp, 6.dp).forEach { h ->
-                        Box(
-                            Modifier.width(2.dp).height(h)
-                                .background(AlkahfColors.AccentDeep, RoundedCornerShape(1.dp)),
-                        )
-                    }
+    if (showNewReciter) {
+        NewReciterDialog(
+            onDismiss = { showNewReciter = false },
+            onCreate = { name ->
+                scope.launch {
+                    repository.createCustomReciter(name)
+                    showNewReciter = false
+                    refreshKey++
                 }
-            }
-            Column(Modifier.weight(1f).padding(start = 13.dp)) {
-                Text(
-                    text = "Sync recitation to the page",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = AlkahfColors.Ink,
-                )
-                Text(
-                    text = when {
-                        total == 0 -> "Tag any recitation by ear"
-                        inProgress > 0 -> "$total timing track${plural(total)} · $inProgress in progress"
-                        else -> "$total timing track${plural(total)}"
-                    },
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = AlkahfColors.InkFaint,
-                    maxLines = 1,
-                )
-            }
-            Icon(
-                imageVector = androidx.compose.material.icons.Icons.AutoMirrored.Outlined.KeyboardArrowRight,
-                contentDescription = null,
-                tint = AlkahfColors.Chevron,
-            )
-        }
+            },
+        )
     }
 }
 
-private fun plural(n: Int): String = if (n == 1) "" else "s"
+@Composable
+private fun NewReciterButton(onClick: () -> Unit) {
+    Box(
+        modifier = Modifier.fillMaxWidth().height(48.dp).padding(bottom = 2.dp)
+            .clickable(onClick = onClick)
+            .drawBehind {
+                drawRoundRect(
+                    color = AlkahfColors.DashedNode,
+                    style = Stroke(
+                        width = 1.5.dp.toPx(),
+                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 8f)),
+                    ),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(18.dp.toPx()),
+                )
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = "+  Import a reciter",
+            fontSize = 13.5.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = AlkahfColors.InkMuted,
+        )
+    }
+}
+
+@Composable
+private fun NewReciterDialog(onDismiss: () -> Unit, onCreate: (String) -> Unit) {
+    var name by remember { mutableStateOf("") }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = AlkahfColors.Surface,
+        title = { Text("Import a reciter", fontWeight = FontWeight.Bold, color = AlkahfColors.Ink) },
+        text = {
+            Column {
+                Text(
+                    "Name this reciter profile, then import an audio file per sūrah.",
+                    fontSize = 13.sp,
+                    color = AlkahfColors.InkSecondary,
+                    modifier = Modifier.padding(bottom = 12.dp),
+                )
+                androidx.compose.material3.OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    singleLine = true,
+                    placeholder = { Text("e.g. Mishary (my recording)") },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        },
+        confirmButton = {
+            androidx.compose.material3.TextButton(
+                onClick = { if (name.isNotBlank()) onCreate(name) },
+                enabled = name.isNotBlank(),
+            ) { Text("Create", color = AlkahfColors.AccentDeep, fontWeight = FontWeight.Bold) }
+        },
+        dismissButton = {
+            androidx.compose.material3.TextButton(onClick = onDismiss) {
+                Text("Cancel", color = AlkahfColors.InkMuted)
+            }
+        },
+    )
+}
 
 @Composable
 private fun LibraryHeader() {
@@ -316,34 +332,26 @@ private fun ReciterRow(
                 color = AlkahfColors.Surface,
                 border = BorderStroke(1.dp, AlkahfColors.Chevron),
             ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 11.dp, vertical = 7.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Download,
-                        contentDescription = null,
-                        tint = AlkahfColors.InkChrome,
-                        modifier = Modifier.size(16.dp),
-                    )
-                    Text(
-                        text = "Manage",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = AlkahfColors.InkChrome,
-                        modifier = Modifier.padding(start = 5.dp),
-                    )
-                }
+                Text(
+                    text = if (reciter.isImported) "Open" else "Manage",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = AlkahfColors.InkChrome,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                )
             }
         }
     }
 }
 
 private fun reciterSubtitle(reciter: ReciterStatus): String = when {
-    reciter.downloadedSurahs > 0 ->
-        "${reciter.downloadedSurahs} of 114 sūrahs · ${formatBytes(reciter.bytes)}"
+    reciter.isImported && reciter.itemCount > 0 -> "Imported · ${reciter.itemCount} sūrah${plural(reciter.itemCount)}"
+    reciter.isImported -> "Imported reciter · no audio yet"
+    reciter.itemCount > 0 -> "${reciter.itemCount} of 114 sūrahs · ${formatBytes(reciter.bytes)}"
     else -> "Not downloaded"
 }
+
+private fun plural(n: Int): String = if (n == 1) "" else "s"
 
 @Composable
 private fun PresetRow(preset: LoopPreset, onClick: () -> Unit) {

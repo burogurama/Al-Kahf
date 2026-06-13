@@ -18,11 +18,12 @@ import app.alkahf.ui.loop.LoopPlayerScreen
 import app.alkahf.ui.mushaf.MushafScreen
 import app.alkahf.ui.progress.ProgressScreen
 import app.alkahf.ui.review.ReviewScreen
-import app.alkahf.ui.tawqit.TawqitHubScreen
 import app.alkahf.ui.tawqit.TawqitTaggingScreen
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 
 private enum class AlkahfDestination {
-    Home, Mushaf, Loop, Review, Progress, Library, ReciterDownloads, TawqitHub, TawqitTagging
+    Home, Mushaf, Loop, Review, Progress, Library, ReciterDownloads, TawqitTagging
 }
 
 /** The current sabaq surah; becomes dynamic once sabaq state is user-configurable. */
@@ -37,11 +38,12 @@ fun AlkahfApp() {
     var mushafTargetPage by remember { mutableStateOf<Int?>(null) }
     // The preset to open in the Loop player; null means the default preset.
     var loopPresetId by remember { mutableStateOf<Long?>(null) }
-    // The reciter whose downloads are being managed.
-    var manageReciter by remember { mutableStateOf<Pair<String, String>?>(null) }
+    // The reciter whose surahs are being managed.
+    var manageReciter by remember { mutableStateOf<app.alkahf.data.ReciterStatus?>(null) }
     // The Tawqīt track being tagged (a fresh draft or an existing track).
     var tawqitDraft by remember { mutableStateOf<app.alkahf.data.TawqitTrack?>(null) }
     val repository = (LocalContext.current.applicationContext as AlkahfApplication).repository
+    val scope = rememberCoroutineScope()
 
     fun openMushaf(surah: Int?, page: Int?) {
         mushafTargetSurah = surah
@@ -121,42 +123,40 @@ fun AlkahfApp() {
                     loopPresetId = null
                     destination = AlkahfDestination.Loop
                 },
-                onManageReciter = { path, name ->
-                    manageReciter = path to name
+                onManageReciter = { reciter ->
+                    manageReciter = reciter
                     destination = AlkahfDestination.ReciterDownloads
                 },
-                onOpenTawqit = { destination = AlkahfDestination.TawqitHub },
                 onSelectTab = ::onTab,
             )
         }
-        AlkahfDestination.TawqitHub -> {
-            BackHandler { destination = AlkahfDestination.Library }
-            TawqitHubScreen(
-                onBack = { destination = AlkahfDestination.Library },
-                onOpenTrack = { track ->
-                    tawqitDraft = track
-                    destination = AlkahfDestination.TawqitTagging
-                },
-            )
-        }
         AlkahfDestination.TawqitTagging -> {
-            BackHandler { destination = AlkahfDestination.TawqitHub }
+            BackHandler { destination = AlkahfDestination.ReciterDownloads }
             tawqitDraft?.let { draft ->
                 TawqitTaggingScreen(
                     draft = draft,
-                    onSaved = { destination = AlkahfDestination.TawqitHub },
-                    onClose = { destination = AlkahfDestination.TawqitHub },
+                    onSaved = { destination = AlkahfDestination.ReciterDownloads },
+                    onClose = { destination = AlkahfDestination.ReciterDownloads },
                 )
             }
         }
         AlkahfDestination.ReciterDownloads -> {
             BackHandler { destination = AlkahfDestination.Library }
-            val (path, name) = manageReciter ?: ("" to "")
-            ReciterDownloadsScreen(
-                reciterPath = path,
-                reciterName = name,
-                onBack = { destination = AlkahfDestination.Library },
-            )
+            val reciter = manageReciter
+            if (reciter != null) {
+                ReciterDownloadsScreen(
+                    reciterKey = reciter.key,
+                    reciterName = reciter.displayName,
+                    isImported = reciter.isImported,
+                    onTimeSurah = { surah ->
+                        scope.launch {
+                            tawqitDraft = repository.tawqitDraftForImport(reciter.key, surah)
+                            if (tawqitDraft != null) destination = AlkahfDestination.TawqitTagging
+                        }
+                    },
+                    onBack = { destination = AlkahfDestination.Library },
+                )
+            }
         }
     }
 }

@@ -54,6 +54,24 @@ data class PracticeEventEntity(
     @ColumnInfo(name = "created_at") val createdAt: Long,
 )
 
+/** A user-created reciter profile that holds imported per-surah audio. */
+@Entity(tableName = "custom_reciters")
+data class CustomReciterEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val name: String,
+    val initial: String,
+    @ColumnInfo(name = "created_at") val createdAt: Long,
+)
+
+/** One imported audio file (one surah) belonging to a custom reciter. */
+@Entity(tableName = "imported_surahs")
+data class ImportedSurahEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    @ColumnInfo(name = "reciter_id") val reciterId: Long,
+    val surah: Int,
+    val uri: String,
+)
+
 /**
  * A Tawqīt timing track: ayah end-times (CSV of ms, 1× scale) aligning one
  * audio source to a portion of the mushaf for the read-along highlight.
@@ -191,6 +209,30 @@ interface UserDao {
 
     @Query("DELETE FROM timing_tracks WHERE id = :id")
     suspend fun deleteTimingTrack(id: Long)
+
+    @Query("SELECT * FROM custom_reciters ORDER BY created_at")
+    suspend fun customReciters(): List<CustomReciterEntity>
+
+    @Insert
+    suspend fun insertCustomReciter(reciter: CustomReciterEntity): Long
+
+    @Query("DELETE FROM custom_reciters WHERE id = :id")
+    suspend fun deleteCustomReciter(id: Long)
+
+    @Query("DELETE FROM imported_surahs WHERE reciter_id = :reciterId")
+    suspend fun deleteImportsForReciter(reciterId: Long)
+
+    @Query("SELECT * FROM imported_surahs WHERE reciter_id = :reciterId")
+    suspend fun importedSurahs(reciterId: Long): List<ImportedSurahEntity>
+
+    @Query("SELECT * FROM imported_surahs WHERE reciter_id = :reciterId AND surah = :surah LIMIT 1")
+    suspend fun importedSurah(reciterId: Long, surah: Int): ImportedSurahEntity?
+
+    @Insert
+    suspend fun insertImportedSurah(entity: ImportedSurahEntity)
+
+    @Query("DELETE FROM imported_surahs WHERE reciter_id = :reciterId AND surah = :surah")
+    suspend fun deleteImportedSurah(reciterId: Long, surah: Int)
 }
 
 @Database(
@@ -202,8 +244,10 @@ interface UserDao {
         PracticeEventEntity::class,
         LoopPresetEntity::class,
         TimingTrackEntity::class,
+        CustomReciterEntity::class,
+        ImportedSurahEntity::class,
     ],
-    version = 6,
+    version = 7,
     exportSchema = false,
 )
 abstract class UserDatabase : RoomDatabase() {

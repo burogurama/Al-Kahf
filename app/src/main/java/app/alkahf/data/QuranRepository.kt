@@ -8,6 +8,8 @@ import app.alkahf.data.audio.AudioStore
 import app.alkahf.data.audio.RECITERS
 import app.alkahf.data.audio.Reciter
 import app.alkahf.data.user.AyahStateEntity
+import app.alkahf.data.user.CustomReciterEntity
+import app.alkahf.data.user.ImportedSurahEntity
 import app.alkahf.data.user.LoopPresetEntity
 import app.alkahf.data.user.PracticeEventEntity
 import app.alkahf.data.user.RevealStateEntity
@@ -100,14 +102,28 @@ data class LoopPreset(
     val isDefault: Boolean = false,
 )
 
-/** A downloadable/active reciter voice and its on-device download summary. */
+/** A reciter (built-in downloadable, or a user-created imported profile). */
 data class ReciterStatus(
-    val path: String,
+    val key: String, // built-in: reciter path; imported: "custom:<id>"
     val displayName: String,
     val arabicInitial: String,
     val isActive: Boolean,
-    val downloadedSurahs: Int,
+    val isImported: Boolean,
+    val itemCount: Int, // downloaded sūrahs (built-in) or imported sūrahs (custom)
     val bytes: Long,
+)
+
+/** One surah row in a reciter's surah list. */
+data class ReciterSurahItem(
+    val surah: Int,
+    val nameLatin: String,
+    val ayahCount: Int,
+    val isImported: Boolean,
+    val hasAudio: Boolean, // fully downloaded (built-in) or imported file present (custom)
+    val downloadedAyahs: Int,
+    val bytes: Long,
+    val timed: Boolean, // a complete Tawqīt track exists (imported only)
+    val importedUri: String?,
 )
 
 /** A surah's downloaded audio for the active reciter. */
@@ -301,47 +317,125 @@ class QuranRepository(context: Context) {
         )
     }
 
-    // --- Audio downloads / storage ---
+    // --- Reciters (built-in + custom imported) ---
 
     suspend fun reciterStatuses(): List<ReciterStatus> {
         val active = activeReciterPath
-        return RECITERS.map { reciter ->
+        val builtins = RECITERS.map { reciter ->
             ReciterStatus(
-                path = reciter.path,
+                key = reciter.path,
                 displayName = reciter.displayName,
                 arabicInitial = reciterInitial(reciter.path),
                 isActive = reciter.path == active,
-                downloadedSurahs = audioStore.downloadedSurahs(reciter.path).size,
+                isImported = false,
+                itemCount = audioStore.downloadedSurahs(reciter.path).size,
                 bytes = audioStore.reciterBytes(reciter.path),
             )
         }
-    }
-
-    suspend fun downloadedSurahs(reciterPath: String): List<DownloadedSurah> {
-        val surahs = quranDao.allSurahs().associateBy { it.number }
-        return audioStore.downloadedSurahs(reciterPath).mapNotNull { surahNumber ->
-            val surah = surahs[surahNumber] ?: return@mapNotNull null
-            DownloadedSurah(
-                surah = surahNumber,
-                nameLatin = surah.nameLatin,
-                downloadedAyahs = audioStore.downloadedAyahCount(reciterPath, surahNumber),
-                totalAyahs = surah.ayahCount,
-                bytes = audioStore.surahBytes(reciterPath, surahNumber),
+        val customs = userDao.customReciters().map { reciter ->
+            ReciterStatus(
+                key = "custom:${reciter.id}",
+                displayName = reciter.name,
+                arabicInitial = reciter.initial,
+                isActive = false,
+                isImported = true,
+                itemCount = userDao.importedSurahs(reciter.id).size,
+                bytes = 0L,
             )
         }
+        return builtins + customs
     }
 
-    /** Download state of every surah for a reciter, for the download manager. */
-    suspend fun surahDownloadStates(reciterPath: String): List<DownloadedSurah> =
-        quranDao.allSurahs().map { surah ->
-            DownloadedSurah(
+    suspend fun createCustomReciter(name: String): String {
+        val initial = name.trim().firstOrNull { !it.isWhitespace() }?.toString() ?: "ق"
+        val id = userDao.insertCustomReciter(
+            CustomReciterEntity(name = name.trim(), initial = initial, createdAt = System.currentTimeMillis()),
+        )
+        return "custom:$id"
+    }
+
+    suspend fun deleteCustomReciter(key: String) {
+        val id = customReciterId(key) ?: return
+        userDao.deleteImportsForReciter(id)
+        userDao.deleteCustomReciter(id)
+    }
+
+    suspend fun importSurah(reciterKey: String, surah: Int, uri: String) {
+        val id = customReciterId(reciterKey) ?: return
+        userDao.deleteImportedSurah(id, surah)
+        userDao.insertImportedSurah(ImportedSurahEntity(reciterId = id, surah = surah, uri = uri))
+    }
+
+    suspend fun removeImportedSurah(reciterKey: String, surah: Int) {
+        val id = customReciterId(reciterKey) ?: return
+        userDao.deleteImportedSurah(id, surah)
+    }
+
+    private fun customReciterId(key: String): Long? =
+        key.removePrefix("custom:").toLongOrNull().takeIf { key.startsWith("custom:") }
+
+    /** Per-surah rows for a reciter's surah list (download or import state). */
+    suspend fun reciterSurahItems(reciterKey: String): List<ReciterSurahItem> {
+        val surahs = quranDao.allSurahs()
+        val customId = customReciterId(reciterKey)
+        if (customId == null) {
+            return surahs.map { surah ->
+                val downloaded = audioStore.downloadedAyahCount(reciterKey, surah.number)
+                ReciterSurahItem(
+                    surah = surah.number,
+                    nameLatin = surah.nameLatin,
+                    ayahCount = surah.ayahCount,
+                    isImported = false,
+                    hasAudio = downloaded >= surah.ayahCount,
+                    downloadedAyahs = downloaded,
+                    bytes = audioStore.surahBytes(reciterKey, surah.number),
+                    timed = false,
+                    importedUri = null,
+                )
+            }
+        }
+        val imports = userDao.importedSurahs(customId).associateBy { it.surah }
+        val tracks = userDao.allTimingTracks()
+        return surahs.map { surah ->
+            val import = imports[surah.number]
+            val timed = import != null && tracks.any {
+                it.sourceRef == import.uri && it.surah == surah.number && it.complete
+            }
+            ReciterSurahItem(
                 surah = surah.number,
                 nameLatin = surah.nameLatin,
-                downloadedAyahs = audioStore.downloadedAyahCount(reciterPath, surah.number),
-                totalAyahs = surah.ayahCount,
-                bytes = audioStore.surahBytes(reciterPath, surah.number),
+                ayahCount = surah.ayahCount,
+                isImported = true,
+                hasAudio = import != null,
+                downloadedAyahs = if (import != null) surah.ayahCount else 0,
+                bytes = 0L,
+                timed = timed,
+                importedUri = import?.uri,
             )
         }
+    }
+
+    /** A Tawqīt draft (new or resumed) for an imported surah of a custom reciter. */
+    suspend fun tawqitDraftForImport(reciterKey: String, surah: Int): TawqitTrack? {
+        val id = customReciterId(reciterKey) ?: return null
+        val import = userDao.importedSurah(id, surah) ?: return null
+        val surahRow = quranDao.surah(surah)
+        val reciterName = userDao.customReciters().firstOrNull { it.id == id }?.name ?: "Imported"
+        val existing = userDao.allTimingTracks()
+            .firstOrNull { it.sourceRef == import.uri && it.surah == surah }
+        return existing?.toTawqitTrack() ?: TawqitTrack(
+            sourceType = TawqitSourceType.IMPORT,
+            sourceRef = import.uri,
+            sourceLabel = "$reciterName (imported)",
+            surah = surah,
+            surahNameLatin = surahRow.nameLatin,
+            ayahFrom = 1,
+            ayahTo = surahRow.ayahCount,
+            endTimesMs = emptyList(),
+            globalOffsetMs = 0,
+            complete = false,
+        )
+    }
 
     suspend fun downloadSurah(reciterPath: String, surah: Int, onProgress: (Float) -> Unit) {
         val ayahCount = quranDao.surah(surah).ayahCount
