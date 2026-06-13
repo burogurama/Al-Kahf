@@ -53,6 +53,8 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLayoutResult
@@ -65,6 +67,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.alkahf.AlkahfApplication
+import app.alkahf.R
 import app.alkahf.data.PageAyah
 import app.alkahf.data.ReviewPortion
 import app.alkahf.data.WordStumble
@@ -104,10 +107,18 @@ fun ReviewScreen(onBack: () -> Unit = {}) {
             .navigationBarsPadding(),
     ) {
         val remaining = queue.size - index
+        val remainingMinutes = minutesValue(remaining)
         ReviewTopBar(
             subtitle = when {
-                completed || queue.isEmpty() -> "Murājaʿah · done for today"
-                else -> "Murājaʿah · ≈ ${minutesLabel(remaining)} left"
+                completed || queue.isEmpty() -> stringResource(R.string.review_subtitle_done)
+                else -> stringResource(
+                    R.string.review_subtitle_remaining,
+                    pluralStringResource(
+                        R.plurals.review_minutes,
+                        remainingMinutes,
+                        remainingMinutes,
+                    ),
+                )
             },
             onBack = onBack,
         )
@@ -175,8 +186,8 @@ fun ReviewScreen(onBack: () -> Unit = {}) {
     }
 }
 
-private fun minutesLabel(remainingPortions: Int): String =
-    "${(remainingPortions * MINUTES_PER_PORTION + 0.5f).toInt().coerceAtLeast(1)} min"
+private fun minutesValue(remainingPortions: Int): Int =
+    (remainingPortions * MINUTES_PER_PORTION + 0.5f).toInt().coerceAtLeast(1)
 
 @Composable
 private fun ReviewTopBar(subtitle: String, onBack: () -> Unit) {
@@ -190,14 +201,14 @@ private fun ReviewTopBar(subtitle: String, onBack: () -> Unit) {
         ) {
             Icon(
                 imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowLeft,
-                contentDescription = "Back",
+                contentDescription = stringResource(R.string.common_back),
                 tint = AlkahfColors.InkChrome,
                 modifier = Modifier.size(26.dp),
             )
         }
         Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-                text = "Daily Review",
+                text = stringResource(R.string.review_title),
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold,
                 color = AlkahfColors.Ink,
@@ -234,14 +245,19 @@ private fun QueueStrip(total: Int, currentIndex: Int, surahLatin: String) {
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Text(
-                text = "Portion ${currentIndex + 1} of $total · $surahLatin",
+                text = stringResource(
+                    R.string.review_portion_of,
+                    currentIndex + 1,
+                    total,
+                    surahLatin,
+                ),
                 fontSize = 11.5.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = AlkahfColors.InkMuted,
                 maxLines = 1,
             )
             Text(
-                text = "$currentIndex graded",
+                text = stringResource(R.string.review_graded_count, currentIndex),
                 fontSize = 11.5.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = AlkahfColors.InkFaint,
@@ -272,7 +288,12 @@ private fun PassageCard(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = "SŪRAT ${portion.surahNameLatin.uppercase()} · ${portion.ayahFrom}–${portion.ayahTo}",
+                    text = stringResource(
+                        R.string.review_surah_header,
+                        portion.surahNameLatin.uppercase(),
+                        portion.ayahFrom,
+                        portion.ayahTo,
+                    ),
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 1.4.sp,
@@ -281,7 +302,11 @@ private fun PassageCard(
                 if (stumbles.isNotEmpty()) {
                     Surface(shape = CircleShape, color = AlkahfColors.StumbleBg) {
                         Text(
-                            text = "${stumbles.size} STUMBLE${if (stumbles.size > 1) "S" else ""}",
+                            text = pluralStringResource(
+                                R.plurals.review_stumble_badge,
+                                stumbles.size,
+                                stumbles.size,
+                            ),
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             color = AlkahfColors.StumbleInk,
@@ -312,9 +337,16 @@ private fun PassageCard(
                 )
                 Text(
                     text = if (fullyRevealed) {
-                        "Revealed after recall · ${stumbleSummary(stumbles.size)}"
+                        stringResource(
+                            R.string.review_revealed_after_recall,
+                            pluralStringResource(
+                                R.plurals.review_stumble_summary,
+                                stumbles.size,
+                                stumbles.size,
+                            ),
+                        )
                     } else {
-                        "Recite from memory, then reveal to check"
+                        stringResource(R.string.review_recite_then_reveal)
                     },
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium,
@@ -323,12 +355,6 @@ private fun PassageCard(
             }
         }
     }
-}
-
-private fun stumbleSummary(count: Int): String = when (count) {
-    0 -> "no stumbles"
-    1 -> "1 stumble recorded"
-    else -> "$count stumbles recorded"
 }
 
 @Composable
@@ -484,7 +510,7 @@ private fun stumbleTarget(
 private fun RevealDock(onStumble: () -> Unit, onRevealAll: () -> Unit) {
     Column(Modifier.padding(start = 18.dp, top = 14.dp, end = 18.dp, bottom = 10.dp)) {
         Text(
-            text = "Tap a word to reveal · long-press for the full ayah",
+            text = stringResource(R.string.review_reveal_hint),
             fontSize = 12.5.sp,
             fontWeight = FontWeight.SemiBold,
             color = AlkahfColors.InkSecondary,
@@ -501,7 +527,7 @@ private fun RevealDock(onStumble: () -> Unit, onRevealAll: () -> Unit) {
             ) {
                 Box(Modifier.padding(horizontal = 18.dp), contentAlignment = Alignment.Center) {
                     Text(
-                        text = "Stumble",
+                        text = stringResource(R.string.review_stumble),
                         fontSize = 14.5.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = AlkahfColors.StumbleInk,
@@ -517,7 +543,11 @@ private fun RevealDock(onStumble: () -> Unit, onRevealAll: () -> Unit) {
                     contentColor = AlkahfColors.OnAccent,
                 ),
             ) {
-                Text(text = "Reveal all", fontSize = 15.5.sp, fontWeight = FontWeight.SemiBold)
+                Text(
+                    text = stringResource(R.string.review_reveal_all),
+                    fontSize = 15.5.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
             }
         }
         Spacer(Modifier.height(9.dp))
@@ -534,7 +564,7 @@ private fun GradingDock(
 ) {
     Column(Modifier.padding(start = 18.dp, top = 14.dp, end = 18.dp, bottom = 10.dp)) {
         Text(
-            text = "How was your recall?",
+            text = stringResource(R.string.review_recall_prompt),
             fontSize = 12.5.sp,
             fontWeight = FontWeight.SemiBold,
             color = AlkahfColors.InkSecondary,
@@ -543,7 +573,7 @@ private fun GradingDock(
         )
         Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
             GradeButton(
-                label = "Forgot",
+                label = stringResource(R.string.review_grade_forgot),
                 hint = hintFor(portion, ReviewGrade.FORGOT, stumbleCount, growthFactor, autoLower),
                 labelColor = AlkahfColors.ForgotInk,
                 hintColor = AlkahfColors.ForgotHint,
@@ -552,7 +582,7 @@ private fun GradingDock(
                 modifier = Modifier.weight(1f),
             ) { onGrade(ReviewGrade.FORGOT) }
             GradeButton(
-                label = "Hesitant",
+                label = stringResource(R.string.review_grade_hesitant),
                 hint = hintFor(portion, ReviewGrade.HESITANT, stumbleCount, growthFactor, autoLower),
                 labelColor = AlkahfColors.StumbleInk,
                 hintColor = AlkahfColors.HesitantHint,
@@ -577,7 +607,7 @@ private fun GradingDock(
                     verticalArrangement = Arrangement.Center,
                 ) {
                     Text(
-                        text = "Perfect",
+                        text = stringResource(R.string.review_grade_perfect),
                         fontSize = 14.5.sp,
                         fontWeight = FontWeight.Bold,
                         color = AlkahfColors.OnAccent,
@@ -593,7 +623,7 @@ private fun GradingDock(
             }
         }
         Text(
-            text = "Stumbles lower the grade automatically",
+            text = stringResource(R.string.review_stumble_lowers_grade),
             fontSize = 11.sp,
             fontWeight = FontWeight.Medium,
             color = AlkahfColors.InkFooter,
@@ -604,6 +634,7 @@ private fun GradingDock(
 }
 
 /** The honest interval each grade would assign, including the stumble cap. */
+@Composable
 private fun hintFor(
     portion: ReviewPortion,
     grade: ReviewGrade,
@@ -612,10 +643,32 @@ private fun hintFor(
     autoLower: Boolean,
 ): String {
     val effective = ReviewScheduler.effectiveGrade(grade, stumbleCount, autoLower)
-    return ReviewScheduler.intervalLabel(
+    return intervalLabelLocalized(
         ReviewScheduler.nextIntervalDays(portion.intervalDays, effective, growthFactor),
     )
 }
+
+/** Localized counterpart of [ReviewScheduler.intervalLabel]. */
+@Composable
+private fun intervalLabelLocalized(days: Int): String = when {
+    days <= 1 -> stringResource(R.string.review_interval_tomorrow)
+    days < 7 -> pluralStringResource(R.plurals.review_interval_days, days, days)
+    days < 11 -> pluralStringResource(R.plurals.review_interval_weeks, 1, 1)
+    else -> {
+        val weeks = (days + 3) / 7
+        pluralStringResource(R.plurals.review_interval_weeks, weeks, weeks)
+    }
+}
+
+/** Localized counterpart of [ReviewScheduler.gradeLabel]. */
+@Composable
+private fun gradeLabelLocalized(grade: ReviewGrade): String = stringResource(
+    when (grade) {
+        ReviewGrade.FORGOT -> R.string.review_grade_forgot
+        ReviewGrade.HESITANT -> R.string.review_grade_hesitant
+        ReviewGrade.PERFECT -> R.string.review_grade_perfect
+    },
+)
 
 @Composable
 private fun GradeButton(
@@ -679,18 +732,20 @@ private fun GradedDock(
                 tint = AlkahfColors.Accent,
                 modifier = Modifier.size(18.dp),
             )
+            val gradeLabel = gradeLabelLocalized(effective)
+            val intervalLabel = intervalLabelLocalized(interval)
             Text(
-                text = buildString {
-                    append("Graded ${ReviewScheduler.gradeLabel(effective)}")
-                    if (capped) append(" (stumble cap)")
-                    append(" · next review ${ReviewScheduler.intervalLabel(interval)}")
+                text = if (capped) {
+                    stringResource(R.string.review_graded_capped, gradeLabel, intervalLabel)
+                } else {
+                    stringResource(R.string.review_graded, gradeLabel, intervalLabel)
                 },
                 fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = AlkahfColors.InkSecondaryDark,
             )
             Text(
-                text = "Change",
+                text = stringResource(R.string.review_change),
                 fontSize = 12.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = AlkahfColors.InkMuted,
@@ -713,16 +768,32 @@ private fun GradedDock(
             ),
         ) {
             Text(
-                text = if (nextPortionName != null) "Next portion · $nextPortionName →" else "Finish review",
+                text = if (nextPortionName != null) {
+                    stringResource(R.string.review_next_portion, nextPortionName)
+                } else {
+                    stringResource(R.string.review_finish)
+                },
                 fontSize = 15.5.sp,
                 fontWeight = FontWeight.SemiBold,
             )
         }
         Text(
             text = if (remainingAfter > 0) {
-                "$remainingAfter portion${if (remainingAfter > 1) "s" else ""} left · ≈ ${minutesLabel(remainingAfter)}"
+                stringResource(
+                    R.string.review_portions_left,
+                    pluralStringResource(
+                        R.plurals.review_portions,
+                        remainingAfter,
+                        remainingAfter,
+                    ),
+                    pluralStringResource(
+                        R.plurals.review_minutes,
+                        minutesValue(remainingAfter),
+                        minutesValue(remainingAfter),
+                    ),
+                )
             } else {
-                "Last portion of today's queue"
+                stringResource(R.string.review_last_portion)
             },
             fontSize = 11.sp,
             fontWeight = FontWeight.Medium,
@@ -747,7 +818,7 @@ private fun CompletedBody(gradedCount: Int, onDone: () -> Unit) {
             modifier = Modifier.size(44.dp),
         )
         Text(
-            text = "Review complete",
+            text = stringResource(R.string.review_complete_title),
             fontSize = 20.sp,
             fontWeight = FontWeight.Bold,
             color = AlkahfColors.Ink,
@@ -755,9 +826,13 @@ private fun CompletedBody(gradedCount: Int, onDone: () -> Unit) {
         )
         Text(
             text = if (gradedCount > 0) {
-                "$gradedCount portion${if (gradedCount > 1) "s" else ""} graded — the scheduler has set their next reviews"
+                pluralStringResource(
+                    R.plurals.review_complete_summary,
+                    gradedCount,
+                    gradedCount,
+                )
             } else {
-                "Nothing due today"
+                stringResource(R.string.review_nothing_due)
             },
             fontSize = 13.sp,
             fontWeight = FontWeight.Medium,
@@ -774,7 +849,11 @@ private fun CompletedBody(gradedCount: Int, onDone: () -> Unit) {
                 contentColor = AlkahfColors.OnAccent,
             ),
         ) {
-            Text(text = "Back to Today", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+            Text(
+                text = stringResource(R.string.review_back_to_today),
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
         }
     }
 }

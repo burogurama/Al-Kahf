@@ -1,5 +1,6 @@
 package app.alkahf.ui.loop
 
+import android.content.Context
 import android.net.Uri
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
@@ -9,6 +10,7 @@ import app.alkahf.audio.LoopSequencer
 import app.alkahf.audio.LoopStep
 import app.alkahf.data.LoopPreset
 import app.alkahf.data.PageAyah
+import app.alkahf.R
 import app.alkahf.data.QuranRepository
 import app.alkahf.data.audio.AudioStore
 import java.io.File
@@ -76,6 +78,7 @@ class LoopController(
     private val audioStore: AudioStore,
     private val player: ExoPlayer,
     private val scope: CoroutineScope,
+    private val context: Context,
     initialPreset: LoopPreset? = null,
 ) {
     private val _state = MutableStateFlow(
@@ -257,7 +260,7 @@ class LoopController(
             _state.update {
                 it.copy(
                     phase = LoopPhase.ERROR,
-                    errorMessage = "Audio download failed — check your connection",
+                    errorMessage = context.getString(R.string.loop_audio_download_failed),
                 )
             }
             null

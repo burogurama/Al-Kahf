@@ -145,6 +145,7 @@ enum class ReviewPacing(val growthFactor: Double) {
 /** All user-configurable settings, read together for the Settings screen. */
 data class SettingsData(
     val themeMode: String,
+    val appLanguage: String,
     val arabicTextSizePt: Int,
     val dailyBudgetMin: Int,
     val newPerDay: Int,
@@ -162,7 +163,9 @@ data class AyahRange(val surah: Int, val from: Int, val to: Int) {
 /** The current sabaq (portion being learned) for the Home hero card. */
 data class SabaqCard(
     val surah: Int,
-    val reference: String,
+    val surahNameLatin: String,
+    val ayahFrom: Int,
+    val ayahTo: Int,
     val firstAyahText: String,
     val firstAyahMarker: String,
     val states: List<MemorizationState>,
@@ -341,7 +344,9 @@ class QuranRepository(context: Context) {
         val first = ayahs.first()
         return SabaqCard(
             surah = range.surah,
-            reference = "Sūrat $nameLatin · ${range.from}–${range.to}",
+            surahNameLatin = nameLatin,
+            ayahFrom = range.from,
+            ayahTo = range.to,
             firstAyahText = first.words.joinToString(" "),
             firstAyahMarker = first.marker,
             states = ayahs.map { MemorizationState.of(states[it.id] ?: 0) },
@@ -431,6 +436,13 @@ class QuranRepository(context: Context) {
             prefs.edit().putString(KEY_THEME_MODE, value).apply()
         }
 
+    /** In-app UI language: "system" (default) | "en" | "ar". */
+    var appLanguage: String
+        get() = prefs.getString(KEY_APP_LANGUAGE, "system") ?: "system"
+        set(value) {
+            prefs.edit().putString(KEY_APP_LANGUAGE, value).apply()
+        }
+
     val arabicTextSizePt: Int get() = prefs.getInt(KEY_ARABIC_SIZE, 24)
     val dailyBudgetMin: Int get() = prefs.getInt(KEY_DAILY_BUDGET, 15)
     val reviewPacing: ReviewPacing
@@ -440,6 +452,7 @@ class QuranRepository(context: Context) {
 
     fun settings(): SettingsData = SettingsData(
         themeMode = themeMode,
+        appLanguage = appLanguage,
         arabicTextSizePt = arabicTextSizePt,
         dailyBudgetMin = dailyBudgetMin,
         newPerDay = prefs.getInt(KEY_NEW_PER_DAY, 5),
@@ -969,6 +982,7 @@ class QuranRepository(context: Context) {
         private const val KEY_LAST_HIDE_MODE = "last_mushaf_hide_mode"
         private const val KEY_ACTIVE_RECITER = "active_reciter"
         private const val KEY_THEME_MODE = "theme_mode"
+        private const val KEY_APP_LANGUAGE = "app_language"
         private const val KEY_ARABIC_SIZE = "arabic_size_pt"
         private const val KEY_DAILY_BUDGET = "daily_budget_min"
         private const val KEY_NEW_PER_DAY = "new_per_day"

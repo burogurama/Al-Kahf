@@ -1,5 +1,6 @@
 package app.alkahf
 
+import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -13,6 +14,10 @@ import app.alkahf.ui.theme.AlkahfTheme
 import app.alkahf.ui.theme.ThemeMode
 
 class MainActivity : ComponentActivity() {
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(LocaleManager.apply(newBase))
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -24,6 +29,10 @@ class MainActivity : ComponentActivity() {
                     onThemeModeChange = { mode ->
                         themeMode = mode
                         repository.themeMode = mode.name.lowercase()
+                    },
+                    onLanguageChange = { language ->
+                        repository.appLanguage = language
+                        recreate()
                     },
                 )
             }

@@ -43,6 +43,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.LayoutDirection
@@ -50,6 +51,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.media3.exoplayer.ExoPlayer
 import app.alkahf.AlkahfApplication
+import app.alkahf.R
 import app.alkahf.data.PageAyah
 import app.alkahf.data.TawqitSourceType
 import app.alkahf.data.TawqitTrack
@@ -106,7 +108,11 @@ fun TawqitTaggingScreen(
                 .padding(horizontal = 20.dp, vertical = 14.dp),
         ) {
             Text(
-                text = "TAGGING ĀYAH ENDS · ĀYAH ${(state.currentIndex + 1).coerceAtMost(state.ayahs.size)} OF ${state.ayahs.size}",
+                text = stringResource(
+                    R.string.tawqit_header_progress,
+                    (state.currentIndex + 1).coerceAtMost(state.ayahs.size),
+                    state.ayahs.size,
+                ),
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Bold,
                 letterSpacing = 1.4.sp,
@@ -140,20 +146,26 @@ private fun TaggingTopBar(draft: TawqitTrack, onClose: () -> Unit, onSave: () ->
             ) {
                 Icon(
                     imageVector = Icons.Outlined.Close,
-                    contentDescription = "Close",
+                    contentDescription = stringResource(R.string.common_close),
                     tint = AlkahfColors.InkChrome,
                     modifier = Modifier.size(22.dp),
                 )
             }
             Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
-                    text = "Tawqīt",
+                    text = stringResource(R.string.tawqit_title),
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
                     color = AlkahfColors.Ink,
                 )
                 Text(
-                    text = "${draft.sourceLabel} · ${draft.surahNameLatin} ${draft.ayahFrom}–${draft.ayahTo}",
+                    text = stringResource(
+                        R.string.tawqit_source_subtitle,
+                        draft.sourceLabel,
+                        draft.surahNameLatin,
+                        draft.ayahFrom,
+                        draft.ayahTo,
+                    ),
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Medium,
                     color = AlkahfColors.InkFaint,
@@ -165,7 +177,7 @@ private fun TaggingTopBar(draft: TawqitTrack, onClose: () -> Unit, onSave: () ->
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    text = "Save",
+                    text = stringResource(R.string.common_save),
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
                     color = AlkahfColors.AccentDeep,
@@ -209,7 +221,7 @@ private fun CurrentAyahCard(ayah: PageAyah, ayahNumber: Int) {
                 Box(Modifier.size(7.dp).background(AlkahfColors.Accent, CircleShape))
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    text = "NOW PLAYING · ĀYAH $ayahNumber",
+                    text = stringResource(R.string.tawqit_now_playing_ayah, ayahNumber),
                     fontSize = 10.5.sp,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 1.2.sp,
@@ -271,7 +283,7 @@ private fun TaggingDock(state: TawqitUiState, controller: TawqitController) {
                     border = BorderStroke(1.dp, AlkahfColors.ControlBorder),
                 ) {
                     Text(
-                        text = "Tagging at ${formatSpeed(state.speed)}",
+                        text = stringResource(R.string.tawqit_tagging_at_speed, formatSpeed(state.speed)),
                         fontSize = 11.5.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = AlkahfColors.InkSecondaryDark,
@@ -287,7 +299,7 @@ private fun TaggingDock(state: TawqitUiState, controller: TawqitController) {
                 DockSquare(onClick = controller::undo, enabled = state.endTimesMs.isNotEmpty()) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.Undo,
-                        contentDescription = "Undo",
+                        contentDescription = stringResource(R.string.tawqit_undo),
                         tint = AlkahfColors.InkChrome,
                         modifier = Modifier.size(22.dp),
                     )
@@ -295,7 +307,7 @@ private fun TaggingDock(state: TawqitUiState, controller: TawqitController) {
                 DockSquare(onClick = controller::playPause) {
                     Icon(
                         imageVector = if (state.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                        contentDescription = "Play/Pause",
+                        contentDescription = stringResource(R.string.common_play_pause),
                         tint = AlkahfColors.InkChrome,
                         modifier = Modifier.size(24.dp),
                     )
@@ -314,7 +326,11 @@ private fun TaggingDock(state: TawqitUiState, controller: TawqitController) {
                         Box(Modifier.size(7.dp).background(AlkahfColors.OnAccent, CircleShape))
                         Spacer(Modifier.width(9.dp))
                         Text(
-                            text = if (state.isComplete) "All āyāt tagged" else "Mark āyah end",
+                            text = if (state.isComplete) {
+                                stringResource(R.string.tawqit_all_ayat_tagged)
+                            } else {
+                                stringResource(R.string.tawqit_mark_ayah_end)
+                            },
                             fontSize = 15.5.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = AlkahfColors.OnAccent,
@@ -328,14 +344,18 @@ private fun TaggingDock(state: TawqitUiState, controller: TawqitController) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = if (state.isComplete) "Nudge to fix reaction lag, then Save" else "Tap when āyah ${state.currentIndex + 1} finishes",
+                    text = if (state.isComplete) {
+                        stringResource(R.string.tawqit_hint_nudge_then_save)
+                    } else {
+                        stringResource(R.string.tawqit_hint_tap_when_ayah_finishes, state.currentIndex + 1)
+                    },
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Medium,
                     color = AlkahfColors.InkFooter,
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = "NUDGE ALL",
+                        text = stringResource(R.string.tawqit_nudge_all),
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 0.8.sp,

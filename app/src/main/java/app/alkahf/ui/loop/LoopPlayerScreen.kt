@@ -62,6 +62,8 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -72,6 +74,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.media3.exoplayer.ExoPlayer
 import app.alkahf.AlkahfApplication
+import app.alkahf.R
 import app.alkahf.audio.LoopMode
 import app.alkahf.data.SurahOption
 import app.alkahf.data.audio.AudioStore
@@ -91,6 +94,7 @@ fun LoopPlayerScreen(presetId: Long? = null, onBack: () -> Unit = {}) {
             audioStore = AudioStore(context.applicationContext),
             player = ExoPlayer.Builder(context).build(),
             scope = scope,
+            context = context.applicationContext,
         )
     }
     var loadedPreset by remember { mutableStateOf<app.alkahf.data.LoopPreset?>(null) }
@@ -110,11 +114,12 @@ fun LoopPlayerScreen(presetId: Long? = null, onBack: () -> Unit = {}) {
 
     if (showEditor && surahs.isNotEmpty()) {
         val base = loadedPreset
+        val defaultDrillName = stringResource(R.string.loop_default_drill_name)
         BackHandler { showEditor = false }
         PresetEditor(
             initial = state.toPreset().copy(
                 id = base?.id ?: 0L,
-                name = base?.name ?: "Drill",
+                name = base?.name ?: defaultDrillName,
                 isDefault = base?.isDefault ?: false,
             ),
             surahs = surahs,
@@ -161,21 +166,25 @@ private fun LoopTopBar(state: LoopUiState, onBack: () -> Unit, onOpenEditor: () 
         ) {
             Icon(
                 imageVector = Icons.Outlined.KeyboardArrowDown,
-                contentDescription = "Close player",
+                contentDescription = stringResource(R.string.loop_close_player),
                 tint = AlkahfColors.InkChrome,
                 modifier = Modifier.size(24.dp),
             )
         }
         Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-                text = "DRILL SESSION",
+                text = stringResource(R.string.loop_drill_session),
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Bold,
                 letterSpacing = 1.6.sp,
                 color = AlkahfColors.InkFooter,
             )
             Text(
-                text = "Sūrat ${state.surahLatin.ifEmpty { "…" }} · ${state.reciterName}",
+                text = stringResource(
+                    R.string.loop_surah_reciter,
+                    state.surahLatin.ifEmpty { stringResource(R.string.loop_ellipsis) },
+                    state.reciterName,
+                ),
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Bold,
                 color = AlkahfColors.Ink,
@@ -189,7 +198,7 @@ private fun LoopTopBar(state: LoopUiState, onBack: () -> Unit, onOpenEditor: () 
         ) {
             Icon(
                 imageVector = Icons.Outlined.Settings,
-                contentDescription = "Preset settings",
+                contentDescription = stringResource(R.string.loop_preset_settings),
                 tint = AlkahfColors.InkChrome,
                 modifier = Modifier.size(22.dp),
             )
@@ -207,7 +216,7 @@ private fun ChainCard(state: LoopUiState, controller: LoopController) {
         Column(Modifier.padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 14.dp)) {
             Row(Modifier.fillMaxWidth().padding(bottom = 5.dp)) {
                 Text(
-                    text = "LOOP MODE",
+                    text = stringResource(R.string.loop_loop_mode),
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 1.sp,
@@ -215,7 +224,7 @@ private fun ChainCard(state: LoopUiState, controller: LoopController) {
                     modifier = Modifier.weight(1f),
                 )
                 Text(
-                    text = "ĀYĀT TO LOOP",
+                    text = stringResource(R.string.loop_ayat_to_loop),
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 1.sp,
@@ -250,9 +259,9 @@ private fun ModeSegmentedControl(
             .padding(3.dp),
     ) {
         listOf(
-            LoopMode.SINGLE to "Single",
-            LoopMode.RANGE to "Range",
-            LoopMode.CHAIN to "Chain",
+            LoopMode.SINGLE to stringResource(R.string.loop_mode_single),
+            LoopMode.RANGE to stringResource(R.string.loop_mode_range),
+            LoopMode.CHAIN to stringResource(R.string.loop_mode_chain),
         ).forEach { (mode, label) ->
             val isSelected = mode == selected
             Box(
@@ -454,9 +463,9 @@ private fun StatusRow(state: LoopUiState) {
         Surface(shape = RoundedCornerShape(8.dp), color = AlkahfColors.AccentTint2) {
             Text(
                 text = if (state.spanStart == state.spanEnd) {
-                    "Repeating āyah ${state.spanStart}"
+                    stringResource(R.string.loop_repeating_single, state.spanStart)
                 } else {
-                    "Repeating ${state.spanStart} → ${state.spanEnd}"
+                    stringResource(R.string.loop_repeating_range, state.spanStart, state.spanEnd)
                 },
                 fontSize = 12.5.sp,
                 fontWeight = FontWeight.SemiBold,
@@ -467,11 +476,11 @@ private fun StatusRow(state: LoopUiState) {
         }
         Text(
             text = buildAnnotatedString {
-                append("pass ")
+                append(stringResource(R.string.loop_pass_prefix))
                 withStyle(SpanStyle(color = AlkahfColors.Ink, fontWeight = FontWeight.Bold)) {
                     append("${state.pass}")
                 }
-                append(" of ${state.passCount}")
+                append(stringResource(R.string.loop_pass_of, state.passCount))
             },
             fontSize = 12.5.sp,
             fontWeight = FontWeight.Medium,
@@ -480,7 +489,7 @@ private fun StatusRow(state: LoopUiState) {
         Spacer(Modifier.weight(1f))
         state.nextToAdd?.let { next ->
             Text(
-                text = "next · +āyah $next",
+                text = stringResource(R.string.loop_next_add_ayah, next),
                 fontSize = 12.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = AlkahfColors.InkFooter,
@@ -518,7 +527,7 @@ private fun AyahCard(state: LoopUiState, modifier: Modifier = Modifier) {
             }
             when (state.phase) {
                 LoopPhase.ERROR -> Text(
-                    text = state.errorMessage ?: "Something went wrong",
+                    text = state.errorMessage ?: stringResource(R.string.loop_generic_error),
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Medium,
                     color = AlkahfColors.StumbleInk,
@@ -526,7 +535,7 @@ private fun AyahCard(state: LoopUiState, modifier: Modifier = Modifier) {
                     modifier = Modifier.padding(top = 16.dp),
                 )
                 LoopPhase.COMPLETE -> Text(
-                    text = "Drill complete — tap play to run it again",
+                    text = stringResource(R.string.loop_drill_complete),
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Medium,
                     color = AlkahfColors.InkMuted,
@@ -539,12 +548,13 @@ private fun AyahCard(state: LoopUiState, modifier: Modifier = Modifier) {
     }
 }
 
+@Composable
 private fun ayahCardLabel(state: LoopUiState): String = when (state.phase) {
-    LoopPhase.PREPARING -> "PREPARING AUDIO…"
-    LoopPhase.GAP -> "RECITE BACK · ĀYAH ${state.currentAyah}"
-    LoopPhase.COMPLETE -> "SESSION COMPLETE"
-    LoopPhase.ERROR -> "PLAYBACK ERROR"
-    LoopPhase.PLAYING -> "NOW RECITING · ĀYAH ${state.currentAyah}"
+    LoopPhase.PREPARING -> stringResource(R.string.loop_label_preparing)
+    LoopPhase.GAP -> stringResource(R.string.loop_label_recite_back, state.currentAyah)
+    LoopPhase.COMPLETE -> stringResource(R.string.loop_label_session_complete)
+    LoopPhase.ERROR -> stringResource(R.string.loop_label_playback_error)
+    LoopPhase.PLAYING -> stringResource(R.string.loop_label_now_reciting, state.currentAyah)
 }
 
 @Composable
@@ -668,9 +678,9 @@ private fun ProgressSection(state: LoopUiState) {
             Surface(shape = RoundedCornerShape(7.dp), color = AlkahfColors.StumbleBg) {
                 Text(
                     text = if (state.phase == LoopPhase.GAP) {
-                        "↻ recite back · ${formatMultiplier(state.gapMultiplier)} gap"
+                        stringResource(R.string.loop_gap_recite_back, formatMultiplier(state.gapMultiplier))
                     } else {
-                        "↻ then ${formatMultiplier(state.gapMultiplier)} silent gap"
+                        stringResource(R.string.loop_gap_then_silent, formatMultiplier(state.gapMultiplier))
                     },
                     fontSize = 11.sp,
                     fontWeight = FontWeight.SemiBold,
@@ -710,7 +720,7 @@ private fun TransportRow(state: LoopUiState, controller: LoopController) {
         ) {
             Icon(
                 imageVector = Icons.Filled.SkipPrevious,
-                contentDescription = "Previous ayah",
+                contentDescription = stringResource(R.string.loop_previous_ayah),
                 tint = AlkahfColors.TransportGlyph,
                 modifier = Modifier.size(26.dp),
             )
@@ -731,7 +741,11 @@ private fun TransportRow(state: LoopUiState, controller: LoopController) {
                     state.phase == LoopPhase.COMPLETE || state.phase == LoopPhase.ERROR
                 Icon(
                     imageVector = if (showPlay) Icons.Filled.PlayArrow else Icons.Filled.Pause,
-                    contentDescription = if (showPlay) "Play" else "Pause",
+                    contentDescription = if (showPlay) {
+                        stringResource(R.string.loop_play)
+                    } else {
+                        stringResource(R.string.loop_pause)
+                    },
                     tint = AlkahfColors.OnAccent,
                     modifier = Modifier.size(30.dp),
                 )
@@ -743,7 +757,7 @@ private fun TransportRow(state: LoopUiState, controller: LoopController) {
         ) {
             Icon(
                 imageVector = Icons.Filled.SkipNext,
-                contentDescription = "Next ayah",
+                contentDescription = stringResource(R.string.loop_next_ayah),
                 tint = AlkahfColors.TransportGlyph,
                 modifier = Modifier.size(26.dp),
             )
@@ -751,7 +765,7 @@ private fun TransportRow(state: LoopUiState, controller: LoopController) {
         SquareControl(onClick = controller::cyclePerAyah) {
             Icon(
                 imageVector = Icons.Outlined.Repeat,
-                contentDescription = "Per-ayah repeats",
+                contentDescription = stringResource(R.string.loop_per_ayah_repeats),
                 tint = AlkahfColors.InkChrome,
                 modifier = Modifier.size(17.dp),
             )
@@ -803,10 +817,10 @@ private fun PresetStrip(state: LoopUiState, onOpenEditor: () -> Unit) {
         modifier = Modifier.fillMaxWidth().padding(top = 14.dp, bottom = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        PresetCard("PER ĀYAH", "${state.perAyah}×", Modifier.weight(1f), onOpenEditor)
-        PresetCard("PER CHAIN", "${state.perChain}×", Modifier.weight(1f), onOpenEditor)
-        PresetCard("GAP", formatMultiplier(state.gapMultiplier), Modifier.weight(1f), onOpenEditor)
-        PresetCard("SPEED", "${state.speed}×", Modifier.weight(1f), onOpenEditor)
+        PresetCard(stringResource(R.string.loop_strip_per_ayah), "${state.perAyah}×", Modifier.weight(1f), onOpenEditor)
+        PresetCard(stringResource(R.string.loop_strip_per_chain), "${state.perChain}×", Modifier.weight(1f), onOpenEditor)
+        PresetCard(stringResource(R.string.loop_strip_gap), formatMultiplier(state.gapMultiplier), Modifier.weight(1f), onOpenEditor)
+        PresetCard(stringResource(R.string.loop_strip_speed), "${state.speed}×", Modifier.weight(1f), onOpenEditor)
     }
 }
 

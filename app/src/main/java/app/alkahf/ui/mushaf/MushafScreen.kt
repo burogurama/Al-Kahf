@@ -73,6 +73,8 @@ import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLayoutResult
@@ -91,6 +93,7 @@ import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import androidx.media3.exoplayer.ExoPlayer
 import app.alkahf.AlkahfApplication
+import app.alkahf.R
 import app.alkahf.data.AyahRange
 import app.alkahf.data.MushafPage
 import app.alkahf.data.PageAyah
@@ -217,6 +220,7 @@ fun MushafScreen(
     val audioController = remember {
         val reciter = repository.activeReciter
         MushafAudioController(
+            context = context.applicationContext,
             repository = repository,
             audioStore = AudioStore(context.applicationContext),
             player = ExoPlayer.Builder(context).build(),
@@ -352,7 +356,9 @@ fun MushafScreen(
     Column(Modifier.fillMaxSize().background(AlkahfColors.Paper)) {
         MushafTopBar(
             title = currentSession?.page?.primarySurahLatin ?: "",
-            location = currentSession?.page?.let { "Juzʼ ${it.juz} · Page ${it.number}" } ?: "",
+            location = currentSession?.page?.let {
+                stringResource(R.string.mushaf_location, it.juz, it.number)
+            } ?: "",
             hideMode = hideMode,
             audioActive = audioDockOpen || rangeAudioOpen,
             onAudioTap = onHeadsetTap,
@@ -548,7 +554,7 @@ private fun MushafTopBar(
             ) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowLeft,
-                    contentDescription = "Back",
+                    contentDescription = stringResource(R.string.common_back),
                     tint = AlkahfColors.InkChrome,
                     modifier = Modifier.size(26.dp),
                 )
@@ -587,7 +593,7 @@ private fun MushafTopBar(
                         Box(Modifier.size(34.dp), contentAlignment = Alignment.Center) {
                             Icon(
                                 imageVector = Icons.Outlined.Headphones,
-                                contentDescription = "Listening on",
+                                contentDescription = stringResource(R.string.mushaf_listening_on),
                                 tint = AlkahfColors.AccentDeep,
                                 modifier = Modifier.size(18.dp),
                             )
@@ -596,7 +602,7 @@ private fun MushafTopBar(
                 } else {
                     Icon(
                         imageVector = Icons.Outlined.Headphones,
-                        contentDescription = "Listening off",
+                        contentDescription = stringResource(R.string.mushaf_listening_off),
                         tint = AlkahfColors.InkMuted,
                         modifier = Modifier.size(20.dp),
                     )
@@ -611,7 +617,7 @@ private fun MushafTopBar(
                         Box(Modifier.size(34.dp), contentAlignment = Alignment.Center) {
                             Icon(
                                 imageVector = Icons.Outlined.VisibilityOff,
-                                contentDescription = "Hide mode on",
+                                contentDescription = stringResource(R.string.mushaf_hide_mode_on),
                                 tint = AlkahfColors.AccentDeep,
                                 modifier = Modifier.size(18.dp),
                             )
@@ -620,7 +626,7 @@ private fun MushafTopBar(
                 } else {
                     Icon(
                         imageVector = Icons.Outlined.Visibility,
-                        contentDescription = "Hide mode off",
+                        contentDescription = stringResource(R.string.mushaf_hide_mode_off),
                         tint = AlkahfColors.InkMuted,
                         modifier = Modifier.size(20.dp),
                     )
@@ -1024,7 +1030,7 @@ private fun PageFooter(page: MushafPage) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = "Ḥizb ${page.hizb} · Juzʼ ${page.juz}",
+                text = stringResource(R.string.mushaf_hizb_juz, page.hizb, page.juz),
                 fontSize = 11.sp,
                 fontWeight = FontWeight.SemiBold,
                 letterSpacing = 0.4.sp,
@@ -1065,7 +1071,7 @@ private fun SelfTestDock(session: SelfTestSession?) {
                     PulsingDot()
                     Spacer(Modifier.width(7.dp))
                     Text(
-                        text = "SELF-TEST",
+                        text = stringResource(R.string.mushaf_self_test),
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 1.2.sp,
@@ -1080,7 +1086,7 @@ private fun SelfTestDock(session: SelfTestSession?) {
                 )
             }
             Text(
-                text = "Tap to reveal through a word · long-press reveals the whole āyah",
+                text = stringResource(R.string.mushaf_self_test_hint),
                 fontSize = 11.5.sp,
                 fontWeight = FontWeight.Medium,
                 color = AlkahfColors.InkFaint,
@@ -1093,11 +1099,12 @@ private fun SelfTestDock(session: SelfTestSession?) {
     }
 }
 
+@Composable
 private fun recitingLabel(session: SelfTestSession?): String {
     val page = session?.page ?: return ""
-    val current = session.currentAyah ?: return "All ayat recalled"
+    val current = session.currentAyah ?: return stringResource(R.string.mushaf_all_recalled)
     val position = page.ayahs.indexOfFirst { it.id == current.id } + 1
-    return "Reciting ayah $position of ${page.ayahs.size}"
+    return stringResource(R.string.mushaf_reciting_ayah, position, page.ayahs.size)
 }
 
 /** Positions a popup so its top edge sits just above [anchor] (window px). */
@@ -1149,24 +1156,24 @@ private fun SelectionContextMenu(
             modifier = Modifier.width(216.dp),
         ) {
             Column(Modifier.padding(vertical = 6.dp)) {
-                MenuItem(label = "Listen", onClick = onListen)
-                MenuItem(label = "Set as sabaq", onClick = onSetSabaq)
+                MenuItem(label = stringResource(R.string.mushaf_menu_listen), onClick = onListen)
+                MenuItem(label = stringResource(R.string.mushaf_menu_set_sabaq), onClick = onSetSabaq)
                 HorizontalDivider(
                     thickness = 1.dp,
                     color = AlkahfColors.Hairline,
                     modifier = Modifier.padding(vertical = 4.dp),
                 )
                 MenuItem(
-                    label = "Set state",
+                    label = stringResource(R.string.mushaf_menu_set_state),
                     trailing = if (stateOpen) "▲" else "▼",
                     onClick = { stateOpen = !stateOpen },
                 )
                 if (stateOpen) {
                     listOf(
-                        MemorizationState.NOT_STARTED to "Not started",
-                        MemorizationState.LEARNING to "Learning",
-                        MemorizationState.MEMORIZED to "Memorized",
-                        MemorizationState.STRONG to "Strong",
+                        MemorizationState.NOT_STARTED to stringResource(R.string.state_not_started),
+                        MemorizationState.LEARNING to stringResource(R.string.state_learning),
+                        MemorizationState.MEMORIZED to stringResource(R.string.state_memorized),
+                        MemorizationState.STRONG to stringResource(R.string.state_strong),
                     ).forEach { (state, label) ->
                         StateMenuItem(
                             label = label,
@@ -1217,7 +1224,7 @@ private fun StateMenuItem(label: String, color: Color, selected: Boolean, onClic
         )
         if (selected) {
             Text(
-                text = "current",
+                text = stringResource(R.string.mushaf_state_current),
                 fontSize = 10.5.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = AlkahfColors.AccentDeep,
@@ -1245,13 +1252,13 @@ private fun SelectionHintBar(
         ) {
             Column(Modifier.weight(1f)) {
                 Text(
-                    text = "$count āyah${if (count > 1) "āt" else ""} selected",
+                    text = pluralStringResource(R.plurals.mushaf_ayah_selected, count, count),
                     fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = AlkahfColors.Ink,
                 )
                 Text(
-                    text = "Long-press the selection for actions",
+                    text = stringResource(R.string.mushaf_selection_hint),
                     fontSize = 11.5.sp,
                     fontWeight = FontWeight.Medium,
                     color = AlkahfColors.InkFaint,
@@ -1269,7 +1276,7 @@ private fun SelectionHintBar(
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
                             imageVector = Icons.Filled.Stop,
-                            contentDescription = "Stop",
+                            contentDescription = stringResource(R.string.common_stop),
                             tint = AlkahfColors.InkChrome,
                             modifier = Modifier.size(20.dp),
                         )
@@ -1281,7 +1288,7 @@ private fun SelectionHintBar(
                 modifier = Modifier.clickable(onClick = onClear).padding(horizontal = 12.dp, vertical = 8.dp),
             ) {
                 Text(
-                    text = "Clear",
+                    text = stringResource(R.string.common_clear),
                     fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = AlkahfColors.InkMuted,
@@ -1317,7 +1324,7 @@ private fun RangeAudioDock(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = "Listen to selection",
+                    text = stringResource(R.string.mushaf_listen_to_selection),
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
                     color = AlkahfColors.Ink,
@@ -1327,7 +1334,7 @@ private fun RangeAudioDock(
                     modifier = Modifier.clickable(onClick = onClose).padding(horizontal = 8.dp, vertical = 4.dp),
                 ) {
                     Text(
-                        text = "Done",
+                        text = stringResource(R.string.common_done),
                         fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = AlkahfColors.AccentDeep,
@@ -1336,15 +1343,15 @@ private fun RangeAudioDock(
             }
             AudioSegmented(
                 options = listOf(
-                    MushafAudioMode.LISTEN to "Normal",
-                    MushafAudioMode.RECITE_BACK to "Recite back",
+                    MushafAudioMode.LISTEN to stringResource(R.string.mushaf_mode_normal),
+                    MushafAudioMode.RECITE_BACK to stringResource(R.string.mushaf_mode_recite_back),
                 ),
                 selected = mode,
                 onSelect = onMode,
             )
             Spacer(Modifier.height(10.dp))
             Text(
-                text = "Speed",
+                text = stringResource(R.string.mushaf_speed),
                 fontSize = 11.sp,
                 fontWeight = FontWeight.SemiBold,
                 letterSpacing = 0.6.sp,
@@ -1358,7 +1365,7 @@ private fun RangeAudioDock(
             )
             Spacer(Modifier.height(10.dp))
             Text(
-                text = "Repeat",
+                text = stringResource(R.string.mushaf_repeat),
                 fontSize = 11.sp,
                 fontWeight = FontWeight.SemiBold,
                 letterSpacing = 0.6.sp,
@@ -1382,7 +1389,11 @@ private fun RangeAudioDock(
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
                             imageVector = if (idle) Icons.Filled.PlayArrow else Icons.Filled.Stop,
-                            contentDescription = if (idle) "Play" else "Stop",
+                            contentDescription = if (idle) {
+                                stringResource(R.string.common_play)
+                            } else {
+                                stringResource(R.string.common_stop)
+                            },
                             tint = AlkahfColors.OnAccent,
                             modifier = Modifier.size(22.dp),
                         )
@@ -1391,11 +1402,18 @@ private fun RangeAudioDock(
                 Text(
                     text = when {
                         state.errorMessage != null -> state.errorMessage
-                        state.phase == MushafAudioPhase.IDLE -> "Ready"
-                        state.phase == MushafAudioPhase.PREPARING -> "Preparing audio…"
+                        state.phase == MushafAudioPhase.IDLE -> stringResource(R.string.mushaf_audio_ready)
+                        state.phase == MushafAudioPhase.PREPARING ->
+                            stringResource(R.string.mushaf_audio_preparing)
                         state.phase == MushafAudioPhase.GAP ->
-                            "Recite back · āyah ${(state.currentAyahId ?: 0) % 1000}"
-                        else -> "Āyah ${(state.currentAyahId ?: 0) % 1000}"
+                            stringResource(
+                                R.string.mushaf_audio_recite_back_ayah,
+                                (state.currentAyahId ?: 0) % 1000,
+                            )
+                        else -> stringResource(
+                            R.string.mushaf_audio_ayah,
+                            (state.currentAyahId ?: 0) % 1000,
+                        )
                     },
                     fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,
@@ -1434,14 +1452,14 @@ private fun LearnSurahSheet(
                     Box(Modifier.width(38.dp).height(4.dp).background(AlkahfColors.DashedNode, RoundedCornerShape(2.dp)))
                 }
                 Text(
-                    text = "Start learning Sūrat $surahName",
+                    text = stringResource(R.string.mushaf_start_learning, surahName),
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                     color = AlkahfColors.Ink,
                     modifier = Modifier.padding(bottom = 6.dp),
                 )
                 Text(
-                    text = "Every āyah not yet memorized will be marked as learning, the sūrah will be split into sections, and the first section becomes your sabaq.",
+                    text = stringResource(R.string.mushaf_start_learning_body),
                     fontSize = 13.5.sp,
                     color = AlkahfColors.InkMuted,
                     lineHeight = 19.sp,
@@ -1457,7 +1475,7 @@ private fun LearnSurahSheet(
                     ) {
                         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             Text(
-                                text = "Cancel",
+                                text = stringResource(R.string.common_cancel),
                                 fontSize = 14.5.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = AlkahfColors.Ink,
@@ -1472,7 +1490,7 @@ private fun LearnSurahSheet(
                     ) {
                         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             Text(
-                                text = "Set as sabaq",
+                                text = stringResource(R.string.mushaf_menu_set_sabaq),
                                 fontSize = 14.5.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = AlkahfColors.OnAccent,
@@ -1502,22 +1520,22 @@ private fun MushafAudioDock(
         ) {
             AudioSegmented(
                 options = listOf(
-                    MushafAudioMode.LISTEN to "Listen",
-                    MushafAudioMode.RECITE_BACK to "Recite back",
-                    MushafAudioMode.TAP to "Tap āyah",
+                    MushafAudioMode.LISTEN to stringResource(R.string.mushaf_mode_listen),
+                    MushafAudioMode.RECITE_BACK to stringResource(R.string.mushaf_mode_recite_back),
+                    MushafAudioMode.TAP to stringResource(R.string.mushaf_mode_tap_ayah),
                 ),
                 selected = state.mode,
                 onSelect = onMode,
             )
             Spacer(Modifier.height(8.dp))
             if (state.mode == MushafAudioMode.TAP) {
-                AudioHint("Tap any āyah on the page to hear it")
+                AudioHint(stringResource(R.string.mushaf_hint_tap_to_hear))
             } else {
                 AudioSegmented(
                     options = listOf(
-                        MushafAudioScope.PAGE to "Page",
-                        MushafAudioScope.SURAH to "Surah",
-                        MushafAudioScope.FROM_AYAH to "From āyah",
+                        MushafAudioScope.PAGE to stringResource(R.string.mushaf_scope_page),
+                        MushafAudioScope.SURAH to stringResource(R.string.mushaf_scope_surah),
+                        MushafAudioScope.FROM_AYAH to stringResource(R.string.mushaf_scope_from_ayah),
                     ),
                     selected = state.scope,
                     onSelect = onScope,
@@ -1526,7 +1544,7 @@ private fun MushafAudioDock(
                     state.phase == MushafAudioPhase.IDLE
                 ) {
                     Spacer(Modifier.height(6.dp))
-                    AudioHint("Tap an āyah on the page to start from it")
+                    AudioHint(stringResource(R.string.mushaf_hint_tap_to_start))
                 }
             }
             Spacer(Modifier.height(10.dp))
@@ -1541,7 +1559,11 @@ private fun MushafAudioDock(
                         val showPlay = state.phase == MushafAudioPhase.IDLE || state.isPaused
                         Icon(
                             imageVector = if (showPlay) Icons.Filled.PlayArrow else Icons.Filled.Pause,
-                            contentDescription = if (showPlay) "Play" else "Pause",
+                            contentDescription = if (showPlay) {
+                                stringResource(R.string.common_play)
+                            } else {
+                                stringResource(R.string.common_pause)
+                            },
                             tint = AlkahfColors.OnAccent,
                             modifier = Modifier.size(22.dp),
                         )
@@ -1551,11 +1573,19 @@ private fun MushafAudioDock(
                     Text(
                         text = when {
                             state.errorMessage != null -> state.errorMessage
-                            state.phase == MushafAudioPhase.IDLE -> "Ready"
-                            state.phase == MushafAudioPhase.PREPARING -> "Preparing audio…"
+                            state.phase == MushafAudioPhase.IDLE ->
+                                stringResource(R.string.mushaf_audio_ready)
+                            state.phase == MushafAudioPhase.PREPARING ->
+                                stringResource(R.string.mushaf_audio_preparing)
                             state.phase == MushafAudioPhase.GAP ->
-                                "Recite back · āyah ${(state.currentAyahId ?: 0) % 1000}"
-                            else -> "Āyah ${(state.currentAyahId ?: 0) % 1000}"
+                                stringResource(
+                                    R.string.mushaf_audio_recite_back_ayah,
+                                    (state.currentAyahId ?: 0) % 1000,
+                                )
+                            else -> stringResource(
+                                R.string.mushaf_audio_ayah,
+                                (state.currentAyahId ?: 0) % 1000,
+                            )
                         },
                         fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold,
@@ -1584,7 +1614,7 @@ private fun MushafAudioDock(
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
                                 imageVector = Icons.Filled.Stop,
-                                contentDescription = "Stop",
+                                contentDescription = stringResource(R.string.common_stop),
                                 tint = AlkahfColors.InkChrome,
                                 modifier = Modifier.size(20.dp),
                             )

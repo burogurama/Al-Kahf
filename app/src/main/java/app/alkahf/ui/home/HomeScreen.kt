@@ -39,6 +39,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -47,6 +49,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.alkahf.R
 import app.alkahf.ui.components.AlkahfBottomNav
 import app.alkahf.ui.components.AlkahfTab
 import app.alkahf.ui.theme.AlkahfColors
@@ -108,7 +111,7 @@ private fun HomeHeader(state: HomeUiState, onOpenSettings: () -> Unit) {
     ) {
         Column {
             Text(
-                text = state.greeting,
+                text = stringResource(R.string.home_greeting),
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Medium,
                 color = AlkahfColors.InkMuted,
@@ -116,7 +119,7 @@ private fun HomeHeader(state: HomeUiState, onOpenSettings: () -> Unit) {
                 maxLines = 1,
             )
             Text(
-                text = "Today",
+                text = stringResource(R.string.home_today),
                 fontSize = 31.sp,
                 fontWeight = FontWeight.Bold,
                 color = AlkahfColors.Ink,
@@ -140,7 +143,7 @@ private fun HomeHeader(state: HomeUiState, onOpenSettings: () -> Unit) {
             ) {
                 Icon(
                     imageVector = Icons.Outlined.Settings,
-                    contentDescription = "Settings",
+                    contentDescription = stringResource(R.string.home_settings),
                     tint = AlkahfColors.InkMuted,
                     modifier = Modifier.size(22.dp),
                 )
@@ -150,7 +153,7 @@ private fun HomeHeader(state: HomeUiState, onOpenSettings: () -> Unit) {
 }
 
 private fun todayLabel(): String =
-    LocalDate.now().format(DateTimeFormatter.ofPattern("EEEE, d MMMM", Locale.ENGLISH))
+    LocalDate.now().format(DateTimeFormatter.ofPattern("EEEE, d MMMM", Locale.getDefault()))
 
 @Composable
 private fun StreakChip(days: Int) {
@@ -176,7 +179,7 @@ private fun StreakChip(days: Int) {
                 color = AlkahfColors.Ink,
             )
             Text(
-                text = "DAYS",
+                text = stringResource(R.string.home_days),
                 fontSize = 11.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = AlkahfColors.InkFaint,
@@ -196,21 +199,21 @@ private fun NoSabaqCard(onOpenMushaf: () -> Unit) {
     ) {
         Column(Modifier.padding(20.dp)) {
             Text(
-                text = "NEW · SABAQ",
+                text = stringResource(R.string.home_new_sabaq),
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Bold,
                 letterSpacing = 1.4.sp,
                 color = AlkahfColors.InkMuted,
             )
             Text(
-                text = "No sabaq yet",
+                text = stringResource(R.string.home_no_sabaq),
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
                 color = AlkahfColors.Ink,
                 modifier = Modifier.padding(top = 8.dp),
             )
             Text(
-                text = "Open a surah in the Mushaf and tap its name to start learning it.",
+                text = stringResource(R.string.home_no_sabaq_hint),
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Medium,
                 color = AlkahfColors.InkFaint,
@@ -256,7 +259,7 @@ private fun SabaqCard(state: HomeUiState, onOpenMushaf: () -> Unit) {
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        text = "NEW · SABAQ",
+                        text = stringResource(R.string.home_new_sabaq),
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 1.4.sp,
@@ -321,7 +324,11 @@ private fun ProgressRow(state: HomeUiState) {
             }
         }
         Text(
-            text = "${state.memorizedInSabaq} of ${state.sabaqAyahStates.size} ayat memorized",
+            text = stringResource(
+                R.string.home_ayat_memorized,
+                state.memorizedInSabaq,
+                state.sabaqAyahStates.size,
+            ),
             fontSize = 12.5.sp,
             fontWeight = FontWeight.SemiBold,
             color = AlkahfColors.InkSecondary,
@@ -361,7 +368,7 @@ private fun ActionRow(onOpenMushaf: () -> Unit) {
             )
             Spacer(Modifier.width(8.dp))
             Text(
-                text = "Continue learning",
+                text = stringResource(R.string.home_continue_learning),
                 fontSize = 15.sp,
                 fontWeight = FontWeight.SemiBold,
             )
@@ -376,7 +383,7 @@ private fun ActionRow(onOpenMushaf: () -> Unit) {
             Box(contentAlignment = Alignment.Center) {
                 Icon(
                     imageVector = Icons.Outlined.VisibilityOff,
-                    contentDescription = "Hide & self-test",
+                    contentDescription = stringResource(R.string.home_hide_self_test),
                     tint = AlkahfColors.AccentDeep,
                     modifier = Modifier.size(22.dp),
                 )
@@ -400,7 +407,7 @@ private fun MurajaahCard(state: HomeUiState, onOpenReview: () -> Unit) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = "REVIEW · MURĀJAʿAH",
+                    text = stringResource(R.string.home_review_murajaah),
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 1.4.sp,
@@ -408,7 +415,7 @@ private fun MurajaahCard(state: HomeUiState, onOpenReview: () -> Unit) {
                 )
                 Surface(shape = CircleShape, color = AlkahfColors.GoldBg) {
                     Text(
-                        text = "DUE TODAY",
+                        text = stringResource(R.string.home_due_today),
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         color = AlkahfColors.GoldText,
@@ -421,7 +428,11 @@ private fun MurajaahCard(state: HomeUiState, onOpenReview: () -> Unit) {
                 horizontalArrangement = Arrangement.spacedBy(9.dp),
             ) {
                 Text(
-                    text = "${state.reviewPortionCount} portions",
+                    text = pluralStringResource(
+                        R.plurals.home_portions,
+                        state.reviewPortionCount,
+                        state.reviewPortionCount,
+                    ),
                     fontSize = 24.sp,
                     fontWeight = FontWeight.Bold,
                     color = AlkahfColors.Ink,
@@ -430,7 +441,7 @@ private fun MurajaahCard(state: HomeUiState, onOpenReview: () -> Unit) {
                     modifier = Modifier.alignByBaseline(),
                 )
                 Text(
-                    text = "≈ ${state.reviewEstimatedMinutes} min",
+                    text = stringResource(R.string.home_approx_min, state.reviewEstimatedMinutes),
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Medium,
                     color = AlkahfColors.InkFaint,
@@ -468,7 +479,7 @@ private fun MurajaahCard(state: HomeUiState, onOpenReview: () -> Unit) {
                 elevation = null,
             ) {
                 Text(
-                    text = "Start review",
+                    text = stringResource(R.string.home_start_review),
                     fontSize = 15.sp,
                     fontWeight = FontWeight.SemiBold,
                 )
@@ -519,7 +530,7 @@ private fun ResumeDrillCard(state: HomeUiState, onOpenLoop: () -> Unit) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
                         imageVector = Icons.Filled.PlayArrow,
-                        contentDescription = "Resume drill",
+                        contentDescription = stringResource(R.string.home_resume_drill),
                         tint = AlkahfColors.PlayTileInk,
                         modifier = Modifier.size(22.dp),
                     )
@@ -527,7 +538,7 @@ private fun ResumeDrillCard(state: HomeUiState, onOpenLoop: () -> Unit) {
             }
             Column(Modifier.weight(1f)) {
                 Text(
-                    text = "RESUME DRILL",
+                    text = stringResource(R.string.home_resume_drill_caption),
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 1.sp,
@@ -570,7 +581,7 @@ private fun ThisWeekCard(state: HomeUiState) {
         ) {
             Column {
                 Text(
-                    text = "This week",
+                    text = stringResource(R.string.home_this_week),
                     fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = AlkahfColors.Ink,

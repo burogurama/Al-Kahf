@@ -7,9 +7,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import android.content.res.Resources
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.rememberCoroutineScope
 import app.alkahf.AlkahfApplication
+import app.alkahf.R
 import app.alkahf.data.HomeData
 import app.alkahf.data.LoopPreset
 import app.alkahf.data.MemorizationState
@@ -32,13 +34,15 @@ private enum class AlkahfDestination {
     Home, Mushaf, Loop, Review, Progress, Library, ReciterDownloads, TawqitTagging, Settings
 }
 
-private fun buildHomeUiState(data: HomeData, preset: LoopPreset): HomeUiState {
+private fun buildHomeUiState(res: Resources, data: HomeData, preset: LoopPreset): HomeUiState {
     val names = data.review.names
     val sabaq = data.sabaq
     return HomeUiState(
         streakDays = data.streakDays,
         hasSabaq = sabaq != null,
-        sabaqReference = sabaq?.reference ?: "",
+        sabaqReference = sabaq?.let {
+            res.getString(R.string.home_sabaq_reference, it.surahNameLatin, it.ayahFrom, it.ayahTo)
+        } ?: "",
         sabaqAyahText = sabaq?.firstAyahText ?: "",
         sabaqAyahMarker = sabaq?.firstAyahMarker ?: "",
         sabaqAyahStates = sabaq?.states?.map { it.toHomeState() } ?: emptyList(),
@@ -46,9 +50,23 @@ private fun buildHomeUiState(data: HomeData, preset: LoopPreset): HomeUiState {
         reviewEstimatedMinutes = data.review.minutes,
         reviewPortionNames = names.take(4),
         reviewOverflowCount = (names.size - 4).coerceAtLeast(0),
-        drillPresetTitle = "${preset.reciterName} · ${preset.surahNameLatin} ${preset.ayahFrom}–${preset.ayahTo}",
-        drillPresetDetail = "Cumulative chain · ${preset.perAyah}× each · ${preset.perChain}× chain",
-        weekSummary = "${data.week.daysPracticed} of 7 days · ${data.week.ayatThisWeek} ayat",
+        drillPresetTitle = res.getString(
+            R.string.home_drill_title,
+            preset.reciterName,
+            preset.surahNameLatin,
+            preset.ayahFrom,
+            preset.ayahTo,
+        ),
+        drillPresetDetail = res.getString(
+            R.string.home_drill_detail,
+            preset.perAyah,
+            preset.perChain,
+        ),
+        weekSummary = res.getString(
+            R.string.home_week_summary,
+            data.week.daysPracticed,
+            data.week.ayatThisWeek,
+        ),
         weekDays = data.week.dayLetters.mapIndexed { index, letter ->
             val isToday = index == data.week.dayLetters.lastIndex
             WeekDay(
@@ -73,6 +91,7 @@ private fun MemorizationState.toHomeState(): AyahMemorizationState = when (this)
 @Composable
 fun AlkahfApp(
     onThemeModeChange: (app.alkahf.ui.theme.ThemeMode) -> Unit = {},
+    onLanguageChange: (String) -> Unit = {},
 ) {
     var destination by remember { mutableStateOf(AlkahfDestination.Home) }
     // Set when the Mushaf is opened for a specific surah (the sabaq) or page
@@ -107,9 +126,10 @@ fun AlkahfApp(
         }
     }
 
+    val resources = LocalContext.current.resources
     val homeState by produceState(initialValue = HomeUiState(), destination) {
         if (destination == AlkahfDestination.Home) {
-            value = buildHomeUiState(repository.homeData(), repository.defaultPreset())
+            value = buildHomeUiState(resources, repository.homeData(), repository.defaultPreset())
         }
     }
 
@@ -178,6 +198,7 @@ fun AlkahfApp(
             app.alkahf.ui.settings.SettingsScreen(
                 onBack = { destination = AlkahfDestination.Home },
                 onThemeModeChange = onThemeModeChange,
+                onLanguageChange = onLanguageChange,
             )
         }
         AlkahfDestination.TawqitTagging -> {

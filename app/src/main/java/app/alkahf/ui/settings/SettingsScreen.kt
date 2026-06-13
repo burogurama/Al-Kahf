@@ -34,10 +34,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.alkahf.AlkahfApplication
+import app.alkahf.R
 import app.alkahf.data.ReviewPacing
 import app.alkahf.data.SettingsData
 import app.alkahf.ui.theme.AlkahfColors
@@ -50,6 +52,7 @@ private const val SAMPLE_BASMALA = "بِسْمِ ٱللَّهِ ٱلرَّحْم
 fun SettingsScreen(
     onBack: () -> Unit,
     onThemeModeChange: (ThemeMode) -> Unit,
+    onLanguageChange: (String) -> Unit = {},
 ) {
     val context = LocalContext.current
     val repository = remember { (context.applicationContext as AlkahfApplication).repository }
@@ -71,13 +74,13 @@ fun SettingsScreen(
             ) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowLeft,
-                    contentDescription = "Back",
+                    contentDescription = stringResource(R.string.common_back),
                     tint = AlkahfColors.InkChrome,
                     modifier = Modifier.size(26.dp),
                 )
             }
             Text(
-                text = "Settings",
+                text = stringResource(R.string.settings_title),
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
                 color = AlkahfColors.Ink,
@@ -88,15 +91,36 @@ fun SettingsScreen(
         Column(
             Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp),
         ) {
-            SectionCaption("APPEARANCE")
+            SectionCaption(stringResource(R.string.settings_section_language))
             SettingsCard {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    RowLabel("Theme")
+                    RowLabel(stringResource(R.string.settings_language))
                     Segmented(
                         options = listOf(
-                            ThemeMode.LIGHT to "Light",
-                            ThemeMode.DARK to "Dark",
-                            ThemeMode.SYSTEM to "System",
+                            "system" to stringResource(R.string.settings_language_auto),
+                            "en" to "English",
+                            "ar" to "العربية",
+                        ),
+                        selected = settings.appLanguage,
+                        onSelect = { language ->
+                            if (language != settings.appLanguage) {
+                                settings = settings.copy(appLanguage = language)
+                                onLanguageChange(language)
+                            }
+                        },
+                    )
+                }
+            }
+
+            SectionCaption(stringResource(R.string.settings_section_appearance))
+            SettingsCard {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    RowLabel(stringResource(R.string.settings_theme))
+                    Segmented(
+                        options = listOf(
+                            ThemeMode.LIGHT to stringResource(R.string.settings_theme_light),
+                            ThemeMode.DARK to stringResource(R.string.settings_theme_dark),
+                            ThemeMode.SYSTEM to stringResource(R.string.settings_theme_system),
                         ),
                         selected = settings.themeMode.toMode(),
                         onSelect = { mode ->
@@ -110,9 +134,9 @@ fun SettingsScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        RowLabel("Arabic text size")
+                        RowLabel(stringResource(R.string.settings_arabic_text_size))
                         Text(
-                            text = "${settings.arabicTextSizePt} pt",
+                            text = stringResource(R.string.settings_pt_value, settings.arabicTextSizePt),
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
                             color = AlkahfColors.AccentDeep,
@@ -137,33 +161,33 @@ fun SettingsScreen(
                         ),
                     )
                     Divider()
-                    NavRow(label = "Script", value = "KFGQPC Uthmanic · HAFS")
+                    NavRow(label = stringResource(R.string.settings_script), value = "KFGQPC Uthmanic · HAFS")
                 }
             }
 
-            SectionCaption("REVIEW & SCHEDULE")
+            SectionCaption(stringResource(R.string.settings_section_review))
             SettingsCard {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     StepperRow(
-                        label = "Daily review budget",
-                        value = "${settings.dailyBudgetMin} min",
+                        label = stringResource(R.string.settings_daily_budget),
+                        value = stringResource(R.string.settings_min_value, settings.dailyBudgetMin),
                         onDecrement = { apply(settings.copy(dailyBudgetMin = (settings.dailyBudgetMin - 5).coerceAtLeast(5))) },
                         onIncrement = { apply(settings.copy(dailyBudgetMin = (settings.dailyBudgetMin + 5).coerceAtMost(120))) },
                     )
                     Divider()
                     StepperRow(
-                        label = "New āyāt per day",
+                        label = stringResource(R.string.settings_new_per_day),
                         value = "${settings.newPerDay}",
                         onDecrement = { apply(settings.copy(newPerDay = (settings.newPerDay - 1).coerceAtLeast(1))) },
                         onIncrement = { apply(settings.copy(newPerDay = (settings.newPerDay + 1).coerceAtMost(20))) },
                     )
                     Divider()
-                    RowLabel("Review pacing")
+                    RowLabel(stringResource(R.string.settings_review_pacing))
                     Segmented(
                         options = listOf(
-                            ReviewPacing.GENTLE to "Gentle",
-                            ReviewPacing.STANDARD to "Standard",
-                            ReviewPacing.AGGRESSIVE to "Aggressive",
+                            ReviewPacing.GENTLE to stringResource(R.string.settings_pacing_gentle),
+                            ReviewPacing.STANDARD to stringResource(R.string.settings_pacing_standard),
+                            ReviewPacing.AGGRESSIVE to stringResource(R.string.settings_pacing_aggressive),
                         ),
                         selected = settings.reviewPacing,
                         onSelect = { apply(settings.copy(reviewPacing = it)) },
@@ -176,27 +200,27 @@ fun SettingsScreen(
                     )
                     Divider()
                     ToggleRow(
-                        label = "Stumbles lower the grade",
-                        subtitle = "Marked slips cap a review's grade automatically",
+                        label = stringResource(R.string.settings_stumbles_lower),
+                        subtitle = stringResource(R.string.settings_stumbles_lower_sub),
                         checked = settings.autoLowerOnStumble,
                         onChange = { apply(settings.copy(autoLowerOnStumble = it)) },
                     )
                 }
             }
 
-            SectionCaption("GENERAL")
+            SectionCaption(stringResource(R.string.settings_section_general))
             SettingsCard {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     ToggleRow(
-                        label = "Keep screen on while reading",
+                        label = stringResource(R.string.settings_keep_screen_on),
                         subtitle = null,
                         checked = settings.keepScreenOn,
                         onChange = { apply(settings.copy(keepScreenOn = it)) },
                     )
                     Divider()
                     ToggleRow(
-                        label = "Background audio & lock-screen controls",
-                        subtitle = "Coming soon",
+                        label = stringResource(R.string.settings_background_audio),
+                        subtitle = stringResource(R.string.settings_coming_soon),
                         checked = settings.backgroundAudio,
                         onChange = { apply(settings.copy(backgroundAudio = it)) },
                     )
@@ -208,13 +232,13 @@ fun SettingsScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(
-                    text = "Alkahf · v0.7",
+                    text = stringResource(R.string.settings_app_version),
                     fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = AlkahfColors.InkFaint,
                 )
                 Text(
-                    text = "All data stored on this device · no account",
+                    text = stringResource(R.string.settings_footer_privacy),
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Medium,
                     color = AlkahfColors.InkFooter,
@@ -231,11 +255,14 @@ private fun String.toMode(): ThemeMode = when (this) {
     else -> ThemeMode.SYSTEM
 }
 
-private fun pacingHint(pacing: ReviewPacing): String = when (pacing) {
-    ReviewPacing.GENTLE -> "Longer first intervals · fewer reviews"
-    ReviewPacing.STANDARD -> "Balanced SM-2 schedule (recommended)"
-    ReviewPacing.AGGRESSIVE -> "Tighter intervals · firmer retention"
-}
+@Composable
+private fun pacingHint(pacing: ReviewPacing): String = stringResource(
+    when (pacing) {
+        ReviewPacing.GENTLE -> R.string.settings_pacing_gentle_hint
+        ReviewPacing.STANDARD -> R.string.settings_pacing_standard_hint
+        ReviewPacing.AGGRESSIVE -> R.string.settings_pacing_aggressive_hint
+    },
+)
 
 @Composable
 private fun SectionCaption(text: String) {

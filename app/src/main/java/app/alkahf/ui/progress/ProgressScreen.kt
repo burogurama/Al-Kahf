@@ -33,6 +33,8 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -40,6 +42,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.alkahf.AlkahfApplication
+import app.alkahf.R
 import app.alkahf.data.JuzProgress
 import app.alkahf.data.JuzStatus
 import app.alkahf.data.MemorizationState
@@ -92,14 +95,18 @@ private fun ProgressHeader(data: ProgressSnapshot) {
     ) {
         Column {
             Text(
-                text = "Progress",
+                text = stringResource(R.string.progress_title),
                 fontSize = 31.sp,
                 fontWeight = FontWeight.Bold,
                 color = AlkahfColors.Ink,
                 letterSpacing = (-0.5).sp,
             )
             Text(
-                text = "${data.memorizedAyahCount} āyāt held in memory",
+                text = pluralStringResource(
+                    R.plurals.progress_ayat_in_memory,
+                    data.memorizedAyahCount,
+                    data.memorizedAyahCount,
+                ),
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Medium,
                 color = AlkahfColors.InkFaint,
@@ -117,7 +124,7 @@ private fun ProgressHeader(data: ProgressSnapshot) {
                 color = AlkahfColors.Accent,
             )
             Text(
-                text = "OF THE QURAN",
+                text = stringResource(R.string.progress_of_quran),
                 fontSize = 11.sp,
                 fontWeight = FontWeight.SemiBold,
                 letterSpacing = 0.3.sp,
@@ -141,7 +148,10 @@ private fun MushafMapCard(data: ProgressSnapshot, onOpenPage: (Int) -> Unit) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = "THE MUSHAF · 604 PAGES",
+                    text = stringResource(
+                        R.string.progress_mushaf_header,
+                        QuranRepository.PAGE_COUNT,
+                    ),
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 1.4.sp,
@@ -149,7 +159,10 @@ private fun MushafMapCard(data: ProgressSnapshot, onOpenPage: (Int) -> Unit) {
                     maxLines = 1,
                 )
                 Text(
-                    text = "${data.memorizedPageCount} memorized",
+                    text = stringResource(
+                        R.string.progress_pages_memorized,
+                        data.memorizedPageCount,
+                    ),
                     fontSize = 11.5.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = AlkahfColors.InkFaint,
@@ -222,11 +235,12 @@ private fun LegendRow() {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         listOf(
-            MemorizationState.STRONG to "Strong",
-            MemorizationState.MEMORIZED to "Memorized",
-            MemorizationState.LEARNING to "Learning",
-            MemorizationState.NOT_STARTED to "Not started",
-        ).forEach { (state, label) ->
+            MemorizationState.STRONG to R.string.progress_state_strong,
+            MemorizationState.MEMORIZED to R.string.progress_state_memorized,
+            MemorizationState.LEARNING to R.string.progress_state_learning,
+            MemorizationState.NOT_STARTED to R.string.progress_state_not_started,
+        ).forEach { (state, labelRes) ->
+            val label = stringResource(labelRes)
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(5.dp),
@@ -256,7 +270,7 @@ private fun ByJuzCard(juzProgress: List<JuzProgress>) {
     ) {
         Column(Modifier.padding(horizontal = 18.dp, vertical = 15.dp)) {
             Text(
-                text = "BY JUZʼ",
+                text = stringResource(R.string.progress_by_juz),
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Bold,
                 letterSpacing = 1.4.sp,
@@ -279,7 +293,7 @@ private fun JuzRow(juz: JuzProgress) {
     }
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(
-            text = "Juzʼ ${juz.juz}",
+            text = stringResource(R.string.progress_juz_label, juz.juz),
             fontSize = 13.sp,
             fontWeight = FontWeight.SemiBold,
             color = AlkahfColors.InkSecondaryDark,
@@ -300,7 +314,7 @@ private fun JuzRow(juz: JuzProgress) {
             )
         }
         Text(
-            text = "${juz.percent}%",
+            text = stringResource(R.string.progress_percent, juz.percent),
             fontSize = 12.5.sp,
             fontWeight = FontWeight.Bold,
             color = if (juz.status == JuzStatus.COMPLETE) AlkahfColors.AccentDeep else AlkahfColors.InkSecondaryDark,
@@ -316,15 +330,32 @@ private fun ActivityRow(data: ProgressSnapshot) {
         modifier = Modifier.fillMaxWidth().padding(bottom = 3.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        ActivityTile("${data.streakDays}", "day streak", Modifier.weight(1f))
-        ActivityTile("${data.weekAyahCount}", "āyāt this week", Modifier.weight(1f))
-        ActivityTile(formatPracticeTime(data.totalPracticeMs), "time spent", Modifier.weight(1f))
+        ActivityTile(
+            value = "${data.streakDays}",
+            label = stringResource(R.string.progress_day_streak),
+            modifier = Modifier.weight(1f),
+        )
+        ActivityTile(
+            value = "${data.weekAyahCount}",
+            label = stringResource(R.string.progress_ayat_this_week),
+            modifier = Modifier.weight(1f),
+        )
+        ActivityTile(
+            value = formatPracticeTime(data.totalPracticeMs),
+            label = stringResource(R.string.progress_time_spent),
+            modifier = Modifier.weight(1f),
+        )
     }
 }
 
+@Composable
 private fun formatPracticeTime(ms: Long): String {
     val minutes = ms / 60_000
-    return if (minutes >= 60) "%.1fh".format(minutes / 60f) else "${minutes}m"
+    return if (minutes >= 60) {
+        stringResource(R.string.progress_hours_value, minutes / 60f)
+    } else {
+        stringResource(R.string.progress_minutes_value, minutes)
+    }
 }
 
 @Composable

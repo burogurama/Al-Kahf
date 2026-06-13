@@ -36,10 +36,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.alkahf.R
 import app.alkahf.data.LoopPreset
 import app.alkahf.data.SurahOption
 import app.alkahf.data.audio.RECITERS
@@ -73,6 +75,7 @@ fun PresetEditor(
 
     val surah = surahs.getOrNull(surahIndex) ?: return
     val maxTo = minOf(ayahFrom + LoopController.MAX_SPAN - 1, surah.ayahCount)
+    val presetName = stringResource(R.string.loop_preset_name, surah.nameLatin, ayahFrom, ayahTo)
 
     fun clampRange() {
         ayahFrom = ayahFrom.coerceIn(1, surah.ayahCount)
@@ -96,13 +99,13 @@ fun PresetEditor(
             ) {
                 Icon(
                     imageVector = Icons.Outlined.Close,
-                    contentDescription = "Close editor",
+                    contentDescription = stringResource(R.string.loop_close_editor),
                     tint = AlkahfColors.InkChrome,
                     modifier = Modifier.size(22.dp),
                 )
             }
             Text(
-                text = "Drill preset",
+                text = stringResource(R.string.loop_drill_preset),
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold,
                 color = AlkahfColors.Ink,
@@ -118,10 +121,10 @@ fun PresetEditor(
                 .padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.spacedBy(9.dp),
         ) {
-            EditorCard("PASSAGE") {
+            EditorCard(stringResource(R.string.loop_card_passage)) {
                 StepperRow(
-                    label = "Surah",
-                    value = "${surah.number} · ${surah.nameLatin}",
+                    label = stringResource(R.string.loop_field_surah),
+                    value = stringResource(R.string.loop_surah_value, surah.number, surah.nameLatin),
                     onDecrement = {
                         if (surahIndex > 0) {
                             surahIndex--
@@ -138,19 +141,19 @@ fun PresetEditor(
                     },
                 )
                 StepperRow(
-                    label = "From āyah",
+                    label = stringResource(R.string.loop_field_from_ayah),
                     value = "$ayahFrom",
                     onDecrement = { ayahFrom = (ayahFrom - 1).coerceAtLeast(1); clampRange() },
                     onIncrement = { ayahFrom = (ayahFrom + 1).coerceAtMost(surah.ayahCount); clampRange() },
                 )
                 StepperRow(
-                    label = "To āyah",
+                    label = stringResource(R.string.loop_field_to_ayah),
                     value = "$ayahTo",
                     onDecrement = { ayahTo = (ayahTo - 1).coerceAtLeast(ayahFrom) },
                     onIncrement = { ayahTo = (ayahTo + 1).coerceAtMost(maxTo) },
                 )
             }
-            EditorCard("RECITER") {
+            EditorCard(stringResource(R.string.loop_card_reciter)) {
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(7.dp),
                     verticalArrangement = Arrangement.spacedBy(7.dp),
@@ -177,36 +180,36 @@ fun PresetEditor(
                     }
                 }
             }
-            EditorCard("DRILL") {
+            EditorCard(stringResource(R.string.loop_card_drill)) {
                 StepperRow(
-                    label = "Per āyah",
+                    label = stringResource(R.string.loop_field_per_ayah),
                     value = "$perAyah×",
                     onDecrement = { perAyah = (perAyah - 1).coerceAtLeast(1) },
                     onIncrement = { perAyah = (perAyah + 1).coerceAtMost(10) },
                 )
                 StepperRow(
-                    label = "Per chain",
+                    label = stringResource(R.string.loop_field_per_chain),
                     value = "$perChain×",
                     onDecrement = { perChain = (perChain - 1).coerceAtLeast(1) },
                     onIncrement = { perChain = (perChain + 1).coerceAtMost(10) },
                 )
                 StepperRow(
-                    label = "Recite-back gap",
+                    label = stringResource(R.string.loop_field_recite_back_gap),
                     value = formatFactor(gap),
                     onDecrement = { gap = (gap - 0.5f).coerceAtLeast(0.5f) },
                     onIncrement = { gap = (gap + 0.5f).coerceAtMost(3f) },
                 )
                 StepperRow(
-                    label = "Speed",
+                    label = stringResource(R.string.loop_field_speed),
                     value = formatFactor(speed),
                     onDecrement = { speed = (speed - 0.25f).coerceAtLeast(0.75f) },
                     onIncrement = { speed = (speed + 0.25f).coerceAtMost(1.5f) },
                 )
             }
-            EditorCard("DEFAULT") {
+            EditorCard(stringResource(R.string.loop_card_default)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = "Resume drill uses this preset",
+                        text = stringResource(R.string.loop_resume_uses_preset),
                         fontSize = 13.5.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = AlkahfColors.InkSecondaryDark,
@@ -222,7 +225,11 @@ fun PresetEditor(
                         ),
                     ) {
                         Text(
-                            text = if (isDefault) "Default" else "Make default",
+                            text = if (isDefault) {
+                                stringResource(R.string.loop_default_badge)
+                            } else {
+                                stringResource(R.string.loop_make_default)
+                            },
                             fontSize = 12.5.sp,
                             fontWeight = FontWeight.Bold,
                             color = if (isDefault) AlkahfColors.AccentDeep else AlkahfColors.InkMuted,
@@ -237,7 +244,7 @@ fun PresetEditor(
                 onSave(
                     LoopPreset(
                         id = initial.id,
-                        name = "${surah.nameLatin} $ayahFrom–$ayahTo",
+                        name = presetName,
                         surah = surah.number,
                         surahNameLatin = surah.nameLatin,
                         ayahFrom = ayahFrom,
@@ -269,7 +276,7 @@ fun PresetEditor(
             ),
         ) {
             Text(
-                text = "Save & start drill",
+                text = stringResource(R.string.loop_save_start_drill),
                 fontSize = 15.5.sp,
                 fontWeight = FontWeight.SemiBold,
             )

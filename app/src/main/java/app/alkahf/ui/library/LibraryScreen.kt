@@ -38,10 +38,13 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.alkahf.AlkahfApplication
+import app.alkahf.R
 import app.alkahf.data.LoopPreset
 import app.alkahf.data.QuranRepository
 import app.alkahf.data.ReciterStatus
@@ -89,7 +92,7 @@ fun LibraryScreen(
         ) {
             LibraryHeader()
             storage?.let { StorageMeter(it) }
-            SectionCaption("RECITERS")
+            SectionCaption(stringResource(R.string.library_section_reciters))
             reciters.forEach { reciter ->
                 ReciterRow(
                     reciter = reciter,
@@ -105,7 +108,7 @@ fun LibraryScreen(
                 )
             }
             NewReciterButton { showNewReciter = true }
-            SectionCaption("DRILL PRESETS")
+            SectionCaption(stringResource(R.string.library_section_drill_presets))
             presets.forEach { preset ->
                 PresetRow(preset = preset, onClick = { onOpenPreset(preset.id) })
             }
@@ -146,7 +149,7 @@ private fun NewReciterButton(onClick: () -> Unit) {
         contentAlignment = Alignment.Center,
     ) {
         Text(
-            text = "+  Import a reciter",
+            text = stringResource(R.string.library_import_reciter_button),
             fontSize = 13.5.sp,
             fontWeight = FontWeight.SemiBold,
             color = AlkahfColors.InkMuted,
@@ -160,11 +163,11 @@ private fun NewReciterDialog(onDismiss: () -> Unit, onCreate: (String) -> Unit) 
     androidx.compose.material3.AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = AlkahfColors.Surface,
-        title = { Text("Import a reciter", fontWeight = FontWeight.Bold, color = AlkahfColors.Ink) },
+        title = { Text(stringResource(R.string.library_import_reciter_title), fontWeight = FontWeight.Bold, color = AlkahfColors.Ink) },
         text = {
             Column {
                 Text(
-                    "Name this reciter profile, then import an audio file per sūrah.",
+                    stringResource(R.string.library_import_reciter_message),
                     fontSize = 13.sp,
                     color = AlkahfColors.InkSecondary,
                     modifier = Modifier.padding(bottom = 12.dp),
@@ -173,7 +176,7 @@ private fun NewReciterDialog(onDismiss: () -> Unit, onCreate: (String) -> Unit) 
                     value = name,
                     onValueChange = { name = it },
                     singleLine = true,
-                    placeholder = { Text("e.g. Mishary (my recording)") },
+                    placeholder = { Text(stringResource(R.string.library_import_reciter_name_hint)) },
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
@@ -182,11 +185,11 @@ private fun NewReciterDialog(onDismiss: () -> Unit, onCreate: (String) -> Unit) 
             androidx.compose.material3.TextButton(
                 onClick = { if (name.isNotBlank()) onCreate(name) },
                 enabled = name.isNotBlank(),
-            ) { Text("Create", color = AlkahfColors.AccentDeep, fontWeight = FontWeight.Bold) }
+            ) { Text(stringResource(R.string.common_create), color = AlkahfColors.AccentDeep, fontWeight = FontWeight.Bold) }
         },
         dismissButton = {
             androidx.compose.material3.TextButton(onClick = onDismiss) {
-                Text("Cancel", color = AlkahfColors.InkMuted)
+                Text(stringResource(R.string.common_cancel), color = AlkahfColors.InkMuted)
             }
         },
     )
@@ -196,14 +199,14 @@ private fun NewReciterDialog(onDismiss: () -> Unit, onCreate: (String) -> Unit) 
 private fun LibraryHeader() {
     Column(Modifier.padding(start = 4.dp, top = 10.dp, end = 4.dp, bottom = 4.dp)) {
         Text(
-            text = "Library",
+            text = stringResource(R.string.library_title),
             fontSize = 31.sp,
             fontWeight = FontWeight.Bold,
             color = AlkahfColors.Ink,
             letterSpacing = (-0.5).sp,
         )
         Text(
-            text = "Reciters, downloads & presets",
+            text = stringResource(R.string.library_subtitle),
             fontSize = 13.sp,
             fontWeight = FontWeight.Medium,
             color = AlkahfColors.InkFaint,
@@ -222,13 +225,17 @@ private fun StorageMeter(storage: StorageInfo) {
         Column(Modifier.padding(horizontal = 16.dp, vertical = 13.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(
-                    text = "Offline audio",
+                    text = stringResource(R.string.library_offline_audio),
                     fontSize = 12.5.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = AlkahfColors.InkSecondaryDark,
                 )
                 Text(
-                    text = "${formatBytes(storage.usedBytes)} of ${formatBytes(storage.totalBytes)}",
+                    text = stringResource(
+                        R.string.library_storage_used_of_total,
+                        formatBytes(storage.usedBytes),
+                        formatBytes(storage.totalBytes),
+                    ),
                     fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = AlkahfColors.InkFaint,
@@ -317,7 +324,7 @@ private fun ReciterRow(
             if (reciter.isActive) {
                 Surface(shape = CircleShape, color = AlkahfColors.AccentTint) {
                     Text(
-                        text = "ACTIVE",
+                        text = stringResource(R.string.library_badge_active),
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         color = AlkahfColors.AccentDeep,
@@ -333,7 +340,8 @@ private fun ReciterRow(
                 border = BorderStroke(1.dp, AlkahfColors.Chevron),
             ) {
                 Text(
-                    text = if (reciter.isImported) "Open" else "Manage",
+                    text = if (reciter.isImported) stringResource(R.string.library_action_open)
+                    else stringResource(R.string.library_action_manage),
                     fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = AlkahfColors.InkChrome,
@@ -344,14 +352,20 @@ private fun ReciterRow(
     }
 }
 
+@Composable
 private fun reciterSubtitle(reciter: ReciterStatus): String = when {
-    reciter.isImported && reciter.itemCount > 0 -> "Imported · ${reciter.itemCount} sūrah${plural(reciter.itemCount)}"
-    reciter.isImported -> "Imported reciter · no audio yet"
-    reciter.itemCount > 0 -> "${reciter.itemCount} of 114 sūrahs · ${formatBytes(reciter.bytes)}"
-    else -> "Not downloaded"
+    reciter.isImported && reciter.itemCount > 0 -> stringResource(
+        R.string.library_reciter_subtitle_imported_count,
+        pluralStringResource(R.plurals.library_surah_count, reciter.itemCount, reciter.itemCount),
+    )
+    reciter.isImported -> stringResource(R.string.library_reciter_subtitle_imported_empty)
+    reciter.itemCount > 0 -> stringResource(
+        R.string.library_reciter_subtitle_downloaded,
+        reciter.itemCount,
+        formatBytes(reciter.bytes),
+    )
+    else -> stringResource(R.string.library_reciter_subtitle_not_downloaded)
 }
-
-private fun plural(n: Int): String = if (n == 1) "" else "s"
 
 @Composable
 private fun PresetRow(preset: LoopPreset, onClick: () -> Unit) {
@@ -385,7 +399,12 @@ private fun PresetRow(preset: LoopPreset, onClick: () -> Unit) {
                     color = AlkahfColors.Ink,
                 )
                 Text(
-                    text = "${preset.reciterName} · ${formatFactor(preset.gapMultiplier)} gap · ${formatFactor(preset.speed)} speed",
+                    text = stringResource(
+                        R.string.library_preset_subtitle,
+                        preset.reciterName,
+                        formatFactor(preset.gapMultiplier),
+                        formatFactor(preset.speed),
+                    ),
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium,
                     color = AlkahfColors.InkFaint,
@@ -395,7 +414,7 @@ private fun PresetRow(preset: LoopPreset, onClick: () -> Unit) {
             if (preset.isDefault) {
                 Surface(shape = CircleShape, color = AlkahfColors.AccentTint) {
                     Text(
-                        text = "DEFAULT",
+                        text = stringResource(R.string.library_badge_default),
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         color = AlkahfColors.AccentDeep,
@@ -440,7 +459,7 @@ private fun NewPresetButton(onClick: () -> Unit) {
                 modifier = Modifier.size(18.dp),
             )
             Text(
-                text = "New preset",
+                text = stringResource(R.string.library_new_preset),
                 fontSize = 13.5.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = AlkahfColors.InkMuted,

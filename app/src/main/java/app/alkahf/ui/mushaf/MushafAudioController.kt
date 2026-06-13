@@ -1,9 +1,11 @@
 package app.alkahf.ui.mushaf
 
+import android.content.Context
 import android.net.Uri
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
+import app.alkahf.R
 import app.alkahf.data.QuranRepository
 import app.alkahf.data.audio.AudioStore
 import java.io.File
@@ -41,6 +43,7 @@ data class MushafAudioState(
  * tapped-ayah playback. Runs on the main dispatcher (ExoPlayer requirement).
  */
 class MushafAudioController(
+    private val context: Context,
     private val repository: QuranRepository,
     private val audioStore: AudioStore,
     private val player: ExoPlayer,
@@ -116,7 +119,7 @@ class MushafAudioController(
                         it.copy(
                             phase = MushafAudioPhase.IDLE,
                             currentAyahId = null,
-                            errorMessage = "Audio download failed — check your connection",
+                            errorMessage = context.getString(R.string.mushaf_audio_download_failed),
                         )
                     }
                     return

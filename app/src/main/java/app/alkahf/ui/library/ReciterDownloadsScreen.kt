@@ -40,10 +40,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.alkahf.AlkahfApplication
+import app.alkahf.R
 import app.alkahf.data.ReciterSurahItem
 import app.alkahf.ui.theme.AlkahfColors
 import kotlinx.coroutines.Job
@@ -121,7 +124,7 @@ fun ReciterDownloadsScreen(
             ) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowLeft,
-                    contentDescription = "Back",
+                    contentDescription = stringResource(R.string.common_back),
                     tint = AlkahfColors.InkChrome,
                     modifier = Modifier.size(26.dp),
                 )
@@ -129,8 +132,17 @@ fun ReciterDownloadsScreen(
             Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(text = reciterName, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = AlkahfColors.Ink)
                 Text(
-                    text = if (isImported) "$readyCount of ${surahs.size} sūrahs imported"
-                    else "$readyCount of ${surahs.size} sūrahs downloaded",
+                    text = if (isImported) pluralStringResource(
+                        R.plurals.library_surahs_imported_progress,
+                        surahs.size,
+                        readyCount,
+                        surahs.size,
+                    ) else pluralStringResource(
+                        R.plurals.library_surahs_downloaded_progress,
+                        surahs.size,
+                        readyCount,
+                        surahs.size,
+                    ),
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Medium,
                     color = AlkahfColors.InkFaint,
@@ -153,9 +165,13 @@ fun ReciterDownloadsScreen(
                 Box(contentAlignment = Alignment.Center) {
                     Text(
                         text = when {
-                            bulkJob != null -> "Cancel download"
-                            allDone -> "All sūrahs downloaded"
-                            else -> "Download all ${surahs.size} sūrahs"
+                            bulkJob != null -> stringResource(R.string.library_cancel_download)
+                            allDone -> stringResource(R.string.library_all_surahs_downloaded)
+                            else -> pluralStringResource(
+                                R.plurals.library_download_all_surahs,
+                                surahs.size,
+                                surahs.size,
+                            )
                         },
                         fontSize = 15.sp,
                         fontWeight = FontWeight.SemiBold,
@@ -165,7 +181,7 @@ fun ReciterDownloadsScreen(
             }
         } else {
             Text(
-                text = "Import an audio file for each sūrah, then tap “Time it” to sync it to the page.",
+                text = stringResource(R.string.library_import_instructions),
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Medium,
                 color = AlkahfColors.InkFaint,
@@ -248,7 +264,8 @@ private fun SurahRow(
                         color = if (surah.timed) AlkahfColors.AccentTint2 else AlkahfColors.Accent,
                     ) {
                         Text(
-                            text = if (surah.timed) "Re-time" else "Time it",
+                            text = if (surah.timed) stringResource(R.string.library_retime)
+                            else stringResource(R.string.library_time_it),
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
                             color = if (surah.timed) AlkahfColors.AccentDeep else AlkahfColors.OnAccent,
@@ -264,7 +281,7 @@ private fun SurahRow(
                     border = BorderStroke(1.dp, AlkahfColors.Chevron),
                 ) {
                     Text(
-                        text = "Import",
+                        text = stringResource(R.string.library_action_import),
                         fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = AlkahfColors.InkChrome,
@@ -276,7 +293,7 @@ private fun SurahRow(
                         Modifier.size(28.dp).background(AlkahfColors.AccentTint2, CircleShape),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Icon(Icons.Outlined.Check, "Downloaded", tint = AlkahfColors.AccentDeep, modifier = Modifier.size(16.dp))
+                        Icon(Icons.Outlined.Check, stringResource(R.string.library_status_downloaded), tint = AlkahfColors.AccentDeep, modifier = Modifier.size(16.dp))
                     }
                     DeleteButton(onDelete)
                 }
@@ -288,7 +305,7 @@ private fun SurahRow(
                     modifier = Modifier.size(34.dp),
                 ) {
                     Box(contentAlignment = Alignment.Center) {
-                        Icon(Icons.Outlined.Download, "Download", tint = AlkahfColors.InkChrome, modifier = Modifier.size(17.dp))
+                        Icon(Icons.Outlined.Download, stringResource(R.string.library_action_download), tint = AlkahfColors.InkChrome, modifier = Modifier.size(17.dp))
                     }
                 }
             }
@@ -302,17 +319,30 @@ private fun DeleteButton(onDelete: () -> Unit) {
         modifier = Modifier.size(34.dp).clickable(onClick = onDelete),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(Icons.Outlined.Delete, "Delete", tint = AlkahfColors.Chevron, modifier = Modifier.size(18.dp))
+        Icon(Icons.Outlined.Delete, stringResource(R.string.common_delete), tint = AlkahfColors.Chevron, modifier = Modifier.size(18.dp))
     }
 }
 
+@Composable
 private fun subtitleFor(surah: ReciterSurahItem): String = when {
-    surah.isImported && surah.hasAudio && surah.timed -> "Imported · timed"
-    surah.isImported && surah.hasAudio -> "Imported · not yet timed"
-    surah.isImported -> "${surah.ayahCount} āyāt · no file"
-    surah.hasAudio -> "Downloaded · ${formatBytes2(surah.bytes)}"
-    surah.downloadedAyahs > 0 -> "${surah.downloadedAyahs} of ${surah.ayahCount} āyāt"
-    else -> "${surah.ayahCount} āyāt"
+    surah.isImported && surah.hasAudio && surah.timed ->
+        stringResource(R.string.library_surah_subtitle_imported_timed)
+    surah.isImported && surah.hasAudio ->
+        stringResource(R.string.library_surah_subtitle_imported_not_timed)
+    surah.isImported -> stringResource(
+        R.string.library_surah_subtitle_imported_no_file,
+        pluralStringResource(R.plurals.library_ayah_count, surah.ayahCount, surah.ayahCount),
+    )
+    surah.hasAudio -> stringResource(
+        R.string.library_surah_subtitle_downloaded,
+        formatBytes2(surah.bytes),
+    )
+    surah.downloadedAyahs > 0 -> stringResource(
+        R.string.library_surah_subtitle_ayah_progress,
+        surah.downloadedAyahs,
+        surah.ayahCount,
+    )
+    else -> pluralStringResource(R.plurals.library_ayah_count, surah.ayahCount, surah.ayahCount)
 }
 
 private fun formatBytes2(bytes: Long): String = when {

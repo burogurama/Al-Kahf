@@ -1,0 +1,396 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">الكهف</string>
+
+    <!-- Common / shared -->
+    <string name="common_back">رجوع</string>
+    <string name="common_cancel">إلغاء</string>
+    <string name="common_create">إنشاء</string>
+    <string name="common_delete">حذف</string>
+    <string name="common_close">إغلاق</string>
+    <string name="common_save">حفظ</string>
+    <string name="common_done">تم</string>
+    <string name="common_play">تشغيل</string>
+    <string name="common_pause">إيقاف مؤقت</string>
+    <string name="common_stop">إيقاف</string>
+    <string name="common_clear">مسح</string>
+    <string name="common_play_pause">تشغيل/إيقاف مؤقت</string>
+
+    <!-- Memorization states -->
+    <string name="state_not_started">لم يبدأ</string>
+    <string name="state_learning">قيد الحفظ</string>
+    <string name="state_memorized">محفوظ</string>
+    <string name="state_strong">متقن</string>
+
+    <!-- Bottom navigation -->
+    <string name="nav_today">اليوم</string>
+    <string name="nav_mushaf">المصحف</string>
+    <string name="nav_review">المراجعة</string>
+    <string name="nav_progress">التقدّم</string>
+    <string name="nav_library">المكتبة</string>
+
+    <!-- Home / Today -->
+    <string name="home_greeting">السلام عليكم</string>
+    <string name="home_today">اليوم</string>
+    <string name="home_settings">الإعدادات</string>
+    <string name="home_days">يوم</string>
+    <string name="home_new_sabaq">جديد · السبق</string>
+    <string name="home_no_sabaq">لا يوجد سبق بعد</string>
+    <string name="home_no_sabaq_hint">افتح سورة في المصحف وانقر على اسمها لبدء حفظها.</string>
+    <string name="home_sabaq_reference">سورة %1$s · %2$d–%3$d</string>
+    <string name="home_ayat_memorized">حُفظت %1$d من %2$d آية</string>
+    <string name="home_continue_learning">متابعة الحفظ</string>
+    <string name="home_hide_self_test">الإخفاء والاختبار الذاتي</string>
+    <string name="home_review_murajaah">المراجعة · مُراجعة</string>
+    <string name="home_due_today">مستحق اليوم</string>
+    <string name="home_approx_min">≈ %1$d د</string>
+    <string name="home_start_review">بدء المراجعة</string>
+    <string name="home_resume_drill">استئناف التمرين</string>
+    <string name="home_resume_drill_caption">استئناف التمرين</string>
+    <string name="home_drill_title">%1$s · %2$s %3$d–%4$d</string>
+    <string name="home_drill_detail">سلسلة تراكمية · %1$d× لكل آية · %2$d× للسلسلة</string>
+    <string name="home_this_week">هذا الأسبوع</string>
+    <string name="home_week_summary">%1$d من 7 أيّام · %2$d آية</string>
+    <plurals name="home_portions">
+        <item quantity="zero">لا مقاطع</item>
+        <item quantity="one">مقطع واحد</item>
+        <item quantity="two">مقطعان</item>
+        <item quantity="few">%1$d مقاطع</item>
+        <item quantity="many">%1$d مقطعًا</item>
+        <item quantity="other">%1$d مقطع</item>
+    </plurals>
+
+    <!-- Settings -->
+    <string name="settings_title">الإعدادات</string>
+    <string name="settings_section_language">اللغة</string>
+    <string name="settings_language">لغة التطبيق</string>
+    <string name="settings_language_auto">تلقائي</string>
+    <string name="settings_section_appearance">المظهر</string>
+    <string name="settings_theme">السمة</string>
+    <string name="settings_theme_light">فاتح</string>
+    <string name="settings_theme_dark">داكن</string>
+    <string name="settings_theme_system">النظام</string>
+    <string name="settings_arabic_text_size">حجم النص العربي</string>
+    <string name="settings_pt_value">%1$d نقطة</string>
+    <string name="settings_script">الرسم</string>
+    <string name="settings_section_review">المراجعة والجدولة</string>
+    <string name="settings_daily_budget">حصة المراجعة اليومية</string>
+    <string name="settings_min_value">%1$d د</string>
+    <string name="settings_new_per_day">آيات جديدة في اليوم</string>
+    <string name="settings_review_pacing">وتيرة المراجعة</string>
+    <string name="settings_pacing_gentle">هادئة</string>
+    <string name="settings_pacing_standard">قياسية</string>
+    <string name="settings_pacing_aggressive">مكثّفة</string>
+    <string name="settings_pacing_gentle_hint">فترات أولى أطول · مراجعات أقل</string>
+    <string name="settings_pacing_standard_hint">جدول SM-2 متوازن (مُوصى به)</string>
+    <string name="settings_pacing_aggressive_hint">فترات أضيق · ترسيخ أمتن</string>
+    <string name="settings_stumbles_lower">التعثّرات تخفض التقدير</string>
+    <string name="settings_stumbles_lower_sub">الزلّات المُعلَّمة تحدّ من تقدير المراجعة تلقائيًّا</string>
+    <string name="settings_section_general">عام</string>
+    <string name="settings_keep_screen_on">إبقاء الشاشة مضاءة أثناء القراءة</string>
+    <string name="settings_background_audio">الصوت في الخلفية وأزرار شاشة القفل</string>
+    <string name="settings_coming_soon">قريبًا</string>
+    <string name="settings_app_version">الكهف · إصدار 0.8</string>
+    <string name="settings_footer_privacy">جميع البيانات محفوظة على هذا الجهاز · بدون حساب</string>
+
+    <!-- Mushaf -->
+    <string name="mushaf_location">جزء %1$d · صفحة %2$d</string>
+    <string name="mushaf_listening_on">الاستماع مُفعَّل</string>
+    <string name="mushaf_listening_off">الاستماع مُعطَّل</string>
+    <string name="mushaf_hide_mode_on">وضع الإخفاء مُفعَّل</string>
+    <string name="mushaf_hide_mode_off">وضع الإخفاء مُعطَّل</string>
+    <string name="mushaf_hizb_juz">حزب %1$d · جزء %2$d</string>
+    <string name="mushaf_self_test">اختبار ذاتي</string>
+    <string name="mushaf_self_test_hint">انقر لكشف ما حتى الكلمة · اضغط مطوّلًا لكشف الآية كاملة</string>
+    <string name="mushaf_all_recalled">تمّ استذكار كل الآيات</string>
+    <string name="mushaf_reciting_ayah">تلاوة الآية %1$d من %2$d</string>
+    <string name="mushaf_menu_listen">استماع</string>
+    <string name="mushaf_menu_set_sabaq">تعيين كسبق</string>
+    <string name="mushaf_menu_set_state">تعيين الحالة</string>
+    <string name="mushaf_state_current">الحالية</string>
+    <string name="mushaf_selection_hint">اضغط مطوّلًا على التحديد للإجراءات</string>
+    <plurals name="mushaf_ayah_selected">
+        <item quantity="zero">لا آيات محدّدة</item>
+        <item quantity="one">آية واحدة محدّدة</item>
+        <item quantity="two">آيتان محدّدتان</item>
+        <item quantity="few">%1$d آيات محدّدة</item>
+        <item quantity="many">%1$d آيةً محدّدة</item>
+        <item quantity="other">%1$d آية محدّدة</item>
+    </plurals>
+    <string name="mushaf_listen_to_selection">الاستماع للتحديد</string>
+    <string name="mushaf_speed">السرعة</string>
+    <string name="mushaf_repeat">التكرار</string>
+    <string name="mushaf_mode_normal">عادي</string>
+    <string name="mushaf_mode_listen">استماع</string>
+    <string name="mushaf_mode_recite_back">ترديد</string>
+    <string name="mushaf_mode_tap_ayah">نقر الآية</string>
+    <string name="mushaf_scope_page">الصفحة</string>
+    <string name="mushaf_scope_surah">السورة</string>
+    <string name="mushaf_scope_from_ayah">من آية</string>
+    <string name="mushaf_hint_tap_to_hear">انقر أي آية في الصفحة لسماعها</string>
+    <string name="mushaf_hint_tap_to_start">انقر آية في الصفحة لتبدأ منها</string>
+    <string name="mushaf_start_learning">بدء حفظ سورة %1$s</string>
+    <string name="mushaf_start_learning_body">كل آية لم تُحفظ بعد ستُعلَّم بأنها قيد الحفظ، وستُقسَّم السورة إلى مقاطع، ويصبح المقطع الأول سبقك.</string>
+
+    <!-- Mushaf audio status -->
+    <string name="mushaf_audio_download_failed">فشل تنزيل الصوت — تحقّق من اتصالك</string>
+    <string name="mushaf_audio_ready">جاهز</string>
+    <string name="mushaf_audio_preparing">جارٍ تحضير الصوت…</string>
+    <string name="mushaf_audio_recite_back_ayah">ترديد · الآية %1$d</string>
+    <string name="mushaf_audio_ayah">الآية %1$d</string>
+
+    <!-- Loop / drill player -->
+    <string name="loop_default_drill_name">تمرين</string>
+    <string name="loop_close_player">إغلاق المشغّل</string>
+    <string name="loop_drill_session">جلسة التمرين</string>
+    <string name="loop_ellipsis">…</string>
+    <string name="loop_surah_reciter">سورة %1$s · %2$s</string>
+    <string name="loop_preset_settings">إعدادات التمرين</string>
+    <string name="loop_loop_mode">نمط التكرار</string>
+    <string name="loop_ayat_to_loop">الآيات المكرَّرة</string>
+    <string name="loop_mode_single">مفردة</string>
+    <string name="loop_mode_range">مجال</string>
+    <string name="loop_mode_chain">سلسلة</string>
+    <string name="loop_repeating_single">تكرار الآية %1$d</string>
+    <string name="loop_repeating_range">تكرار %1$d ← %2$d</string>
+    <string name="loop_pass_prefix">المرور </string>
+    <string name="loop_pass_of"> من %1$d</string>
+    <string name="loop_next_add_ayah">التالي · +آية %1$d</string>
+    <string name="loop_generic_error">حدث خطأ ما</string>
+    <string name="loop_drill_complete">اكتمل التمرين — اضغط تشغيل لإعادته</string>
+    <string name="loop_label_preparing">جارٍ تحضير الصوت…</string>
+    <string name="loop_label_recite_back">ترديد · الآية %1$d</string>
+    <string name="loop_label_session_complete">اكتملت الجلسة</string>
+    <string name="loop_label_playback_error">خطأ في التشغيل</string>
+    <string name="loop_label_now_reciting">يُتلى الآن · الآية %1$d</string>
+    <string name="loop_gap_recite_back">↻ ترديد · فاصل %1$s</string>
+    <string name="loop_gap_then_silent">↻ ثم فاصل صامت %1$s</string>
+    <string name="loop_previous_ayah">الآية السابقة</string>
+    <string name="loop_next_ayah">الآية التالية</string>
+    <string name="loop_play">تشغيل</string>
+    <string name="loop_pause">إيقاف مؤقت</string>
+    <string name="loop_per_ayah_repeats">تكرار كل آية</string>
+    <string name="loop_strip_per_ayah">لكل آية</string>
+    <string name="loop_strip_per_chain">لكل سلسلة</string>
+    <string name="loop_strip_gap">الفاصل</string>
+    <string name="loop_strip_speed">السرعة</string>
+    <string name="loop_close_editor">إغلاق المحرِّر</string>
+    <string name="loop_drill_preset">إعداد التمرين</string>
+    <string name="loop_card_passage">المقطع</string>
+    <string name="loop_field_surah">السورة</string>
+    <string name="loop_surah_value">%1$d · %2$s</string>
+    <string name="loop_field_from_ayah">من الآية</string>
+    <string name="loop_field_to_ayah">إلى الآية</string>
+    <string name="loop_card_reciter">القارئ</string>
+    <string name="loop_card_drill">التمرين</string>
+    <string name="loop_field_per_ayah">لكل آية</string>
+    <string name="loop_field_per_chain">لكل سلسلة</string>
+    <string name="loop_field_recite_back_gap">فاصل الترديد</string>
+    <string name="loop_field_speed">السرعة</string>
+    <string name="loop_card_default">الافتراضي</string>
+    <string name="loop_resume_uses_preset">يستخدم استئنافُ التمرين هذا الإعداد</string>
+    <string name="loop_default_badge">افتراضي</string>
+    <string name="loop_make_default">تعيين كافتراضي</string>
+    <string name="loop_preset_name">%1$s %2$d–%3$d</string>
+    <string name="loop_save_start_drill">حفظ وبدء التمرين</string>
+    <string name="loop_audio_download_failed">فشل تنزيل الصوت — تحقّق من اتصالك</string>
+
+    <!-- Review -->
+    <string name="review_title">المراجعة اليومية</string>
+    <string name="review_subtitle_done">المراجعة · انتهت لليوم</string>
+    <string name="review_subtitle_remaining">المراجعة · يتبقّى ≈ %1$s</string>
+    <string name="review_portion_of">المقطع %1$d من %2$d · %3$s</string>
+    <string name="review_graded_count">%1$d مُقيَّم</string>
+    <string name="review_surah_header">سورة %1$s · %2$d–%3$d</string>
+    <string name="review_revealed_after_recall">كُشف بعد الاستذكار · %1$s</string>
+    <string name="review_recite_then_reveal">استظهر من الذاكرة، ثمّ اكشف للتحقّق</string>
+    <string name="review_reveal_hint">انقر كلمة لكشفها · اضغط مطوّلًا لكشف الآية كاملة</string>
+    <string name="review_stumble">تعثّر</string>
+    <string name="review_reveal_all">اكشف الكل</string>
+    <string name="review_recall_prompt">كيف كان استذكارك؟</string>
+    <string name="review_grade_forgot">نسيت</string>
+    <string name="review_grade_hesitant">متردّد</string>
+    <string name="review_grade_perfect">متقن</string>
+    <string name="review_stumble_lowers_grade">التعثّرات تخفض التقدير تلقائيًّا</string>
+    <string name="review_interval_tomorrow">غدًا مجدّدًا</string>
+    <string name="review_graded">قُيِّم %1$s · المراجعة التالية %2$s</string>
+    <string name="review_graded_capped">قُيِّم %1$s (حدّ التعثّر) · المراجعة التالية %2$s</string>
+    <string name="review_change">تغيير</string>
+    <string name="review_next_portion">المقطع التالي · %1$s ←</string>
+    <string name="review_finish">إنهاء المراجعة</string>
+    <string name="review_portions_left">يتبقّى %1$s · ≈ %2$s</string>
+    <string name="review_last_portion">آخر مقطع في طابور اليوم</string>
+    <string name="review_complete_title">اكتملت المراجعة</string>
+    <string name="review_nothing_due">لا شيء مستحق اليوم</string>
+    <string name="review_back_to_today">العودة إلى اليوم</string>
+    <plurals name="review_minutes">
+        <item quantity="zero">%1$d د</item>
+        <item quantity="one">%1$d د</item>
+        <item quantity="two">%1$d د</item>
+        <item quantity="few">%1$d د</item>
+        <item quantity="many">%1$d د</item>
+        <item quantity="other">%1$d د</item>
+    </plurals>
+    <plurals name="review_stumble_badge">
+        <item quantity="zero">%1$d تعثّر</item>
+        <item quantity="one">تعثّر %1$d</item>
+        <item quantity="two">تعثّران</item>
+        <item quantity="few">%1$d تعثّرات</item>
+        <item quantity="many">%1$d تعثّرًا</item>
+        <item quantity="other">%1$d تعثّر</item>
+    </plurals>
+    <plurals name="review_stumble_summary">
+        <item quantity="zero">لا تعثّرات</item>
+        <item quantity="one">تعثّر واحد مُسجَّل</item>
+        <item quantity="two">تعثّران مُسجَّلان</item>
+        <item quantity="few">%1$d تعثّرات مُسجَّلة</item>
+        <item quantity="many">%1$d تعثّرًا مُسجَّلًا</item>
+        <item quantity="other">%1$d تعثّر مُسجَّل</item>
+    </plurals>
+    <plurals name="review_interval_days">
+        <item quantity="zero">بعد %1$d يوم</item>
+        <item quantity="one">بعد يوم</item>
+        <item quantity="two">بعد يومين</item>
+        <item quantity="few">بعد %1$d أيّام</item>
+        <item quantity="many">بعد %1$d يومًا</item>
+        <item quantity="other">بعد %1$d يوم</item>
+    </plurals>
+    <plurals name="review_interval_weeks">
+        <item quantity="zero">بعد %1$d أسبوع</item>
+        <item quantity="one">بعد أسبوع</item>
+        <item quantity="two">بعد أسبوعين</item>
+        <item quantity="few">بعد %1$d أسابيع</item>
+        <item quantity="many">بعد %1$d أسبوعًا</item>
+        <item quantity="other">بعد %1$d أسبوع</item>
+    </plurals>
+    <plurals name="review_portions">
+        <item quantity="zero">لا مقاطع</item>
+        <item quantity="one">مقطع واحد</item>
+        <item quantity="two">مقطعان</item>
+        <item quantity="few">%1$d مقاطع</item>
+        <item quantity="many">%1$d مقطعًا</item>
+        <item quantity="other">%1$d مقطع</item>
+    </plurals>
+    <plurals name="review_complete_summary">
+        <item quantity="zero">لم يُقيَّم أي مقطع</item>
+        <item quantity="one">قُيِّم مقطع — حدّد المجدول مراجعته القادمة</item>
+        <item quantity="two">قُيِّم مقطعان — حدّد المجدول مراجعتيهما القادمتين</item>
+        <item quantity="few">قُيِّمت %1$d مقاطع — حدّد المجدول مراجعاتها القادمة</item>
+        <item quantity="many">قُيِّم %1$d مقطعًا — حدّد المجدول مراجعاتها القادمة</item>
+        <item quantity="other">قُيِّم %1$d مقطع — حدّد المجدول مراجعاتها القادمة</item>
+    </plurals>
+
+    <!-- Progress -->
+    <string name="progress_title">التقدّم</string>
+    <string name="progress_of_quran">من القرآن</string>
+    <string name="progress_mushaf_header">المصحف · %1$d صفحة</string>
+    <string name="progress_pages_memorized">%1$d محفوظة</string>
+    <string name="progress_state_strong">متقن</string>
+    <string name="progress_state_memorized">محفوظ</string>
+    <string name="progress_state_learning">قيد الحفظ</string>
+    <string name="progress_state_not_started">لم يبدأ</string>
+    <string name="progress_by_juz">حسب الجزء</string>
+    <string name="progress_juz_label">جزء %1$d</string>
+    <string name="progress_percent">%1$d%%</string>
+    <string name="progress_day_streak">تتابع الأيّام</string>
+    <string name="progress_ayat_this_week">آيات هذا الأسبوع</string>
+    <string name="progress_time_spent">الوقت المُستغرَق</string>
+    <string name="progress_hours_value">%1$.1f س</string>
+    <string name="progress_minutes_value">%1$d د</string>
+    <plurals name="progress_ayat_in_memory">
+        <item quantity="zero">لا آيات محفوظة</item>
+        <item quantity="one">آية واحدة محفوظة</item>
+        <item quantity="two">آيتان محفوظتان</item>
+        <item quantity="few">%1$d آيات محفوظة</item>
+        <item quantity="many">%1$d آيةً محفوظة</item>
+        <item quantity="other">%1$d آية محفوظة</item>
+    </plurals>
+
+    <!-- Library -->
+    <string name="library_title">المكتبة</string>
+    <string name="library_subtitle">القرّاء والتنزيلات والإعدادات المسبقة</string>
+    <string name="library_section_reciters">القرّاء</string>
+    <string name="library_section_drill_presets">إعدادات التمرين</string>
+    <string name="library_offline_audio">الصوت دون اتصال</string>
+    <string name="library_storage_used_of_total">%1$s من %2$s</string>
+    <string name="library_import_reciter_button">+  استيراد قارئ</string>
+    <string name="library_import_reciter_title">استيراد قارئ</string>
+    <string name="library_import_reciter_message">سمِّ ملف القارئ هذا، ثم استورد ملفًا صوتيًا لكل سورة.</string>
+    <string name="library_import_reciter_name_hint">مثال: مشاري (تسجيلي)</string>
+    <string name="library_badge_active">نشط</string>
+    <string name="library_badge_default">افتراضي</string>
+    <string name="library_action_open">فتح</string>
+    <string name="library_action_manage">إدارة</string>
+    <string name="library_action_import">استيراد</string>
+    <string name="library_action_download">تنزيل</string>
+    <string name="library_status_downloaded">مُنزَّل</string>
+    <string name="library_reciter_subtitle_imported_count">مُستورَد · %1$s</string>
+    <string name="library_reciter_subtitle_imported_empty">قارئ مُستورَد · لا يوجد صوت بعد</string>
+    <string name="library_reciter_subtitle_downloaded">%1$d من 114 سورة · %2$s</string>
+    <string name="library_reciter_subtitle_not_downloaded">غير مُنزَّل</string>
+    <string name="library_preset_subtitle">%1$s · فاصل %2$s · سرعة %3$s</string>
+    <string name="library_new_preset">إعداد مسبق جديد</string>
+    <string name="library_cancel_download">إلغاء التنزيل</string>
+    <string name="library_all_surahs_downloaded">تم تنزيل جميع السور</string>
+    <string name="library_import_instructions">استورد ملفًا صوتيًا لكل سورة، ثم اضغط “وقِّتها” لمزامنته مع الصفحة.</string>
+    <string name="library_time_it">وقِّتها</string>
+    <string name="library_retime">إعادة التوقيت</string>
+    <string name="library_surah_subtitle_imported_timed">مُستورَد · مُوقَّت</string>
+    <string name="library_surah_subtitle_imported_not_timed">مُستورَد · غير مُوقَّت بعد</string>
+    <string name="library_surah_subtitle_imported_no_file">%1$s · لا يوجد ملف</string>
+    <string name="library_surah_subtitle_downloaded">مُنزَّل · %1$s</string>
+    <string name="library_surah_subtitle_ayah_progress">%1$d من %2$d آية</string>
+    <plurals name="library_surah_count">
+        <item quantity="zero">لا سور</item>
+        <item quantity="one">سورة واحدة</item>
+        <item quantity="two">سورتان</item>
+        <item quantity="few">%1$d سور</item>
+        <item quantity="many">%1$d سورة</item>
+        <item quantity="other">%1$d سورة</item>
+    </plurals>
+    <plurals name="library_ayah_count">
+        <item quantity="zero">لا آيات</item>
+        <item quantity="one">آية واحدة</item>
+        <item quantity="two">آيتان</item>
+        <item quantity="few">%1$d آيات</item>
+        <item quantity="many">%1$d آية</item>
+        <item quantity="other">%1$d آية</item>
+    </plurals>
+    <plurals name="library_surahs_imported_progress">
+        <item quantity="zero">تم استيراد %1$d من %2$d سورة</item>
+        <item quantity="one">تم استيراد %1$d من %2$d سورة</item>
+        <item quantity="two">تم استيراد %1$d من %2$d سورة</item>
+        <item quantity="few">تم استيراد %1$d من %2$d سور</item>
+        <item quantity="many">تم استيراد %1$d من %2$d سورة</item>
+        <item quantity="other">تم استيراد %1$d من %2$d سورة</item>
+    </plurals>
+    <plurals name="library_surahs_downloaded_progress">
+        <item quantity="zero">تم تنزيل %1$d من %2$d سورة</item>
+        <item quantity="one">تم تنزيل %1$d من %2$d سورة</item>
+        <item quantity="two">تم تنزيل %1$d من %2$d سورة</item>
+        <item quantity="few">تم تنزيل %1$d من %2$d سور</item>
+        <item quantity="many">تم تنزيل %1$d من %2$d سورة</item>
+        <item quantity="other">تم تنزيل %1$d من %2$d سورة</item>
+    </plurals>
+    <plurals name="library_download_all_surahs">
+        <item quantity="zero">تنزيل %1$d سورة</item>
+        <item quantity="one">تنزيل سورة واحدة</item>
+        <item quantity="two">تنزيل سورتين</item>
+        <item quantity="few">تنزيل %1$d سور</item>
+        <item quantity="many">تنزيل %1$d سورة</item>
+        <item quantity="other">تنزيل جميع السور (%1$d)</item>
+    </plurals>
+
+    <!-- Tawqīt (timing) -->
+    <string name="tawqit_title">التوقيت</string>
+    <string name="tawqit_undo">تراجع</string>
+    <string name="tawqit_source_subtitle">%1$s · %2$s %3$d–%4$d</string>
+    <string name="tawqit_header_progress">ضبط نهايات الآيات · الآية %1$d من %2$d</string>
+    <string name="tawqit_now_playing_ayah">قيد التشغيل الآن · الآية %1$d</string>
+    <string name="tawqit_tagging_at_speed">الضبط بسرعة %1$s</string>
+    <string name="tawqit_mark_ayah_end">تحديد نهاية الآية</string>
+    <string name="tawqit_all_ayat_tagged">تم ضبط كل الآيات</string>
+    <string name="tawqit_hint_nudge_then_save">عدّل الإزاحة لتصحيح تأخّر الاستجابة، ثم احفظ</string>
+    <string name="tawqit_hint_tap_when_ayah_finishes">انقر عند انتهاء الآية %1$d</string>
+    <string name="tawqit_nudge_all">تعديل الكل</string>
+</resources>

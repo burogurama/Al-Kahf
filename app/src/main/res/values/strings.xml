@@ -1,4 +1,336 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Alkahf</string>
+
+    <!-- Common / shared -->
+    <string name="common_back">Back</string>
+    <string name="common_cancel">Cancel</string>
+    <string name="common_create">Create</string>
+    <string name="common_delete">Delete</string>
+    <string name="common_close">Close</string>
+    <string name="common_save">Save</string>
+    <string name="common_done">Done</string>
+    <string name="common_play">Play</string>
+    <string name="common_pause">Pause</string>
+    <string name="common_stop">Stop</string>
+    <string name="common_clear">Clear</string>
+    <string name="common_play_pause">Play/Pause</string>
+
+    <!-- Memorization states -->
+    <string name="state_not_started">Not started</string>
+    <string name="state_learning">Learning</string>
+    <string name="state_memorized">Memorized</string>
+    <string name="state_strong">Strong</string>
+
+    <!-- Bottom navigation -->
+    <string name="nav_today">Today</string>
+    <string name="nav_mushaf">Mushaf</string>
+    <string name="nav_review">Review</string>
+    <string name="nav_progress">Progress</string>
+    <string name="nav_library">Library</string>
+
+    <!-- Home / Today -->
+    <string name="home_greeting">Assalāmu ʿalaykum</string>
+    <string name="home_today">Today</string>
+    <string name="home_settings">Settings</string>
+    <string name="home_days">DAYS</string>
+    <string name="home_new_sabaq">NEW · SABAQ</string>
+    <string name="home_no_sabaq">No sabaq yet</string>
+    <string name="home_no_sabaq_hint">Open a surah in the Mushaf and tap its name to start learning it.</string>
+    <string name="home_sabaq_reference">Sūrat %1$s · %2$d–%3$d</string>
+    <string name="home_ayat_memorized">%1$d of %2$d ayat memorized</string>
+    <string name="home_continue_learning">Continue learning</string>
+    <string name="home_hide_self_test">Hide &amp; self-test</string>
+    <string name="home_review_murajaah">REVIEW · MURĀJAʿAH</string>
+    <string name="home_due_today">DUE TODAY</string>
+    <string name="home_approx_min">≈ %1$d min</string>
+    <string name="home_start_review">Start review</string>
+    <string name="home_resume_drill">Resume drill</string>
+    <string name="home_resume_drill_caption">RESUME DRILL</string>
+    <string name="home_drill_title">%1$s · %2$s %3$d–%4$d</string>
+    <string name="home_drill_detail">Cumulative chain · %1$d× each · %2$d× chain</string>
+    <string name="home_this_week">This week</string>
+    <string name="home_week_summary">%1$d of 7 days · %2$d ayat</string>
+    <plurals name="home_portions">
+        <item quantity="one">%1$d portion</item>
+        <item quantity="other">%1$d portions</item>
+    </plurals>
+
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_section_language">LANGUAGE</string>
+    <string name="settings_language">App language</string>
+    <string name="settings_language_auto">Auto</string>
+    <string name="settings_section_appearance">APPEARANCE</string>
+    <string name="settings_theme">Theme</string>
+    <string name="settings_theme_light">Light</string>
+    <string name="settings_theme_dark">Dark</string>
+    <string name="settings_theme_system">System</string>
+    <string name="settings_arabic_text_size">Arabic text size</string>
+    <string name="settings_pt_value">%1$d pt</string>
+    <string name="settings_script">Script</string>
+    <string name="settings_section_review">REVIEW &amp; SCHEDULE</string>
+    <string name="settings_daily_budget">Daily review budget</string>
+    <string name="settings_min_value">%1$d min</string>
+    <string name="settings_new_per_day">New āyāt per day</string>
+    <string name="settings_review_pacing">Review pacing</string>
+    <string name="settings_pacing_gentle">Gentle</string>
+    <string name="settings_pacing_standard">Standard</string>
+    <string name="settings_pacing_aggressive">Aggressive</string>
+    <string name="settings_pacing_gentle_hint">Longer first intervals · fewer reviews</string>
+    <string name="settings_pacing_standard_hint">Balanced SM-2 schedule (recommended)</string>
+    <string name="settings_pacing_aggressive_hint">Tighter intervals · firmer retention</string>
+    <string name="settings_stumbles_lower">Stumbles lower the grade</string>
+    <string name="settings_stumbles_lower_sub">Marked slips cap a review\'s grade automatically</string>
+    <string name="settings_section_general">GENERAL</string>
+    <string name="settings_keep_screen_on">Keep screen on while reading</string>
+    <string name="settings_background_audio">Background audio &amp; lock-screen controls</string>
+    <string name="settings_coming_soon">Coming soon</string>
+    <string name="settings_app_version">Alkahf · v0.8</string>
+    <string name="settings_footer_privacy">All data stored on this device · no account</string>
+
+    <!-- Mushaf -->
+    <string name="mushaf_location">Juzʼ %1$d · Page %2$d</string>
+    <string name="mushaf_listening_on">Listening on</string>
+    <string name="mushaf_listening_off">Listening off</string>
+    <string name="mushaf_hide_mode_on">Hide mode on</string>
+    <string name="mushaf_hide_mode_off">Hide mode off</string>
+    <string name="mushaf_hizb_juz">Ḥizb %1$d · Juzʼ %2$d</string>
+    <string name="mushaf_self_test">SELF-TEST</string>
+    <string name="mushaf_self_test_hint">Tap to reveal through a word · long-press reveals the whole āyah</string>
+    <string name="mushaf_all_recalled">All ayat recalled</string>
+    <string name="mushaf_reciting_ayah">Reciting ayah %1$d of %2$d</string>
+    <string name="mushaf_menu_listen">Listen</string>
+    <string name="mushaf_menu_set_sabaq">Set as sabaq</string>
+    <string name="mushaf_menu_set_state">Set state</string>
+    <string name="mushaf_state_current">current</string>
+    <string name="mushaf_selection_hint">Long-press the selection for actions</string>
+    <plurals name="mushaf_ayah_selected">
+        <item quantity="one">%1$d āyah selected</item>
+        <item quantity="other">%1$d āyāt selected</item>
+    </plurals>
+    <string name="mushaf_listen_to_selection">Listen to selection</string>
+    <string name="mushaf_speed">Speed</string>
+    <string name="mushaf_repeat">Repeat</string>
+    <string name="mushaf_mode_normal">Normal</string>
+    <string name="mushaf_mode_listen">Listen</string>
+    <string name="mushaf_mode_recite_back">Recite back</string>
+    <string name="mushaf_mode_tap_ayah">Tap āyah</string>
+    <string name="mushaf_scope_page">Page</string>
+    <string name="mushaf_scope_surah">Surah</string>
+    <string name="mushaf_scope_from_ayah">From āyah</string>
+    <string name="mushaf_hint_tap_to_hear">Tap any āyah on the page to hear it</string>
+    <string name="mushaf_hint_tap_to_start">Tap an āyah on the page to start from it</string>
+    <string name="mushaf_start_learning">Start learning Sūrat %1$s</string>
+    <string name="mushaf_start_learning_body">Every āyah not yet memorized will be marked as learning, the sūrah will be split into sections, and the first section becomes your sabaq.</string>
+
+    <!-- Mushaf audio status (built from a non-composable controller / render blocks) -->
+    <string name="mushaf_audio_download_failed">Audio download failed — check your connection</string>
+    <string name="mushaf_audio_ready">Ready</string>
+    <string name="mushaf_audio_preparing">Preparing audio…</string>
+    <string name="mushaf_audio_recite_back_ayah">Recite back · āyah %1$d</string>
+    <string name="mushaf_audio_ayah">Āyah %1$d</string>
+
+    <!-- Loop / drill player -->
+    <string name="loop_default_drill_name">Drill</string>
+    <string name="loop_close_player">Close player</string>
+    <string name="loop_drill_session">DRILL SESSION</string>
+    <string name="loop_ellipsis">…</string>
+    <string name="loop_surah_reciter">Sūrat %1$s · %2$s</string>
+    <string name="loop_preset_settings">Preset settings</string>
+    <string name="loop_loop_mode">LOOP MODE</string>
+    <string name="loop_ayat_to_loop">ĀYĀT TO LOOP</string>
+    <string name="loop_mode_single">Single</string>
+    <string name="loop_mode_range">Range</string>
+    <string name="loop_mode_chain">Chain</string>
+    <string name="loop_repeating_single">Repeating āyah %1$d</string>
+    <string name="loop_repeating_range">Repeating %1$d → %2$d</string>
+    <string name="loop_pass_prefix">pass </string>
+    <string name="loop_pass_of"> of %1$d</string>
+    <string name="loop_next_add_ayah">next · +āyah %1$d</string>
+    <string name="loop_generic_error">Something went wrong</string>
+    <string name="loop_drill_complete">Drill complete — tap play to run it again</string>
+    <string name="loop_label_preparing">PREPARING AUDIO…</string>
+    <string name="loop_label_recite_back">RECITE BACK · ĀYAH %1$d</string>
+    <string name="loop_label_session_complete">SESSION COMPLETE</string>
+    <string name="loop_label_playback_error">PLAYBACK ERROR</string>
+    <string name="loop_label_now_reciting">NOW RECITING · ĀYAH %1$d</string>
+    <string name="loop_gap_recite_back">↻ recite back · %1$s gap</string>
+    <string name="loop_gap_then_silent">↻ then %1$s silent gap</string>
+    <string name="loop_previous_ayah">Previous ayah</string>
+    <string name="loop_next_ayah">Next ayah</string>
+    <string name="loop_play">Play</string>
+    <string name="loop_pause">Pause</string>
+    <string name="loop_per_ayah_repeats">Per-ayah repeats</string>
+    <string name="loop_strip_per_ayah">PER ĀYAH</string>
+    <string name="loop_strip_per_chain">PER CHAIN</string>
+    <string name="loop_strip_gap">GAP</string>
+    <string name="loop_strip_speed">SPEED</string>
+    <string name="loop_close_editor">Close editor</string>
+    <string name="loop_drill_preset">Drill preset</string>
+    <string name="loop_card_passage">PASSAGE</string>
+    <string name="loop_field_surah">Surah</string>
+    <string name="loop_surah_value">%1$d · %2$s</string>
+    <string name="loop_field_from_ayah">From āyah</string>
+    <string name="loop_field_to_ayah">To āyah</string>
+    <string name="loop_card_reciter">RECITER</string>
+    <string name="loop_card_drill">DRILL</string>
+    <string name="loop_field_per_ayah">Per āyah</string>
+    <string name="loop_field_per_chain">Per chain</string>
+    <string name="loop_field_recite_back_gap">Recite-back gap</string>
+    <string name="loop_field_speed">Speed</string>
+    <string name="loop_card_default">DEFAULT</string>
+    <string name="loop_resume_uses_preset">Resume drill uses this preset</string>
+    <string name="loop_default_badge">Default</string>
+    <string name="loop_make_default">Make default</string>
+    <string name="loop_preset_name">%1$s %2$d–%3$d</string>
+    <string name="loop_save_start_drill">Save &amp; start drill</string>
+    <string name="loop_audio_download_failed">Audio download failed — check your connection</string>
+
+    <!-- Review -->
+    <string name="review_title">Daily Review</string>
+    <string name="review_subtitle_done">Murājaʿah · done for today</string>
+    <string name="review_subtitle_remaining">Murājaʿah · ≈ %1$s left</string>
+    <string name="review_portion_of">Portion %1$d of %2$d · %3$s</string>
+    <string name="review_graded_count">%1$d graded</string>
+    <string name="review_surah_header">SŪRAT %1$s · %2$d–%3$d</string>
+    <string name="review_revealed_after_recall">Revealed after recall · %1$s</string>
+    <string name="review_recite_then_reveal">Recite from memory, then reveal to check</string>
+    <string name="review_reveal_hint">Tap a word to reveal · long-press for the full ayah</string>
+    <string name="review_stumble">Stumble</string>
+    <string name="review_reveal_all">Reveal all</string>
+    <string name="review_recall_prompt">How was your recall?</string>
+    <string name="review_grade_forgot">Forgot</string>
+    <string name="review_grade_hesitant">Hesitant</string>
+    <string name="review_grade_perfect">Perfect</string>
+    <string name="review_stumble_lowers_grade">Stumbles lower the grade automatically</string>
+    <string name="review_interval_tomorrow">again tomorrow</string>
+    <string name="review_graded">Graded %1$s · next review %2$s</string>
+    <string name="review_graded_capped">Graded %1$s (stumble cap) · next review %2$s</string>
+    <string name="review_change">Change</string>
+    <string name="review_next_portion">Next portion · %1$s →</string>
+    <string name="review_finish">Finish review</string>
+    <string name="review_portions_left">%1$s left · ≈ %2$s</string>
+    <string name="review_last_portion">Last portion of today\'s queue</string>
+    <string name="review_complete_title">Review complete</string>
+    <string name="review_nothing_due">Nothing due today</string>
+    <string name="review_back_to_today">Back to Today</string>
+    <plurals name="review_minutes">
+        <item quantity="one">%1$d min</item>
+        <item quantity="other">%1$d min</item>
+    </plurals>
+    <plurals name="review_stumble_badge">
+        <item quantity="one">%1$d STUMBLE</item>
+        <item quantity="other">%1$d STUMBLES</item>
+    </plurals>
+    <plurals name="review_stumble_summary">
+        <item quantity="one">%1$d stumble recorded</item>
+        <item quantity="other">%1$d stumbles recorded</item>
+    </plurals>
+    <plurals name="review_interval_days">
+        <item quantity="one">in %1$d day</item>
+        <item quantity="other">in %1$d days</item>
+    </plurals>
+    <plurals name="review_interval_weeks">
+        <item quantity="one">in %1$d week</item>
+        <item quantity="other">in %1$d weeks</item>
+    </plurals>
+    <plurals name="review_portions">
+        <item quantity="one">%1$d portion</item>
+        <item quantity="other">%1$d portions</item>
+    </plurals>
+    <plurals name="review_complete_summary">
+        <item quantity="one">%1$d portion graded — the scheduler has set their next reviews</item>
+        <item quantity="other">%1$d portions graded — the scheduler has set their next reviews</item>
+    </plurals>
+
+    <!-- Progress -->
+    <string name="progress_title">Progress</string>
+    <string name="progress_of_quran">OF THE QURAN</string>
+    <string name="progress_mushaf_header">THE MUSHAF · %1$d PAGES</string>
+    <string name="progress_pages_memorized">%1$d memorized</string>
+    <string name="progress_state_strong">Strong</string>
+    <string name="progress_state_memorized">Memorized</string>
+    <string name="progress_state_learning">Learning</string>
+    <string name="progress_state_not_started">Not started</string>
+    <string name="progress_by_juz">BY JUZʼ</string>
+    <string name="progress_juz_label">Juzʼ %1$d</string>
+    <string name="progress_percent">%1$d%%</string>
+    <string name="progress_day_streak">day streak</string>
+    <string name="progress_ayat_this_week">āyāt this week</string>
+    <string name="progress_time_spent">time spent</string>
+    <string name="progress_hours_value">%1$.1fh</string>
+    <string name="progress_minutes_value">%1$dm</string>
+    <plurals name="progress_ayat_in_memory">
+        <item quantity="one">%1$d āyah held in memory</item>
+        <item quantity="other">%1$d āyāt held in memory</item>
+    </plurals>
+
+    <!-- Library -->
+    <string name="library_title">Library</string>
+    <string name="library_subtitle">Reciters, downloads &amp; presets</string>
+    <string name="library_section_reciters">RECITERS</string>
+    <string name="library_section_drill_presets">DRILL PRESETS</string>
+    <string name="library_offline_audio">Offline audio</string>
+    <string name="library_storage_used_of_total">%1$s of %2$s</string>
+    <string name="library_import_reciter_button">+  Import a reciter</string>
+    <string name="library_import_reciter_title">Import a reciter</string>
+    <string name="library_import_reciter_message">Name this reciter profile, then import an audio file per sūrah.</string>
+    <string name="library_import_reciter_name_hint">e.g. Mishary (my recording)</string>
+    <string name="library_badge_active">ACTIVE</string>
+    <string name="library_badge_default">DEFAULT</string>
+    <string name="library_action_open">Open</string>
+    <string name="library_action_manage">Manage</string>
+    <string name="library_action_import">Import</string>
+    <string name="library_action_download">Download</string>
+    <string name="library_status_downloaded">Downloaded</string>
+    <string name="library_reciter_subtitle_imported_count">Imported · %1$s</string>
+    <string name="library_reciter_subtitle_imported_empty">Imported reciter · no audio yet</string>
+    <string name="library_reciter_subtitle_downloaded">%1$d of 114 sūrahs · %2$s</string>
+    <string name="library_reciter_subtitle_not_downloaded">Not downloaded</string>
+    <string name="library_preset_subtitle">%1$s · %2$s gap · %3$s speed</string>
+    <string name="library_new_preset">New preset</string>
+    <string name="library_cancel_download">Cancel download</string>
+    <string name="library_all_surahs_downloaded">All sūrahs downloaded</string>
+    <string name="library_import_instructions">Import an audio file for each sūrah, then tap “Time it” to sync it to the page.</string>
+    <string name="library_time_it">Time it</string>
+    <string name="library_retime">Re-time</string>
+    <string name="library_surah_subtitle_imported_timed">Imported · timed</string>
+    <string name="library_surah_subtitle_imported_not_timed">Imported · not yet timed</string>
+    <string name="library_surah_subtitle_imported_no_file">%1$s · no file</string>
+    <string name="library_surah_subtitle_downloaded">Downloaded · %1$s</string>
+    <string name="library_surah_subtitle_ayah_progress">%1$d of %2$d āyāt</string>
+    <plurals name="library_surah_count">
+        <item quantity="one">%1$d sūrah</item>
+        <item quantity="other">%1$d sūrahs</item>
+    </plurals>
+    <plurals name="library_ayah_count">
+        <item quantity="one">%1$d āyah</item>
+        <item quantity="other">%1$d āyāt</item>
+    </plurals>
+    <plurals name="library_surahs_imported_progress">
+        <item quantity="one">%1$d of %2$d sūrah imported</item>
+        <item quantity="other">%1$d of %2$d sūrahs imported</item>
+    </plurals>
+    <plurals name="library_surahs_downloaded_progress">
+        <item quantity="one">%1$d of %2$d sūrah downloaded</item>
+        <item quantity="other">%1$d of %2$d sūrahs downloaded</item>
+    </plurals>
+    <plurals name="library_download_all_surahs">
+        <item quantity="one">Download %1$d sūrah</item>
+        <item quantity="other">Download all %1$d sūrahs</item>
+    </plurals>
+
+    <!-- Tawqīt (timing) -->
+    <string name="tawqit_title">Tawqīt</string>
+    <string name="tawqit_undo">Undo</string>
+    <string name="tawqit_source_subtitle">%1$s · %2$s %3$d–%4$d</string>
+    <string name="tawqit_header_progress">TAGGING ĀYAH ENDS · ĀYAH %1$d OF %2$d</string>
+    <string name="tawqit_now_playing_ayah">NOW PLAYING · ĀYAH %1$d</string>
+    <string name="tawqit_tagging_at_speed">Tagging at %1$s</string>
+    <string name="tawqit_mark_ayah_end">Mark āyah end</string>
+    <string name="tawqit_all_ayat_tagged">All āyāt tagged</string>
+    <string name="tawqit_hint_nudge_then_save">Nudge to fix reaction lag, then Save</string>
+    <string name="tawqit_hint_tap_when_ayah_finishes">Tap when āyah %1$d finishes</string>
+    <string name="tawqit_nudge_all">NUDGE ALL</string>
 </resources>
