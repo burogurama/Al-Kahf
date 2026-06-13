@@ -281,6 +281,23 @@ class QuranRepository(context: Context) {
     }
 
     /**
+     * Marks every āyah in the current sabaq range as memorized in one step, then
+     * advances. The "I've memorized this section" shortcut — independent of how
+     * many pages the range spans or what is selected in the Mushaf.
+     */
+    suspend fun markSabaqMemorized() {
+        val range = sabaqRange ?: return
+        val ids = range.ayahIds.toList()
+        val states = ayahStatesForPage(ids)
+        // Only upgrade āyāt not yet memorized; never demote a "strong" āyah.
+        val toMark = ids
+            .filter { (states[it] ?: MemorizationState.NOT_STARTED).value < MemorizationState.MEMORIZED.value }
+            .map { AyahStateEntity(it, MemorizationState.MEMORIZED.value) }
+        if (toMark.isNotEmpty()) userDao.upsertAyahStates(toMark)
+        maybeAdvanceSabaq()
+    }
+
+    /**
      * Advances the sabaq past any fully-memorized section: the sabaq steps
      * forward by the section length until it lands on a section that still has
      * an unmemorized ayah, or clears when it runs off the end of the surah.

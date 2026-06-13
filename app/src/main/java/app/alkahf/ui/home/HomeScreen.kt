@@ -22,9 +22,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -63,6 +63,7 @@ fun HomeScreen(
     state: HomeUiState = HomeUiState(),
     onOpenMushaf: () -> Unit = {},
     onOpenSabaq: () -> Unit = {},
+    onMarkSabaq: () -> Unit = {},
     onOpenLoop: () -> Unit = {},
     onOpenReview: () -> Unit = {},
     onOpenProgress: () -> Unit = {},
@@ -92,7 +93,7 @@ fun HomeScreen(
             verticalArrangement = Arrangement.spacedBy(9.dp),
         ) {
             HomeHeader(state, onOpenSettings)
-            SabaqCard(state, onOpenSabaq)
+            SabaqCard(state, onOpenSabaq, onMarkSabaq)
             MurajaahCard(state, onOpenReview)
             ResumeDrillCard(state, onOpenLoop)
             ThisWeekCard(state)
@@ -224,7 +225,7 @@ private fun NoSabaqCard(onOpenMushaf: () -> Unit) {
 }
 
 @Composable
-private fun SabaqCard(state: HomeUiState, onOpenMushaf: () -> Unit) {
+private fun SabaqCard(state: HomeUiState, onOpenMushaf: () -> Unit, onMarkSabaq: () -> Unit) {
     if (!state.hasSabaq) {
         NoSabaqCard(onOpenMushaf)
         return
@@ -275,7 +276,7 @@ private fun SabaqCard(state: HomeUiState, onOpenMushaf: () -> Unit) {
                 }
                 AyahBlock(state)
                 ProgressRow(state)
-                ActionRow(onOpenMushaf)
+                ActionRow(onOpenMushaf, onMarkSabaq)
             }
         }
     }
@@ -337,7 +338,7 @@ private fun ProgressRow(state: HomeUiState) {
 }
 
 @Composable
-private fun ActionRow(onOpenMushaf: () -> Unit) {
+private fun ActionRow(onOpenMushaf: () -> Unit, onMarkSabaq: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -374,7 +375,7 @@ private fun ActionRow(onOpenMushaf: () -> Unit) {
             )
         }
         Surface(
-            onClick = onOpenMushaf,
+            onClick = onMarkSabaq,
             modifier = Modifier.size(48.dp),
             shape = RoundedCornerShape(14.dp),
             color = Color.White.copy(alpha = 0.5f),
@@ -382,8 +383,8 @@ private fun ActionRow(onOpenMushaf: () -> Unit) {
         ) {
             Box(contentAlignment = Alignment.Center) {
                 Icon(
-                    imageVector = Icons.Outlined.VisibilityOff,
-                    contentDescription = stringResource(R.string.home_hide_self_test),
+                    imageVector = Icons.Filled.Check,
+                    contentDescription = stringResource(R.string.home_mark_sabaq_memorized),
                     tint = AlkahfColors.AccentDeep,
                     modifier = Modifier.size(22.dp),
                 )

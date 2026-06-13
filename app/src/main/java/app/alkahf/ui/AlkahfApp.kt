@@ -127,7 +127,10 @@ fun AlkahfApp(
     }
 
     val resources = LocalContext.current.resources
-    val homeState by produceState(initialValue = HomeUiState(), destination) {
+    // Bumped to force the Home dashboard to reload after an in-place change
+    // (e.g. marking the sabaq memorized) that doesn't switch destination.
+    var homeRefresh by remember { mutableStateOf(0) }
+    val homeState by produceState(initialValue = HomeUiState(), destination, homeRefresh) {
         if (destination == AlkahfDestination.Home) {
             value = buildHomeUiState(resources, repository.homeData(), repository.defaultPreset())
         }
@@ -139,6 +142,12 @@ fun AlkahfApp(
             onOpenMushaf = { openMushaf(null, null) },
             onOpenSabaq = { openMushaf(null, null, highlight = repository.sabaqRange) },
             // (sabaqRange is null when there's no sabaq → opens the Mushaf normally)
+            onMarkSabaq = {
+                scope.launch {
+                    repository.markSabaqMemorized()
+                    homeRefresh++
+                }
+            },
             onOpenLoop = {
                 loopPresetId = null
                 destination = AlkahfDestination.Loop
