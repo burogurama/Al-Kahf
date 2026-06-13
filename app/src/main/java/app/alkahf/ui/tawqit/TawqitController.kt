@@ -1,7 +1,6 @@
 package app.alkahf.ui.tawqit
 
 import androidx.media3.common.MediaItem
-import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import app.alkahf.data.PageAyah
 import kotlinx.coroutines.CoroutineScope
@@ -39,9 +38,8 @@ class TawqitController(
     private val _state = MutableStateFlow(TawqitUiState())
     val state: StateFlow<TawqitUiState> = _state.asStateFlow()
 
-    // Total duration of playlist items already passed, for cumulative position.
-    private var completedMs = 0L
-    private var lastIndex = 0
+    // Durations of playlist items as they become known, for cumulative position.
+    private val itemDurations = HashMap<Int, Long>()
     private var ticker: Job? = null
 
     fun load(
@@ -60,17 +58,8 @@ class TawqitController(
                 speed = speed,
             )
         }
+        itemDurations.clear()
         player.setMediaItems(uris.map { MediaItem.fromUri(it) })
-        player.addListener(object : Player.Listener {
-            override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-                val index = player.currentMediaItemIndex
-                if (index > lastIndex) {
-                    // Accumulate the duration of the item we just left.
-                    completedMs += player.duration.coerceAtLeast(0)
-                    lastIndex = index
-                }
-            }
-        })
         player.setPlaybackSpeed(speed)
         player.prepare()
         startTicker()
@@ -80,11 +69,11 @@ class TawqitController(
         ticker?.cancel()
         ticker = scope.launch {
             while (true) {
-                val total = totalDurationEstimate()
+                recordCurrentDuration()
                 _state.update {
                     it.copy(
                         positionMs = positionMs(),
-                        durationMs = total,
+                        durationMs = totalDurationEstimate(),
                         isPlaying = player.isPlaying,
                     )
                 }
@@ -93,12 +82,39 @@ class TawqitController(
         }
     }
 
-    private fun positionMs(): Long = completedMs + player.currentPosition.coerceAtLeast(0)
+    private fun recordCurrentDuration() {
+        val duration = player.duration
+        if (duration > 0) {
+            val index = player.currentMediaItemIndex
+            itemDurations[index] = maxOf(itemDurations[index] ?: 0L, duration)
+        }
+    }
+
+    private fun baseMs(itemIndex: Int): Long =
+        (0 until itemIndex).sumOf { itemDurations[it] ?: 0L }
+
+    private fun positionMs(): Long =
+        baseMs(player.currentMediaItemIndex) + player.currentPosition.coerceAtLeast(0)
 
     private fun totalDurationEstimate(): Long {
-        // Best-effort: current cumulative base + the current item's duration.
-        val current = player.duration.coerceAtLeast(0)
-        return completedMs + current
+        val known = (0 until player.mediaItemCount).sumOf { itemDurations[it] ?: 0L }
+        return maxOf(known, positionMs())
+    }
+
+    /** Seeks the audio to a cumulative (playlist-wide) millisecond position. */
+    private fun seekToCumulative(target: Long) {
+        var index = 0
+        var acc = 0L
+        while (index < player.mediaItemCount - 1) {
+            val duration = itemDurations[index] ?: Long.MAX_VALUE
+            if (acc + duration <= target) {
+                acc += duration
+                index++
+            } else {
+                break
+            }
+        }
+        player.seekTo(index, (target - acc).coerceAtLeast(0))
     }
 
     fun playPause() {
@@ -127,12 +143,16 @@ class TawqitController(
     fun undo() {
         val s = _state.value
         if (s.endTimesMs.isEmpty()) return
+        val newTimes = s.endTimesMs.dropLast(1)
         _state.update {
             it.copy(
-                endTimesMs = it.endTimesMs.dropLast(1),
+                endTimesMs = newTimes,
                 currentIndex = (it.currentIndex - 1).coerceAtLeast(0),
             )
         }
+        // Rewind the audio to the start of the ayah now being re-tagged
+        // (the previous mark, or the very beginning).
+        seekToCumulative(newTimes.lastOrNull() ?: 0L)
     }
 
     fun nudgeOffset(deltaMs: Long) {
