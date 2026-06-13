@@ -13,12 +13,13 @@ import app.alkahf.ui.components.AlkahfTab
 import app.alkahf.ui.home.HomeScreen
 import app.alkahf.ui.home.HomeUiState
 import app.alkahf.ui.library.LibraryScreen
+import app.alkahf.ui.library.ReciterDownloadsScreen
 import app.alkahf.ui.loop.LoopPlayerScreen
 import app.alkahf.ui.mushaf.MushafScreen
 import app.alkahf.ui.progress.ProgressScreen
 import app.alkahf.ui.review.ReviewScreen
 
-private enum class AlkahfDestination { Home, Mushaf, Loop, Review, Progress, Library }
+private enum class AlkahfDestination { Home, Mushaf, Loop, Review, Progress, Library, ReciterDownloads }
 
 /** The current sabaq surah; becomes dynamic once sabaq state is user-configurable. */
 private const val SABAQ_SURAH = 18
@@ -32,6 +33,8 @@ fun AlkahfApp() {
     var mushafTargetPage by remember { mutableStateOf<Int?>(null) }
     // The preset to open in the Loop player; null means the default preset.
     var loopPresetId by remember { mutableStateOf<Long?>(null) }
+    // The reciter whose downloads are being managed.
+    var manageReciter by remember { mutableStateOf<Pair<String, String>?>(null) }
     val repository = (LocalContext.current.applicationContext as AlkahfApplication).repository
 
     fun openMushaf(surah: Int?, page: Int?) {
@@ -112,7 +115,20 @@ fun AlkahfApp() {
                     loopPresetId = null
                     destination = AlkahfDestination.Loop
                 },
+                onManageReciter = { path, name ->
+                    manageReciter = path to name
+                    destination = AlkahfDestination.ReciterDownloads
+                },
                 onSelectTab = ::onTab,
+            )
+        }
+        AlkahfDestination.ReciterDownloads -> {
+            BackHandler { destination = AlkahfDestination.Library }
+            val (path, name) = manageReciter ?: ("" to "")
+            ReciterDownloadsScreen(
+                reciterPath = path,
+                reciterName = name,
+                onBack = { destination = AlkahfDestination.Library },
             )
         }
     }

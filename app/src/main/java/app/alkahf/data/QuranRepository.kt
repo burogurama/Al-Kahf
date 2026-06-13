@@ -307,6 +307,18 @@ class QuranRepository(context: Context) {
         }
     }
 
+    /** Download state of every surah for a reciter, for the download manager. */
+    suspend fun surahDownloadStates(reciterPath: String): List<DownloadedSurah> =
+        quranDao.allSurahs().map { surah ->
+            DownloadedSurah(
+                surah = surah.number,
+                nameLatin = surah.nameLatin,
+                downloadedAyahs = audioStore.downloadedAyahCount(reciterPath, surah.number),
+                totalAyahs = surah.ayahCount,
+                bytes = audioStore.surahBytes(reciterPath, surah.number),
+            )
+        }
+
     suspend fun downloadSurah(reciterPath: String, surah: Int, onProgress: (Float) -> Unit) {
         val ayahCount = quranDao.surah(surah).ayahCount
         audioStore.downloadSurah(reciterPath, surah, ayahCount, onProgress)

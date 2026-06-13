@@ -60,6 +60,7 @@ import kotlinx.coroutines.launch
 fun LibraryScreen(
     onOpenPreset: (Long) -> Unit = {},
     onNewPreset: () -> Unit = {},
+    onManageReciter: (String, String) -> Unit = { _, _ -> },
     onSelectTab: (AlkahfTab) -> Unit = {},
 ) {
     val context = LocalContext.current
@@ -103,23 +104,18 @@ fun LibraryScreen(
                         repository.setActiveReciter(reciter.path)
                         activeReciterPath = reciter.path
                     },
-                    onDownload = {
-                        // Download the active reciter's currently-read surah set is
-                        // open-ended; here we fetch al-Fātiḥah as a quick starter and
-                        // let per-surah management grow it. Downloads Al-Fātiḥah (1).
-                        scope.launch {
-                            surahProgress[reciter.path.hashCode()] = 0f
-                            repository.downloadSurah(reciter.path, 1) { p ->
-                                surahProgress[reciter.path.hashCode()] = p
-                            }
-                            surahProgress.remove(reciter.path.hashCode())
-                            refreshKey++
-                        }
-                    },
-                    downloadProgress = surahProgress[reciter.path.hashCode()],
+                    onDownload = { onManageReciter(reciter.path, reciter.displayName) },
                 )
             }
-            SectionCaption("DOWNLOADS · ${activeReciterName(reciters, activeReciterPath)}")
+            DownloadsCaption(
+                reciterName = activeReciterName(reciters, activeReciterPath),
+                onManage = {
+                    onManageReciter(
+                        activeReciterPath,
+                        reciters.firstOrNull { it.path == activeReciterPath }?.displayName ?: "",
+                    )
+                },
+            )
             if (downloads.isEmpty()) {
                 EmptyHint("No audio downloaded yet for this reciter")
             }
@@ -233,11 +229,34 @@ private fun EmptyHint(text: String) {
 }
 
 @Composable
+private fun DownloadsCaption(reciterName: String, onManage: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(start = 4.dp, top = 18.dp, bottom = 10.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = "DOWNLOADS · ${reciterName.uppercase()}",
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 1.4.sp,
+            color = AlkahfColors.InkFooter,
+        )
+        Text(
+            text = "Manage",
+            fontSize = 11.5.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = AlkahfColors.AccentDeep,
+            modifier = Modifier.clickable(onClick = onManage).padding(end = 4.dp),
+        )
+    }
+}
+
+@Composable
 private fun ReciterRow(
     reciter: ReciterStatus,
     onActivate: () -> Unit,
     onDownload: () -> Unit,
-    downloadProgress: Float?,
 ) {
     Surface(
         onClick = onActivate,
@@ -282,8 +301,8 @@ private fun ReciterRow(
                     maxLines = 1,
                 )
             }
-            when {
-                reciter.isActive -> Surface(shape = CircleShape, color = AlkahfColors.AccentTint) {
+            if (reciter.isActive) {
+                Surface(shape = CircleShape, color = AlkahfColors.AccentTint) {
                     Text(
                         text = "ACTIVE",
                         fontSize = 11.sp,
@@ -292,13 +311,8 @@ private fun ReciterRow(
                         modifier = Modifier.padding(horizontal = 11.dp, vertical = 5.dp),
                     )
                 }
-                downloadProgress != null -> CircularProgressIndicator(
-                    progress = { downloadProgress },
-                    modifier = Modifier.size(28.dp),
-                    color = AlkahfColors.Accent,
-                    strokeWidth = 2.5.dp,
-                )
-                else -> Surface(
+            } else {
+                Surface(
                     onClick = onDownload,
                     shape = CircleShape,
                     color = AlkahfColors.Surface,
@@ -308,7 +322,7 @@ private fun ReciterRow(
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
                             imageVector = Icons.Outlined.Download,
-                            contentDescription = "Download",
+                            contentDescription = "Manage downloads",
                             tint = AlkahfColors.InkChrome,
                             modifier = Modifier.size(18.dp),
                         )
