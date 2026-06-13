@@ -29,6 +29,7 @@ data class MushafAudioState(
     val phase: MushafAudioPhase = MushafAudioPhase.IDLE,
     val isPaused: Boolean = false,
     val currentAyahId: Int? = null,
+    val speed: Float = 1f,
     val reciterPath: String = AudioStore.DEFAULT_RECITER,
     val reciterName: String = "Ḥuṣarī",
     val errorMessage: String? = null,
@@ -54,6 +55,7 @@ class MushafAudioController(
 
     private var job: Job? = null
     private var lastDurationMs = 0L
+    private var playbackSpeed = 1f
 
     fun setMode(mode: MushafAudioMode) {
         stop()
@@ -65,12 +67,22 @@ class MushafAudioController(
         _state.update { it.copy(scope = scope) }
     }
 
-    /** Plays the given ayat (ids encode surah * 1000 + number) in order. */
-    fun playAyahIds(ayahIds: List<Int>) {
+    /** Sets the playback rate applied to subsequent (and current) playback. */
+    fun setSpeed(speed: Float) {
+        playbackSpeed = speed
+        player.setPlaybackSpeed(speed)
+        _state.update { it.copy(speed = speed) }
+    }
+
+    /**
+     * Plays the given ayat (ids encode surah * 1000 + number) in order,
+     * looping the whole list [repeat] times.
+     */
+    fun playAyahIds(ayahIds: List<Int>, repeat: Int = 1) {
         job?.cancel()
         player.stop()
         _state.update { it.copy(isPaused = false, errorMessage = null) }
-        job = coroutineScope.launch { run(ayahIds) }
+        job = coroutineScope.launch { run(ayahIds, repeat) }
     }
 
     fun playSingle(ayahId: Int) = playAyahIds(listOf(ayahId))
@@ -93,26 +105,28 @@ class MushafAudioController(
         player.release()
     }
 
-    private suspend fun run(ayahIds: List<Int>) {
-        for (ayahId in ayahIds) {
-            _state.update { it.copy(currentAyahId = ayahId, phase = MushafAudioPhase.PREPARING) }
-            val file = try {
-                audioStore.ayahFile(ayahId / 1000, ayahId % 1000, _state.value.reciterPath)
-            } catch (e: IOException) {
-                _state.update {
-                    it.copy(
-                        phase = MushafAudioPhase.IDLE,
-                        currentAyahId = null,
-                        errorMessage = "Audio download failed — check your connection",
-                    )
+    private suspend fun run(ayahIds: List<Int>, repeat: Int = 1) {
+        repeat(repeat.coerceAtLeast(1)) {
+            for (ayahId in ayahIds) {
+                _state.update { it.copy(currentAyahId = ayahId, phase = MushafAudioPhase.PREPARING) }
+                val file = try {
+                    audioStore.ayahFile(ayahId / 1000, ayahId % 1000, _state.value.reciterPath)
+                } catch (e: IOException) {
+                    _state.update {
+                        it.copy(
+                            phase = MushafAudioPhase.IDLE,
+                            currentAyahId = null,
+                            errorMessage = "Audio download failed — check your connection",
+                        )
+                    }
+                    return
                 }
-                return
-            }
-            val finished = playFile(file)
-            if (!finished) return
-            repository.logPractice(type = "listen", ayahCount = 1, durationMs = lastDurationMs)
-            if (_state.value.mode == MushafAudioMode.RECITE_BACK) {
-                reciteBackGap()
+                val finished = playFile(file)
+                if (!finished) return
+                repository.logPractice(type = "listen", ayahCount = 1, durationMs = lastDurationMs)
+                if (_state.value.mode == MushafAudioMode.RECITE_BACK) {
+                    reciteBackGap()
+                }
             }
         }
         _state.update { it.copy(phase = MushafAudioPhase.IDLE, currentAyahId = null) }
@@ -122,6 +136,7 @@ class MushafAudioController(
     private suspend fun playFile(file: File): Boolean {
         player.setMediaItem(MediaItem.fromUri(Uri.fromFile(file)))
         player.prepare()
+        player.setPlaybackSpeed(playbackSpeed)
         player.playWhenReady = !_state.value.isPaused
         _state.update { it.copy(phase = MushafAudioPhase.PLAYING) }
         while (true) {
@@ -139,9 +154,11 @@ class MushafAudioController(
 
     private suspend fun reciteBackGap() {
         if (lastDurationMs <= 0) return
+        // Match the gap to how long the āyah actually took to play (speed-scaled).
+        val gapMs = (lastDurationMs / playbackSpeed).toLong()
         _state.update { it.copy(phase = MushafAudioPhase.GAP) }
         var elapsed = 0L
-        while (elapsed < lastDurationMs) {
+        while (elapsed < gapMs) {
             if (!_state.value.isPaused) elapsed += 100
             delay(100)
         }

@@ -69,6 +69,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.AnnotatedString
@@ -78,9 +80,15 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntRect
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupPositionProvider
+import androidx.compose.ui.window.PopupProperties
 import androidx.media3.exoplayer.ExoPlayer
 import app.alkahf.AlkahfApplication
 import app.alkahf.data.AyahRange
@@ -92,6 +100,7 @@ import app.alkahf.data.QuranRepository
 import app.alkahf.data.audio.AudioStore
 import app.alkahf.ui.theme.AlkahfColors
 import app.alkahf.ui.theme.KfgqpcHafs
+import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 
 /** Character range of one word or end-of-ayah marker inside a group's text. */
@@ -250,13 +259,25 @@ fun MushafScreen(
     // Reader-mode selection: a contiguous index range into the current page's
     // ayat, for marking several at once. Cleared on page change / mode toggle.
     var selection by remember { mutableStateOf<IntRange?>(null) }
-    LaunchedEffect(currentPageNumber) { selection = null }
-    val selectedIds = currentSession?.page?.ayahs?.let { ayahs ->
+    // Floating action menu for the selection: anchored at the long-press point
+    // in window coordinates (null = closed).
+    var menuAnchor by remember { mutableStateOf<IntOffset?>(null) }
+    // The range-listening config sheet (long-press the headset with a selection).
+    var rangeAudioOpen by remember { mutableStateOf(false) }
+    var rangeMode by remember { mutableStateOf(MushafAudioMode.LISTEN) }
+    var rangeSpeed by remember { mutableStateOf(1f) }
+    var rangeTimes by remember { mutableStateOf(1) }
+    LaunchedEffect(currentPageNumber) {
+        selection = null
+        menuAnchor = null
+        rangeAudioOpen = false
+    }
+    val orderedSelectedIds: List<Int> = currentSession?.page?.ayahs?.let { ayahs ->
         // Bounds-guard: during a page swap the old range may not fit the new page.
         selection?.takeIf { it.first >= 0 && it.last < ayahs.size }
-            ?.let { range -> ayahs.slice(range).map { it.id }.toSet() }
-    } ?: emptySet()
-    var showStateSheet by remember { mutableStateOf(false) }
+            ?.let { range -> ayahs.slice(range).map { it.id } }
+    } ?: emptyList()
+    val selectedIds = orderedSelectedIds.toSet()
     // The surah whose "start learning" confirmation is open (header tapped).
     var learnSurah by remember { mutableStateOf<Pair<Int, String>?>(null) }
 
@@ -286,17 +307,57 @@ fun MushafScreen(
         }
     }
 
+    fun playSelectedRange(mode: MushafAudioMode) {
+        if (orderedSelectedIds.isEmpty()) return
+        audioController.setMode(mode)
+        audioController.setSpeed(rangeSpeed)
+        audioController.playAyahIds(orderedSelectedIds, repeat = rangeTimes)
+        rangeMode = mode
+    }
+
+    // Long-pressing an ayah in reading mode opens the floating action menu,
+    // re-selecting that ayah alone when it lies outside the current selection.
+    val onAyahLongPress: (Int, IntOffset) -> Unit = { ayahId, offset ->
+        val ayahs = currentSession?.page?.ayahs
+        val index = ayahs?.indexOfFirst { it.id == ayahId } ?: -1
+        if (index >= 0) {
+            val sel = selection
+            if (sel == null || index !in sel) selection = index..index
+            menuAnchor = offset
+        }
+    }
+
+    fun toggleAudioDock() {
+        val opening = !audioDockOpen
+        audioDockOpen = opening
+        if (!opening) audioController.stop()
+    }
+    // The headset overrides its utility when a range is selected: tap plays the
+    // range, double-tap plays it recite-back, long-press opens the range config.
+    val onHeadsetTap = {
+        if (selectedIds.isNotEmpty()) playSelectedRange(MushafAudioMode.LISTEN) else toggleAudioDock()
+    }
+    val onHeadsetDoubleTap = {
+        if (selectedIds.isNotEmpty()) playSelectedRange(MushafAudioMode.RECITE_BACK) else Unit
+    }
+    val onHeadsetLongPress = {
+        if (selectedIds.isNotEmpty()) {
+            audioDockOpen = false
+            rangeAudioOpen = true
+        } else {
+            toggleAudioDock()
+        }
+    }
+
     Column(Modifier.fillMaxSize().background(AlkahfColors.Paper)) {
         MushafTopBar(
             title = currentSession?.page?.primarySurahLatin ?: "",
             location = currentSession?.page?.let { "Juzʼ ${it.juz} · Page ${it.number}" } ?: "",
             hideMode = hideMode,
-            audioActive = audioDockOpen,
-            onToggleAudio = {
-                val opening = !audioDockOpen
-                audioDockOpen = opening
-                if (!opening) audioController.stop()
-            },
+            audioActive = audioDockOpen || rangeAudioOpen,
+            onAudioTap = onHeadsetTap,
+            onAudioDoubleTap = onHeadsetDoubleTap,
+            onAudioLongPress = onHeadsetLongPress,
             onBack = onBack,
             onToggleHideMode = {
                 val turningOn = !hideMode
@@ -333,6 +394,7 @@ fun MushafScreen(
                         onSessionReady = { sessions[pageIndex + 1] = it },
                         persistReveal = persistReveal,
                         onSelectAyah = onSelectAyah,
+                        onAyahLongPress = onAyahLongPress,
                         onLearnSurah = { surah, name -> learnSurah = surah to name },
                         playingAyahId = audioState.currentAyahId,
                         onAudioTap = onAudioTap,
@@ -344,6 +406,21 @@ fun MushafScreen(
             }
         }
         when {
+            rangeAudioOpen -> RangeAudioDock(
+                mode = rangeMode,
+                speed = rangeSpeed,
+                times = rangeTimes,
+                state = audioState,
+                onMode = { rangeMode = it },
+                onSpeed = { rangeSpeed = it },
+                onTimes = { rangeTimes = it },
+                onPlay = { playSelectedRange(rangeMode) },
+                onStop = audioController::stop,
+                onClose = {
+                    rangeAudioOpen = false
+                    audioController.stop()
+                },
+            )
             audioDockOpen -> MushafAudioDock(
                 state = audioState,
                 onMode = audioController::setMode,
@@ -372,44 +449,55 @@ fun MushafScreen(
                 },
                 onStop = audioController::stop,
             )
-            selectedIds.isNotEmpty() -> SelectionDock(
+            selectedIds.isNotEmpty() -> SelectionHintBar(
                 count = selectedIds.size,
-                onSetState = { showStateSheet = true },
-                onSetSabaq = {
-                    val session = currentSession ?: return@SelectionDock
-                    val picked = session.page.ayahs.filter { it.id in selectedIds }
-                    val surah = picked.first().surah
-                    val nums = picked.filter { it.surah == surah }.map { it.number }
-                    scope.launch {
-                        repository.setSabaqToRange(surah, nums.min(), nums.max())
-                        reloadMemStates()
-                    }
-                    selection = null
-                },
+                playing = audioState.phase != MushafAudioPhase.IDLE,
+                onStop = audioController::stop,
                 onClear = { selection = null },
             )
             hideMode -> SelfTestDock(session = currentSession)
         }
     }
 
-    val session = currentSession
-    if (showStateSheet && session != null && selectedIds.isNotEmpty()) {
-        val currentStates = selectedIds.map { session.memStates[it] ?: MemorizationState.NOT_STARTED }
-        MemorizationSheet(
-            title = if (selectedIds.size == 1) "Mark āyah" else "Mark ${selectedIds.size} āyāt",
-            current = currentStates.distinct().singleOrNull(),
-            onPick = { state ->
+    val anchor = menuAnchor
+    val menuSession = currentSession
+    if (anchor != null && menuSession != null && selectedIds.isNotEmpty()) {
+        val currentState = selectedIds
+            .map { menuSession.memStates[it] ?: MemorizationState.NOT_STARTED }
+            .distinct()
+            .singleOrNull()
+        SelectionContextMenu(
+            anchor = anchor,
+            currentState = currentState,
+            onListen = {
+                playSelectedRange(MushafAudioMode.LISTEN)
+                menuAnchor = null
+            },
+            onSetSabaq = {
+                val picked = menuSession.page.ayahs.filter { it.id in selectedIds }
+                if (picked.isNotEmpty()) {
+                    val surah = picked.first().surah
+                    val nums = picked.filter { it.surah == surah }.map { it.number }
+                    scope.launch {
+                        repository.setSabaqToRange(surah, nums.min(), nums.max())
+                        reloadMemStates()
+                    }
+                }
+                selection = null
+                menuAnchor = null
+            },
+            onSetState = { state ->
                 val ids = selectedIds.toList()
-                ids.forEach { session.memStates[it] = state }
+                ids.forEach { menuSession.memStates[it] = state }
                 scope.launch {
                     ids.forEach { repository.setAyahState(it, state) }
                     // Memorizing the sabaq's ayat may complete its section.
                     repository.maybeAdvanceSabaq()
                 }
-                showStateSheet = false
                 selection = null
+                menuAnchor = null
             },
-            onDismiss = { showStateSheet = false },
+            onDismiss = { menuAnchor = null },
         )
     }
 
@@ -435,10 +523,17 @@ private fun MushafTopBar(
     location: String,
     hideMode: Boolean,
     audioActive: Boolean,
-    onToggleAudio: () -> Unit,
+    onAudioTap: () -> Unit,
+    onAudioDoubleTap: () -> Unit,
+    onAudioLongPress: () -> Unit,
     onBack: () -> Unit,
     onToggleHideMode: () -> Unit,
 ) {
+    // The headset gesture detector lives in a pointerInput(Unit) that never
+    // restarts, so capture the latest handlers to avoid acting on stale state.
+    val currentAudioTap by rememberUpdatedState(onAudioTap)
+    val currentAudioDoubleTap by rememberUpdatedState(onAudioDoubleTap)
+    val currentAudioLongPress by rememberUpdatedState(onAudioLongPress)
     Column(Modifier.fillMaxWidth().background(AlkahfColors.Paper).statusBarsPadding()) {
         Row(
             modifier = Modifier
@@ -478,7 +573,13 @@ private fun MushafTopBar(
                 )
             }
             Box(
-                modifier = Modifier.size(40.dp).clickable(onClick = onToggleAudio),
+                modifier = Modifier.size(40.dp).pointerInput(Unit) {
+                    detectTapGestures(
+                        onTap = { currentAudioTap() },
+                        onDoubleTap = { currentAudioDoubleTap() },
+                        onLongPress = { currentAudioLongPress() },
+                    )
+                },
                 contentAlignment = Alignment.Center,
             ) {
                 if (audioActive) {
@@ -561,6 +662,7 @@ private fun MushafPageView(
     onSessionReady: (SelfTestSession) -> Unit,
     persistReveal: (Int, Int) -> Unit,
     onSelectAyah: (Int) -> Unit,
+    onAyahLongPress: (Int, IntOffset) -> Unit,
     onLearnSurah: (Int, String) -> Unit,
     playingAyahId: Int?,
     onAudioTap: (Int) -> Boolean,
@@ -617,6 +719,7 @@ private fun MushafPageView(
                             playingAyahId = playingAyahId,
                             onAudioTap = onAudioTap,
                             onSelectAyah = onSelectAyah,
+                            onAyahLongPress = onAyahLongPress,
                             onLearnSurah = onLearnSurah,
                             highlightIds = highlightIds,
                             selectedIds = selectedIds,
@@ -637,6 +740,7 @@ private fun PageGroupView(
     playingAyahId: Int?,
     onAudioTap: (Int) -> Boolean,
     onSelectAyah: (Int) -> Unit,
+    onAyahLongPress: (Int, IntOffset) -> Unit,
     onLearnSurah: (Int, String) -> Unit,
     highlightIds: Set<Int>,
     selectedIds: Set<Int>,
@@ -656,7 +760,7 @@ private fun PageGroupView(
                 .padding(top = 12.dp, bottom = 10.dp),
         )
     }
-    AyatBody(group, hideMode, session, playingAyahId, onAudioTap, onSelectAyah, highlightIds, selectedIds)
+    AyatBody(group, hideMode, session, playingAyahId, onAudioTap, onSelectAyah, onAyahLongPress, highlightIds, selectedIds)
 }
 
 @Composable
@@ -715,6 +819,7 @@ private fun AyatBody(
     playingAyahId: Int?,
     onAudioTap: (Int) -> Boolean,
     onSelectAyah: (Int) -> Unit,
+    onAyahLongPress: (Int, IntOffset) -> Unit,
     highlightIds: Set<Int>,
     selectedIds: Set<Int>,
 ) {
@@ -730,7 +835,9 @@ private fun AyatBody(
     }
     val currentOnAudioTap by rememberUpdatedState(onAudioTap)
     val currentOnSelect by rememberUpdatedState(onSelectAyah)
+    val currentOnLongPress by rememberUpdatedState(onAyahLongPress)
     val layoutResult = remember { mutableStateOf<TextLayoutResult?>(null) }
+    var coords by remember { mutableStateOf<LayoutCoordinates?>(null) }
     val bodySize = LocalMushafTextSize.current.sp
     val fill = AlkahfColors.AyahHighlightFill
 
@@ -747,6 +854,7 @@ private fun AyatBody(
             onTextLayout = { layoutResult.value = it },
             modifier = Modifier
                 .fillMaxWidth()
+                .onGloballyPositioned { coords = it }
                 .drawBehind {
                     val layout = layoutResult.value ?: return@drawBehind
                     val padH = 6.dp.toPx()
@@ -805,11 +913,20 @@ private fun AyatBody(
                             }
                         },
                         onLongPress = { position ->
-                            if (!hideMode) return@detectTapGestures
                             val ayahId = spanAt(layoutResult.value, groupText, position)?.ayahId
                                 ?: markerAyahIdAt(layoutResult.value, groupText, position)
                                 ?: return@detectTapGestures
-                            session.revealAyah(ayahId)
+                            if (hideMode) {
+                                session.revealAyah(ayahId)
+                            } else {
+                                // Reading mode: open the floating action menu at
+                                // the press point (in window coordinates).
+                                val win = coords?.localToWindow(position) ?: return@detectTapGestures
+                                currentOnLongPress(
+                                    ayahId,
+                                    IntOffset(win.x.roundToInt(), win.y.roundToInt()),
+                                )
+                            }
                         },
                     )
                 },
@@ -963,7 +1080,7 @@ private fun SelfTestDock(session: SelfTestSession?) {
                 )
             }
             Text(
-                text = "Tap to reveal · long-press reveals the ayah · in reading mode, long-press to mark it memorized",
+                text = "Tap to reveal through a word · long-press reveals the whole āyah",
                 fontSize = 11.5.sp,
                 fontWeight = FontWeight.Medium,
                 color = AlkahfColors.InkFaint,
@@ -983,71 +1100,79 @@ private fun recitingLabel(session: SelfTestSession?): String {
     return "Reciting ayah $position of ${page.ayahs.size}"
 }
 
+/** Positions a popup so its top edge sits just above [anchor] (window px). */
+private class AnchorPositionProvider(private val anchor: IntOffset) : PopupPositionProvider {
+    override fun calculatePosition(
+        anchorBounds: IntRect,
+        windowSize: IntSize,
+        layoutDirection: LayoutDirection,
+        popupContentSize: IntSize,
+    ): IntOffset {
+        val margin = 12
+        val x = (anchor.x - popupContentSize.width / 2)
+            .coerceIn(margin, (windowSize.width - popupContentSize.width - margin).coerceAtLeast(margin))
+        val above = anchor.y - popupContentSize.height - 16
+        val y = if (above >= margin) {
+            above
+        } else {
+            (anchor.y + 16).coerceAtMost((windowSize.height - popupContentSize.height - margin).coerceAtLeast(margin))
+        }
+        return IntOffset(x, y)
+    }
+}
+
+/**
+ * Floating action menu for the current selection, anchored where the user
+ * long-pressed: Listen to the range, set it as the sabaq, or expand the state
+ * picker to mark the range's memorization state.
+ */
 @Composable
-private fun SelectionDock(
-    count: Int,
-    onSetState: () -> Unit,
+private fun SelectionContextMenu(
+    anchor: IntOffset,
+    currentState: MemorizationState?,
+    onListen: () -> Unit,
     onSetSabaq: () -> Unit,
-    onClear: () -> Unit,
+    onSetState: (MemorizationState) -> Unit,
+    onDismiss: () -> Unit,
 ) {
-    Column(Modifier.fillMaxWidth().background(AlkahfColors.NavSurface)) {
-        HorizontalDivider(thickness = 1.dp, color = AlkahfColors.DockBorder)
-        Column(
-            modifier = Modifier
-                .navigationBarsPadding()
-                .padding(start = 16.dp, top = 12.dp, end = 16.dp, bottom = 12.dp),
+    Popup(
+        popupPositionProvider = remember(anchor) { AnchorPositionProvider(anchor) },
+        onDismissRequest = onDismiss,
+        properties = PopupProperties(focusable = true),
+    ) {
+        var stateOpen by remember { mutableStateOf(false) }
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = AlkahfColors.Paper,
+            border = BorderStroke(1.dp, AlkahfColors.CardBorder),
+            shadowElevation = 14.dp,
+            modifier = Modifier.width(216.dp),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = "$count āyah${if (count > 1) "āt" else ""} selected",
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = AlkahfColors.Ink,
-                    modifier = Modifier.weight(1f),
+            Column(Modifier.padding(vertical = 6.dp)) {
+                MenuItem(label = "Listen", onClick = onListen)
+                MenuItem(label = "Set as sabaq", onClick = onSetSabaq)
+                HorizontalDivider(
+                    thickness = 1.dp,
+                    color = AlkahfColors.Hairline,
+                    modifier = Modifier.padding(vertical = 4.dp),
                 )
-                Box(
-                    modifier = Modifier.clickable(onClick = onClear).padding(horizontal = 12.dp, vertical = 8.dp),
-                ) {
-                    Text(
-                        text = "Clear",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = AlkahfColors.InkMuted,
-                    )
-                }
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Surface(
-                    onClick = onSetSabaq,
-                    shape = RoundedCornerShape(14.dp),
-                    color = AlkahfColors.Surface,
-                    border = BorderStroke(1.dp, AlkahfColors.CardBorderHero),
-                    modifier = Modifier.weight(1f).height(44.dp),
-                ) {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text(
-                            text = "Set as sabaq",
-                            fontSize = 14.5.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = AlkahfColors.AccentDeep,
-                        )
-                    }
-                }
-                Surface(
-                    onClick = onSetState,
-                    shape = RoundedCornerShape(14.dp),
-                    color = AlkahfColors.Accent,
-                    modifier = Modifier.weight(1f).height(44.dp).padding(start = 10.dp),
-                ) {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text(
-                            text = "Set state",
-                            fontSize = 14.5.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = AlkahfColors.OnAccent,
+                MenuItem(
+                    label = "Set state",
+                    trailing = if (stateOpen) "▲" else "▼",
+                    onClick = { stateOpen = !stateOpen },
+                )
+                if (stateOpen) {
+                    listOf(
+                        MemorizationState.NOT_STARTED to "Not started",
+                        MemorizationState.LEARNING to "Learning",
+                        MemorizationState.MEMORIZED to "Memorized",
+                        MemorizationState.STRONG to "Strong",
+                    ).forEach { (state, label) ->
+                        StateMenuItem(
+                            label = label,
+                            color = memMedallionColor(state),
+                            selected = state == currentState,
+                            onClick = { onSetState(state) },
                         )
                     }
                 }
@@ -1057,83 +1182,226 @@ private fun SelectionDock(
 }
 
 @Composable
-private fun MemorizationSheet(
-    title: String,
-    current: MemorizationState?,
-    onPick: (MemorizationState) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    val options = listOf(
-        MemorizationState.NOT_STARTED to "Not started",
-        MemorizationState.LEARNING to "Learning",
-        MemorizationState.MEMORIZED to "Memorized",
-        MemorizationState.STRONG to "Strong",
-    )
-    Box(
-        Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.34f))
-            .clickable(onClick = onDismiss),
-        contentAlignment = Alignment.BottomCenter,
+private fun MenuItem(label: String, trailing: String? = null, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 11.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Surface(
-            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-            color = AlkahfColors.Paper,
-            modifier = Modifier.fillMaxWidth().clickable(enabled = false) {},
+        Text(
+            text = label,
+            fontSize = 14.5.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = AlkahfColors.Ink,
+            modifier = Modifier.weight(1f),
+        )
+        if (trailing != null) {
+            Text(text = trailing, fontSize = 11.sp, color = AlkahfColors.InkMuted)
+        }
+    }
+}
+
+@Composable
+private fun StateMenuItem(label: String, color: Color, selected: Boolean, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clickable(onClick = onClick)
+            .padding(start = 22.dp, end = 16.dp, top = 9.dp, bottom = 9.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(11.dp).background(color, CircleShape))
+        Text(
+            text = label,
+            fontSize = 13.5.sp,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+            color = AlkahfColors.Ink,
+            modifier = Modifier.weight(1f).padding(start = 11.dp),
+        )
+        if (selected) {
+            Text(
+                text = "current",
+                fontSize = 10.5.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = AlkahfColors.AccentDeep,
+            )
+        }
+    }
+}
+
+/** Slim status bar shown while a selection is active (no action buttons). */
+@Composable
+private fun SelectionHintBar(
+    count: Int,
+    playing: Boolean,
+    onStop: () -> Unit,
+    onClear: () -> Unit,
+) {
+    Column(Modifier.fillMaxWidth().background(AlkahfColors.NavSurface)) {
+        HorizontalDivider(thickness = 1.dp, color = AlkahfColors.DockBorder)
+        Row(
+            modifier = Modifier
+                .navigationBarsPadding()
+                .fillMaxWidth()
+                .padding(start = 16.dp, top = 12.dp, end = 16.dp, bottom = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Column(
-                Modifier.navigationBarsPadding()
-                    .padding(start = 20.dp, top = 12.dp, end = 20.dp, bottom = 20.dp),
-            ) {
-                Box(
-                    Modifier.fillMaxWidth().padding(bottom = 12.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Box(Modifier.width(38.dp).height(4.dp).background(AlkahfColors.DashedNode, RoundedCornerShape(2.dp)))
-                }
+            Column(Modifier.weight(1f)) {
                 Text(
-                    text = title,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
+                    text = "$count āyah${if (count > 1) "āt" else ""} selected",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
                     color = AlkahfColors.Ink,
-                    modifier = Modifier.padding(bottom = 12.dp),
                 )
-                options.forEach { (state, label) ->
-                    val selected = state == current
-                    Surface(
-                        onClick = { onPick(state) },
-                        shape = RoundedCornerShape(14.dp),
-                        color = if (selected) AlkahfColors.SurfaceHero else AlkahfColors.Surface,
-                        border = BorderStroke(
-                            1.dp,
-                            if (selected) AlkahfColors.CardBorderHero else AlkahfColors.CardBorder,
-                        ),
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                    ) {
-                        Row(
-                            Modifier.padding(horizontal = 14.dp, vertical = 13.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Box(
-                                Modifier.size(12.dp)
-                                    .background(memMedallionColor(state), CircleShape),
-                            )
-                            Text(
-                                text = label,
-                                fontSize = 14.5.sp,
-                                fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
-                                color = AlkahfColors.Ink,
-                                modifier = Modifier.weight(1f).padding(start = 12.dp),
-                            )
-                            if (selected) {
-                                Text(
-                                    text = "current",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = AlkahfColors.AccentDeep,
-                                )
-                            }
-                        }
+                Text(
+                    text = "Long-press the selection for actions",
+                    fontSize = 11.5.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = AlkahfColors.InkFaint,
+                    modifier = Modifier.padding(top = 1.dp),
+                )
+            }
+            if (playing) {
+                Surface(
+                    onClick = onStop,
+                    shape = RoundedCornerShape(12.dp),
+                    color = AlkahfColors.PageSurface,
+                    border = BorderStroke(1.dp, AlkahfColors.ControlBorder),
+                    modifier = Modifier.size(40.dp),
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Filled.Stop,
+                            contentDescription = "Stop",
+                            tint = AlkahfColors.InkChrome,
+                            modifier = Modifier.size(20.dp),
+                        )
                     }
                 }
+                Spacer(Modifier.width(10.dp))
+            }
+            Box(
+                modifier = Modifier.clickable(onClick = onClear).padding(horizontal = 12.dp, vertical = 8.dp),
+            ) {
+                Text(
+                    text = "Clear",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = AlkahfColors.InkMuted,
+                )
+            }
+        }
+    }
+}
+
+/** Bottom config for listening to the selected range (long-press the headset). */
+@Composable
+private fun RangeAudioDock(
+    mode: MushafAudioMode,
+    speed: Float,
+    times: Int,
+    state: MushafAudioState,
+    onMode: (MushafAudioMode) -> Unit,
+    onSpeed: (Float) -> Unit,
+    onTimes: (Int) -> Unit,
+    onPlay: () -> Unit,
+    onStop: () -> Unit,
+    onClose: () -> Unit,
+) {
+    Column(Modifier.fillMaxWidth().background(AlkahfColors.NavSurface)) {
+        HorizontalDivider(thickness = 1.dp, color = AlkahfColors.DockBorder)
+        Column(
+            Modifier
+                .navigationBarsPadding()
+                .padding(start = 16.dp, top = 12.dp, end = 16.dp, bottom = 10.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "Listen to selection",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = AlkahfColors.Ink,
+                    modifier = Modifier.weight(1f),
+                )
+                Box(
+                    modifier = Modifier.clickable(onClick = onClose).padding(horizontal = 8.dp, vertical = 4.dp),
+                ) {
+                    Text(
+                        text = "Done",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = AlkahfColors.AccentDeep,
+                    )
+                }
+            }
+            AudioSegmented(
+                options = listOf(
+                    MushafAudioMode.LISTEN to "Normal",
+                    MushafAudioMode.RECITE_BACK to "Recite back",
+                ),
+                selected = mode,
+                onSelect = onMode,
+            )
+            Spacer(Modifier.height(10.dp))
+            Text(
+                text = "Speed",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold,
+                letterSpacing = 0.6.sp,
+                color = AlkahfColors.InkMuted,
+                modifier = Modifier.padding(bottom = 5.dp),
+            )
+            AudioSegmented(
+                options = listOf(0.75f to "0.75×", 1f to "1×", 1.25f to "1.25×", 1.5f to "1.5×"),
+                selected = speed,
+                onSelect = onSpeed,
+            )
+            Spacer(Modifier.height(10.dp))
+            Text(
+                text = "Repeat",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold,
+                letterSpacing = 0.6.sp,
+                color = AlkahfColors.InkMuted,
+                modifier = Modifier.padding(bottom = 5.dp),
+            )
+            AudioSegmented(
+                options = listOf(1 to "1×", 2 to "2×", 3 to "3×", 5 to "5×"),
+                selected = times,
+                onSelect = onTimes,
+            )
+            Spacer(Modifier.height(12.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                val idle = state.phase == MushafAudioPhase.IDLE
+                Surface(
+                    onClick = if (idle) onPlay else onStop,
+                    shape = CircleShape,
+                    color = AlkahfColors.Accent,
+                    modifier = Modifier.size(46.dp),
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = if (idle) Icons.Filled.PlayArrow else Icons.Filled.Stop,
+                            contentDescription = if (idle) "Play" else "Stop",
+                            tint = AlkahfColors.OnAccent,
+                            modifier = Modifier.size(22.dp),
+                        )
+                    }
+                }
+                Text(
+                    text = when {
+                        state.errorMessage != null -> state.errorMessage
+                        state.phase == MushafAudioPhase.IDLE -> "Ready"
+                        state.phase == MushafAudioPhase.PREPARING -> "Preparing audio…"
+                        state.phase == MushafAudioPhase.GAP ->
+                            "Recite back · āyah ${(state.currentAyahId ?: 0) % 1000}"
+                        else -> "Āyah ${(state.currentAyahId ?: 0) % 1000}"
+                    },
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (state.errorMessage != null) AlkahfColors.StumbleInk else AlkahfColors.Ink,
+                    modifier = Modifier.weight(1f).padding(start = 12.dp),
+                )
             }
         }
     }
