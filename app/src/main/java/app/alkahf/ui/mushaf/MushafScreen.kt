@@ -6,6 +6,7 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -28,9 +29,14 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowLeft
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.outlined.Headphones
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.HorizontalDivider
@@ -39,7 +45,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
@@ -47,6 +55,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -71,12 +80,14 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.media3.exoplayer.ExoPlayer
 import app.alkahf.AlkahfApplication
 import app.alkahf.data.MushafPage
 import app.alkahf.data.PageAyah
 import app.alkahf.data.PageGroup
 import app.alkahf.data.QuranRepository
 import app.alkahf.data.WordStumble
+import app.alkahf.data.audio.AudioStore
 import app.alkahf.ui.theme.AlkahfColors
 import app.alkahf.ui.theme.KfgqpcHafs
 import kotlinx.coroutines.launch
@@ -170,6 +181,44 @@ fun MushafScreen(
         }
     }
 
+    val audioController = remember {
+        val preset = repository.loopPreset
+        MushafAudioController(
+            repository = repository,
+            audioStore = AudioStore(context.applicationContext),
+            player = ExoPlayer.Builder(context).build(),
+            coroutineScope = scope,
+            reciterPath = preset?.reciterPath ?: AudioStore.DEFAULT_RECITER,
+            reciterName = preset?.reciterName ?: "Ḥuṣarī",
+        )
+    }
+    DisposableEffect(Unit) {
+        onDispose { audioController.release() }
+    }
+    val audioState by audioController.state.collectAsState()
+    var audioDockOpen by remember { mutableStateOf(false) }
+
+    // Audio modes take priority over reveal/stumble taps while the dock is open.
+    val onAudioTap: (Int) -> Boolean = { ayahId ->
+        when {
+            !audioDockOpen -> false
+            audioState.mode == MushafAudioMode.TAP -> {
+                audioController.playSingle(ayahId)
+                true
+            }
+            audioState.scope == MushafAudioScope.FROM_AYAH -> {
+                scope.launch {
+                    val ids = repository
+                        .ayahsForRange(ayahId / 1000, ayahId % 1000, 300)
+                        .map { it.id }
+                    audioController.playAyahIds(ids)
+                }
+                true
+            }
+            else -> false
+        }
+    }
+
     val persistReveal: (Int, Int) -> Unit = remember {
         { ayahId, count -> scope.launch { repository.saveRevealState(ayahId, count) } }
     }
@@ -189,6 +238,12 @@ fun MushafScreen(
             title = currentSession?.page?.primarySurahLatin ?: "",
             location = currentSession?.page?.let { "Juzʼ ${it.juz} · Page ${it.number}" } ?: "",
             hideMode = hideMode,
+            audioActive = audioDockOpen,
+            onToggleAudio = {
+                val opening = !audioDockOpen
+                audioDockOpen = opening
+                if (!opening) audioController.stop()
+            },
             onBack = onBack,
             onToggleHideMode = {
                 val turningOn = !hideMode
@@ -220,12 +275,42 @@ fun MushafScreen(
                         onSessionReady = { sessions[pageIndex + 1] = it },
                         persistReveal = persistReveal,
                         onToggleStumble = toggleStumble,
+                        playingAyahId = audioState.currentAyahId,
+                        onAudioTap = onAudioTap,
                     )
                 }
             }
         }
-        if (hideMode) {
-            SelfTestDock(session = currentSession)
+        when {
+            audioDockOpen -> MushafAudioDock(
+                state = audioState,
+                onMode = audioController::setMode,
+                onScope = audioController::setScope,
+                onPlayPause = {
+                    if (audioState.phase != MushafAudioPhase.IDLE) {
+                        audioController.togglePause()
+                    } else {
+                        val session = currentSession
+                        when {
+                            audioState.mode == MushafAudioMode.TAP -> {}
+                            audioState.scope == MushafAudioScope.PAGE -> session?.let {
+                                audioController.playAyahIds(it.page.ayahs.map { ayah -> ayah.id })
+                            }
+                            audioState.scope == MushafAudioScope.SURAH -> session?.let {
+                                val surah = it.page.ayahs.first().surah
+                                scope.launch {
+                                    audioController.playAyahIds(
+                                        repository.ayahsForRange(surah, 1, 300).map { ayah -> ayah.id },
+                                    )
+                                }
+                            }
+                            else -> {}
+                        }
+                    }
+                },
+                onStop = audioController::stop,
+            )
+            hideMode -> SelfTestDock(session = currentSession)
         }
     }
 }
@@ -235,6 +320,8 @@ private fun MushafTopBar(
     title: String,
     location: String,
     hideMode: Boolean,
+    audioActive: Boolean,
+    onToggleAudio: () -> Unit,
     onBack: () -> Unit,
     onToggleHideMode: () -> Unit,
 ) {
@@ -275,6 +362,30 @@ private fun MushafTopBar(
                     color = AlkahfColors.InkFaint,
                     modifier = Modifier.padding(top = 1.dp),
                 )
+            }
+            Box(
+                modifier = Modifier.size(40.dp).clickable(onClick = onToggleAudio),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (audioActive) {
+                    Surface(shape = CircleShape, color = AlkahfColors.AccentTint) {
+                        Box(Modifier.size(34.dp), contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Outlined.Headphones,
+                                contentDescription = "Listening on",
+                                tint = AlkahfColors.AccentDeep,
+                                modifier = Modifier.size(18.dp),
+                            )
+                        }
+                    }
+                } else {
+                    Icon(
+                        imageVector = Icons.Outlined.Headphones,
+                        contentDescription = "Listening off",
+                        tint = AlkahfColors.InkMuted,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
             }
             Box(
                 modifier = Modifier.size(40.dp).clickable(onClick = onToggleHideMode),
@@ -335,6 +446,8 @@ private fun MushafPageView(
     onSessionReady: (SelfTestSession) -> Unit,
     persistReveal: (Int, Int) -> Unit,
     onToggleStumble: (SelfTestSession, WordStumble) -> Unit,
+    playingAyahId: Int?,
+    onAudioTap: (Int) -> Boolean,
 ) {
     LaunchedEffect(pageNumber) {
         if (session == null) {
@@ -362,7 +475,7 @@ private fun MushafPageView(
         ) {
             Column {
                 session.page.groups.forEach { group ->
-                    PageGroupView(group, hideMode, session) { mark ->
+                    PageGroupView(group, hideMode, session, playingAyahId, onAudioTap) { mark ->
                         onToggleStumble(session, mark)
                     }
                 }
@@ -377,6 +490,8 @@ private fun PageGroupView(
     group: PageGroup,
     hideMode: Boolean,
     session: SelfTestSession,
+    playingAyahId: Int?,
+    onAudioTap: (Int) -> Boolean,
     onToggleStumble: (WordStumble) -> Unit,
 ) {
     if (group.showSurahHeader) {
@@ -394,7 +509,7 @@ private fun PageGroupView(
                 .padding(top = 12.dp, bottom = 10.dp),
         )
     }
-    AyatBody(group, hideMode, session, onToggleStumble)
+    AyatBody(group, hideMode, session, playingAyahId, onAudioTap, onToggleStumble)
 }
 
 @Composable
@@ -450,12 +565,15 @@ private fun AyatBody(
     group: PageGroup,
     hideMode: Boolean,
     session: SelfTestSession,
+    playingAyahId: Int?,
+    onAudioTap: (Int) -> Boolean,
     onToggleStumble: (WordStumble) -> Unit,
 ) {
     val revealedByAyah = group.ayahs.associate { it.id to session.revealedOf(it) }
-    val groupText = remember(revealedByAyah, hideMode) {
-        buildGroupText(group, revealedByAyah, hideMode)
+    val groupText = remember(revealedByAyah, hideMode, playingAyahId) {
+        buildGroupText(group, revealedByAyah, hideMode, playingAyahId)
     }
+    val currentOnAudioTap by rememberUpdatedState(onAudioTap)
     val layoutResult = remember { mutableStateOf<TextLayoutResult?>(null) }
     val stumbleAmber = AlkahfColors.StumbleAmber
 
@@ -477,6 +595,7 @@ private fun AyatBody(
                         onTap = { position ->
                             val span = spanAt(layoutResult.value, groupText, position)
                                 ?: return@detectTapGestures
+                            if (currentOnAudioTap(span.ayahId)) return@detectTapGestures
                             // In reader mode every word is visible, so any tap
                             // marks; in hide mode only revealed words can be
                             // marked — tapping concealed text reveals instead.
@@ -546,11 +665,13 @@ private fun buildGroupText(
     group: PageGroup,
     revealedByAyah: Map<Int, Int>,
     hideMode: Boolean,
+    playingAyahId: Int? = null,
 ): GroupText {
     val spans = mutableListOf<PageSpan>()
     val annotated = buildAnnotatedString {
         group.ayahs.forEachIndexed { ayahIndex, ayah ->
             val revealed = revealedByAyah[ayah.id] ?: 0
+            val playing = ayah.id == playingAyahId
             ayah.words.forEachIndexed { wordIndex, word ->
                 val start = length
                 append(word)
@@ -567,7 +688,10 @@ private fun buildGroupText(
                             ),
                         )
                     } else {
-                        SpanStyle(color = AlkahfColors.Ink)
+                        SpanStyle(
+                            color = AlkahfColors.Ink,
+                            background = if (playing) AlkahfColors.WordHighlightBg else Color.Unspecified,
+                        )
                     },
                     start = start,
                     end = length,
@@ -675,6 +799,169 @@ private fun recitingLabel(session: SelfTestSession?): String {
     val current = session.currentAyah ?: return "All ayat recalled"
     val position = page.ayahs.indexOfFirst { it.id == current.id } + 1
     return "Reciting ayah $position of ${page.ayahs.size}"
+}
+
+@Composable
+private fun MushafAudioDock(
+    state: MushafAudioState,
+    onMode: (MushafAudioMode) -> Unit,
+    onScope: (MushafAudioScope) -> Unit,
+    onPlayPause: () -> Unit,
+    onStop: () -> Unit,
+) {
+    Column(Modifier.fillMaxWidth().background(AlkahfColors.NavSurface)) {
+        HorizontalDivider(thickness = 1.dp, color = AlkahfColors.DockBorder)
+        Column(
+            Modifier
+                .navigationBarsPadding()
+                .padding(start = 16.dp, top = 12.dp, end = 16.dp, bottom = 10.dp),
+        ) {
+            AudioSegmented(
+                options = listOf(
+                    MushafAudioMode.LISTEN to "Listen",
+                    MushafAudioMode.RECITE_BACK to "Recite back",
+                    MushafAudioMode.TAP to "Tap āyah",
+                ),
+                selected = state.mode,
+                onSelect = onMode,
+            )
+            Spacer(Modifier.height(8.dp))
+            if (state.mode == MushafAudioMode.TAP) {
+                AudioHint("Tap any āyah on the page to hear it")
+            } else {
+                AudioSegmented(
+                    options = listOf(
+                        MushafAudioScope.PAGE to "Page",
+                        MushafAudioScope.SURAH to "Surah",
+                        MushafAudioScope.FROM_AYAH to "From āyah",
+                    ),
+                    selected = state.scope,
+                    onSelect = onScope,
+                )
+                if (state.scope == MushafAudioScope.FROM_AYAH &&
+                    state.phase == MushafAudioPhase.IDLE
+                ) {
+                    Spacer(Modifier.height(6.dp))
+                    AudioHint("Tap an āyah on the page to start from it")
+                }
+            }
+            Spacer(Modifier.height(10.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Surface(
+                    onClick = onPlayPause,
+                    shape = CircleShape,
+                    color = AlkahfColors.Accent,
+                    modifier = Modifier.size(46.dp),
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        val showPlay = state.phase == MushafAudioPhase.IDLE || state.isPaused
+                        Icon(
+                            imageVector = if (showPlay) Icons.Filled.PlayArrow else Icons.Filled.Pause,
+                            contentDescription = if (showPlay) "Play" else "Pause",
+                            tint = AlkahfColors.OnAccent,
+                            modifier = Modifier.size(22.dp),
+                        )
+                    }
+                }
+                Column(Modifier.weight(1f).padding(start = 12.dp)) {
+                    Text(
+                        text = when {
+                            state.errorMessage != null -> state.errorMessage
+                            state.phase == MushafAudioPhase.IDLE -> "Ready"
+                            state.phase == MushafAudioPhase.PREPARING -> "Preparing audio…"
+                            state.phase == MushafAudioPhase.GAP ->
+                                "Recite back · āyah ${(state.currentAyahId ?: 0) % 1000}"
+                            else -> "Āyah ${(state.currentAyahId ?: 0) % 1000}"
+                        },
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (state.errorMessage != null) {
+                            AlkahfColors.StumbleInk
+                        } else {
+                            AlkahfColors.Ink
+                        },
+                    )
+                    Text(
+                        text = state.reciterName,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = AlkahfColors.InkFaint,
+                        modifier = Modifier.padding(top = 1.dp),
+                    )
+                }
+                if (state.phase != MushafAudioPhase.IDLE) {
+                    Surface(
+                        onClick = onStop,
+                        shape = RoundedCornerShape(12.dp),
+                        color = AlkahfColors.PageSurface,
+                        border = BorderStroke(1.dp, AlkahfColors.ControlBorder),
+                        modifier = Modifier.size(40.dp),
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Filled.Stop,
+                                contentDescription = "Stop",
+                                tint = AlkahfColors.InkChrome,
+                                modifier = Modifier.size(20.dp),
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AudioHint(text: String) {
+    Text(
+        text = text,
+        fontSize = 11.5.sp,
+        fontWeight = FontWeight.Medium,
+        color = AlkahfColors.InkFaint,
+        textAlign = TextAlign.Center,
+        modifier = Modifier.fillMaxWidth(),
+    )
+}
+
+@Composable
+private fun <T> AudioSegmented(
+    options: List<Pair<T, String>>,
+    selected: T,
+    onSelect: (T) -> Unit,
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .background(AlkahfColors.SegmentedTrack, RoundedCornerShape(12.dp))
+            .padding(3.dp),
+    ) {
+        options.forEach { (option, label) ->
+            val isSelected = option == selected
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .let {
+                        if (isSelected) {
+                            it.background(AlkahfColors.SegmentedSelected, RoundedCornerShape(9.dp))
+                        } else {
+                            it
+                        }
+                    }
+                    .clickable { onSelect(option) }
+                    .padding(vertical = 7.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = label,
+                    fontSize = 12.sp,
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
+                    color = if (isSelected) AlkahfColors.AccentDeep else AlkahfColors.InkMuted,
+                    maxLines = 1,
+                )
+            }
+        }
+    }
 }
 
 @Composable
