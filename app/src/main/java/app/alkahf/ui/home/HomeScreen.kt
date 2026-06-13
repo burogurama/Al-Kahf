@@ -19,9 +19,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -62,6 +64,7 @@ fun HomeScreen(
     onOpenReview: () -> Unit = {},
     onOpenProgress: () -> Unit = {},
     onOpenLibrary: () -> Unit = {},
+    onOpenSettings: () -> Unit = {},
 ) {
     Scaffold(
         containerColor = AlkahfColors.Paper,
@@ -85,7 +88,7 @@ fun HomeScreen(
                 .padding(horizontal = 18.dp),
             verticalArrangement = Arrangement.spacedBy(9.dp),
         ) {
-            HomeHeader(state)
+            HomeHeader(state, onOpenSettings)
             SabaqCard(state, onOpenSabaq)
             MurajaahCard(state, onOpenReview)
             ResumeDrillCard(state, onOpenLoop)
@@ -96,7 +99,7 @@ fun HomeScreen(
 }
 
 @Composable
-private fun HomeHeader(state: HomeUiState) {
+private fun HomeHeader(state: HomeUiState, onOpenSettings: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -129,7 +132,20 @@ private fun HomeHeader(state: HomeUiState) {
                 modifier = Modifier.padding(top = 4.dp),
             )
         }
-        StreakChip(days = state.streakDays)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            StreakChip(days = state.streakDays)
+            Box(
+                modifier = Modifier.padding(start = 6.dp).size(40.dp).clickable(onClick = onOpenSettings),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Settings,
+                    contentDescription = "Settings",
+                    tint = AlkahfColors.InkMuted,
+                    modifier = Modifier.size(22.dp),
+                )
+            }
+        }
     }
 }
 

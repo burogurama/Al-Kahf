@@ -85,6 +85,8 @@ fun ReviewScreen(onBack: () -> Unit = {}) {
     val portions by produceState<List<ReviewPortion>?>(initialValue = null) {
         value = repository.dueReviewPortions()
     }
+    val growthFactor = remember { repository.reviewPacing.growthFactor }
+    val autoLower = remember { repository.autoLowerOnStumble }
     var index by remember { mutableIntStateOf(0) }
     var completed by remember { mutableStateOf(false) }
 
@@ -146,18 +148,22 @@ fun ReviewScreen(onBack: () -> Unit = {}) {
             grade == null -> GradingDock(
                 portion = portion,
                 stumbleCount = stumbles.size,
+                growthFactor = growthFactor,
+                autoLower = autoLower,
                 onGrade = { grade = it },
             )
             else -> GradedDock(
                 portion = portion,
                 chosenGrade = grade ?: ReviewGrade.HESITANT,
                 stumbleCount = stumbles.size,
+                growthFactor = growthFactor,
+                autoLower = autoLower,
                 nextPortionName = queue.getOrNull(index + 1)?.surahNameLatin,
                 remainingAfter = queue.size - index - 1,
                 onChange = { grade = null },
                 onNext = {
                     val chosen = grade ?: return@GradedDock
-                    val effective = ReviewScheduler.effectiveGrade(chosen, stumbles.size)
+                    val effective = ReviewScheduler.effectiveGrade(chosen, stumbles.size, autoLower)
                     scope.launch {
                         repository.commitReviewGrade(portion, effective)
                         stumbles.forEach { repository.addStumble(it) }
@@ -522,6 +528,8 @@ private fun RevealDock(onStumble: () -> Unit, onRevealAll: () -> Unit) {
 private fun GradingDock(
     portion: ReviewPortion,
     stumbleCount: Int,
+    growthFactor: Double,
+    autoLower: Boolean,
     onGrade: (ReviewGrade) -> Unit,
 ) {
     Column(Modifier.padding(start = 18.dp, top = 14.dp, end = 18.dp, bottom = 10.dp)) {
@@ -536,7 +544,7 @@ private fun GradingDock(
         Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
             GradeButton(
                 label = "Forgot",
-                hint = hintFor(portion, ReviewGrade.FORGOT, stumbleCount),
+                hint = hintFor(portion, ReviewGrade.FORGOT, stumbleCount, growthFactor, autoLower),
                 labelColor = AlkahfColors.ForgotInk,
                 hintColor = AlkahfColors.ForgotHint,
                 background = AlkahfColors.ForgotBg,
@@ -545,7 +553,7 @@ private fun GradingDock(
             ) { onGrade(ReviewGrade.FORGOT) }
             GradeButton(
                 label = "Hesitant",
-                hint = hintFor(portion, ReviewGrade.HESITANT, stumbleCount),
+                hint = hintFor(portion, ReviewGrade.HESITANT, stumbleCount, growthFactor, autoLower),
                 labelColor = AlkahfColors.StumbleInk,
                 hintColor = AlkahfColors.HesitantHint,
                 background = AlkahfColors.StumbleBg,
@@ -575,7 +583,7 @@ private fun GradingDock(
                         color = AlkahfColors.OnAccent,
                     )
                     Text(
-                        text = hintFor(portion, ReviewGrade.PERFECT, stumbleCount),
+                        text = hintFor(portion, ReviewGrade.PERFECT, stumbleCount, growthFactor, autoLower),
                         fontSize = 11.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = AlkahfColors.PerfectHint,
@@ -596,10 +604,16 @@ private fun GradingDock(
 }
 
 /** The honest interval each grade would assign, including the stumble cap. */
-private fun hintFor(portion: ReviewPortion, grade: ReviewGrade, stumbleCount: Int): String {
-    val effective = ReviewScheduler.effectiveGrade(grade, stumbleCount)
+private fun hintFor(
+    portion: ReviewPortion,
+    grade: ReviewGrade,
+    stumbleCount: Int,
+    growthFactor: Double,
+    autoLower: Boolean,
+): String {
+    val effective = ReviewScheduler.effectiveGrade(grade, stumbleCount, autoLower)
     return ReviewScheduler.intervalLabel(
-        ReviewScheduler.nextIntervalDays(portion.intervalDays, effective),
+        ReviewScheduler.nextIntervalDays(portion.intervalDays, effective, growthFactor),
     )
 }
 
@@ -643,13 +657,15 @@ private fun GradedDock(
     portion: ReviewPortion,
     chosenGrade: ReviewGrade,
     stumbleCount: Int,
+    growthFactor: Double,
+    autoLower: Boolean,
     nextPortionName: String?,
     remainingAfter: Int,
     onChange: () -> Unit,
     onNext: () -> Unit,
 ) {
-    val effective = ReviewScheduler.effectiveGrade(chosenGrade, stumbleCount)
-    val interval = ReviewScheduler.nextIntervalDays(portion.intervalDays, effective)
+    val effective = ReviewScheduler.effectiveGrade(chosenGrade, stumbleCount, autoLower)
+    val interval = ReviewScheduler.nextIntervalDays(portion.intervalDays, effective, growthFactor)
     val capped = effective != chosenGrade
     Column(Modifier.padding(start = 18.dp, top = 14.dp, end = 18.dp, bottom = 10.dp)) {
         Row(

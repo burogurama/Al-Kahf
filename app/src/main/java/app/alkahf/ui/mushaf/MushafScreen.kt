@@ -110,6 +110,9 @@ private data class GroupText(val annotated: AnnotatedString, val spans: List<Pag
 /** First-launch fallback before any page has been read: the current sabaq surah. */
 private const val DEFAULT_SURAH = 18
 
+/** The mushaf body font size (pt/sp), set from Settings. */
+val LocalMushafTextSize = androidx.compose.runtime.compositionLocalOf { 24 }
+
 /**
  * Hide/reveal progress and stumbles for one page's self-test. Reveal changes
  * are reported through [onRevealChanged] so they persist and the test resumes
@@ -158,6 +161,15 @@ fun MushafScreen(
     val context = LocalContext.current
     val repository = remember { (context.applicationContext as AlkahfApplication).repository }
     val scope = rememberCoroutineScope()
+    val settings = remember { repository.settings() }
+    // Keep the screen awake while reading, if enabled in Settings.
+    if (settings.keepScreenOn) {
+        val view = androidx.compose.ui.platform.LocalView.current
+        DisposableEffect(Unit) {
+            view.keepScreenOn = true
+            onDispose { view.keepScreenOn = false }
+        }
+    }
     // Opening the sabaq lands in reading mode (text shown); plain browsing
     // starts in hide/self-test mode.
     var hideMode by remember { mutableStateOf(highlightRange == null) }
@@ -275,7 +287,10 @@ fun MushafScreen(
         )
         // RTL pager: swiping toward the right turns to the next page, as in a
         // physical mushaf. Page content restores LTR for its own chrome.
-        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+        CompositionLocalProvider(
+            LocalLayoutDirection provides LayoutDirection.Rtl,
+            LocalMushafTextSize provides settings.arabicTextSizePt,
+        ) {
             HorizontalPager(
                 state = pagerState,
                 modifier = Modifier.weight(1f).fillMaxWidth(),
@@ -644,14 +659,15 @@ private fun AyatBody(
     val currentOnMark by rememberUpdatedState(onMarkAyah)
     val layoutResult = remember { mutableStateOf<TextLayoutResult?>(null) }
     val stumbleAmber = AlkahfColors.StumbleAmber
+    val bodySize = LocalMushafTextSize.current.sp
 
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
         Text(
             text = groupText.annotated,
             style = TextStyle(
                 fontFamily = KfgqpcHafs,
-                fontSize = 22.sp,
-                lineHeight = 42.sp,
+                fontSize = bodySize,
+                lineHeight = bodySize * 1.9f,
                 color = AlkahfColors.Ink,
                 textAlign = TextAlign.Justify,
             ),

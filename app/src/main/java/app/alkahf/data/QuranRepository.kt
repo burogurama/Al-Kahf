@@ -138,6 +138,22 @@ data class DownloadedSurah(
 /** Storage occupied by offline audio vs. total device storage. */
 data class StorageInfo(val usedBytes: Long, val totalBytes: Long)
 
+enum class ReviewPacing(val growthFactor: Double) {
+    GENTLE(3.0), STANDARD(2.5), AGGRESSIVE(2.0),
+}
+
+/** All user-configurable settings, read together for the Settings screen. */
+data class SettingsData(
+    val themeMode: String,
+    val arabicTextSizePt: Int,
+    val dailyBudgetMin: Int,
+    val newPerDay: Int,
+    val reviewPacing: ReviewPacing,
+    val autoLowerOnStumble: Boolean,
+    val keepScreenOn: Boolean,
+    val backgroundAudio: Boolean,
+)
+
 /** A surah + ayah range (e.g. the current sabaq). */
 data class AyahRange(val surah: Int, val from: Int, val to: Int) {
     val ayahIds: Set<Int> get() = (from..to).map { surah * 1000 + it }.toSet()
@@ -348,6 +364,37 @@ class QuranRepository(context: Context) {
         set(value) {
             prefs.edit().putString(KEY_THEME_MODE, value).apply()
         }
+
+    val arabicTextSizePt: Int get() = prefs.getInt(KEY_ARABIC_SIZE, 24)
+    val dailyBudgetMin: Int get() = prefs.getInt(KEY_DAILY_BUDGET, 15)
+    val reviewPacing: ReviewPacing
+        get() = runCatching { ReviewPacing.valueOf(prefs.getString(KEY_PACING, "STANDARD")!!) }
+            .getOrDefault(ReviewPacing.STANDARD)
+    val autoLowerOnStumble: Boolean get() = prefs.getBoolean(KEY_AUTO_LOWER, true)
+
+    fun settings(): SettingsData = SettingsData(
+        themeMode = themeMode,
+        arabicTextSizePt = arabicTextSizePt,
+        dailyBudgetMin = dailyBudgetMin,
+        newPerDay = prefs.getInt(KEY_NEW_PER_DAY, 5),
+        reviewPacing = reviewPacing,
+        autoLowerOnStumble = autoLowerOnStumble,
+        keepScreenOn = prefs.getBoolean(KEY_KEEP_SCREEN_ON, true),
+        backgroundAudio = prefs.getBoolean(KEY_BACKGROUND_AUDIO, true),
+    )
+
+    fun updateSettings(s: SettingsData) {
+        prefs.edit()
+            .putString(KEY_THEME_MODE, s.themeMode)
+            .putInt(KEY_ARABIC_SIZE, s.arabicTextSizePt)
+            .putInt(KEY_DAILY_BUDGET, s.dailyBudgetMin)
+            .putInt(KEY_NEW_PER_DAY, s.newPerDay)
+            .putString(KEY_PACING, s.reviewPacing.name)
+            .putBoolean(KEY_AUTO_LOWER, s.autoLowerOnStumble)
+            .putBoolean(KEY_KEEP_SCREEN_ON, s.keepScreenOn)
+            .putBoolean(KEY_BACKGROUND_AUDIO, s.backgroundAudio)
+            .apply()
+    }
 
     // --- Loop presets (Room-backed; one is the default) ---
 
@@ -667,7 +714,9 @@ class QuranRepository(context: Context) {
 
     suspend fun dueReviewPortions(): List<ReviewPortion> {
         ensureSeeded()
-        return userDao.duePortions(LocalDate.now().toEpochDay()).map { entity ->
+        // Cap the queue to the daily time budget (≈1.6 min per portion).
+        val budgetLimit = (dailyBudgetMin / 1.6f).toInt().coerceAtLeast(1)
+        return userDao.duePortions(LocalDate.now().toEpochDay()).take(budgetLimit).map { entity ->
             ReviewPortion(
                 id = entity.id,
                 surah = entity.surah,
@@ -681,7 +730,9 @@ class QuranRepository(context: Context) {
     }
 
     suspend fun commitReviewGrade(portion: ReviewPortion, grade: ReviewGrade) {
-        val nextInterval = ReviewScheduler.nextIntervalDays(portion.intervalDays, grade)
+        val nextInterval = ReviewScheduler.nextIntervalDays(
+            portion.intervalDays, grade, reviewPacing.growthFactor,
+        )
         userDao.updateSchedule(
             id = portion.id,
             intervalDays = nextInterval,
@@ -856,6 +907,13 @@ class QuranRepository(context: Context) {
         private const val KEY_LAST_MUSHAF_PAGE = "last_mushaf_page"
         private const val KEY_ACTIVE_RECITER = "active_reciter"
         private const val KEY_THEME_MODE = "theme_mode"
+        private const val KEY_ARABIC_SIZE = "arabic_size_pt"
+        private const val KEY_DAILY_BUDGET = "daily_budget_min"
+        private const val KEY_NEW_PER_DAY = "new_per_day"
+        private const val KEY_PACING = "review_pacing"
+        private const val KEY_AUTO_LOWER = "auto_lower_stumble"
+        private const val KEY_KEEP_SCREEN_ON = "keep_screen_on"
+        private const val KEY_BACKGROUND_AUDIO = "background_audio"
         private const val KEY_SABAQ_SURAH = "sabaq_surah"
         private const val KEY_SABAQ_FROM = "sabaq_from"
         private const val KEY_SABAQ_TO = "sabaq_to"

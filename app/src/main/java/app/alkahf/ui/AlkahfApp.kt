@@ -29,16 +29,7 @@ import app.alkahf.ui.tawqit.TawqitTaggingScreen
 import kotlinx.coroutines.launch
 
 private enum class AlkahfDestination {
-    Home, Mushaf, Loop, Review, Progress, Library, ReciterDownloads, TawqitTagging
-}
-
-@Composable
-fun AlkahfApp(
-    themeMode: app.alkahf.ui.theme.ThemeMode,
-    onThemeModeChange: (app.alkahf.ui.theme.ThemeMode) -> Unit,
-) {
-    // themeMode / onThemeModeChange are consumed by the Settings screen.
-    AlkahfApp()
+    Home, Mushaf, Loop, Review, Progress, Library, ReciterDownloads, TawqitTagging, Settings
 }
 
 private fun buildHomeUiState(data: HomeData, preset: LoopPreset): HomeUiState {
@@ -78,7 +69,9 @@ private fun MemorizationState.toHomeState(): AyahMemorizationState = when (this)
 }
 
 @Composable
-fun AlkahfApp() {
+fun AlkahfApp(
+    onThemeModeChange: (app.alkahf.ui.theme.ThemeMode) -> Unit = {},
+) {
     var destination by remember { mutableStateOf(AlkahfDestination.Home) }
     // Set when the Mushaf is opened for a specific surah (the sabaq) or page
     // (from the Progress map); both null means resume the last page read.
@@ -130,6 +123,7 @@ fun AlkahfApp() {
             onOpenReview = { destination = AlkahfDestination.Review },
             onOpenProgress = { destination = AlkahfDestination.Progress },
             onOpenLibrary = { destination = AlkahfDestination.Library },
+            onOpenSettings = { destination = AlkahfDestination.Settings },
         )
         AlkahfDestination.Mushaf -> {
             BackHandler { destination = AlkahfDestination.Home }
@@ -174,6 +168,13 @@ fun AlkahfApp() {
                     destination = AlkahfDestination.ReciterDownloads
                 },
                 onSelectTab = ::onTab,
+            )
+        }
+        AlkahfDestination.Settings -> {
+            BackHandler { destination = AlkahfDestination.Home }
+            app.alkahf.ui.settings.SettingsScreen(
+                onBack = { destination = AlkahfDestination.Home },
+                onThemeModeChange = onThemeModeChange,
             )
         }
         AlkahfDestination.TawqitTagging -> {

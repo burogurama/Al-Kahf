@@ -21,7 +21,6 @@ class MainActivity : ComponentActivity() {
             var themeMode by remember { mutableStateOf(toThemeMode(repository.themeMode)) }
             AlkahfTheme(mode = themeMode) {
                 AlkahfApp(
-                    themeMode = themeMode,
                     onThemeModeChange = { mode ->
                         themeMode = mode
                         repository.themeMode = mode.name.lowercase()

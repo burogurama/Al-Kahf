@@ -13,14 +13,21 @@ enum class ReviewGrade { FORGOT, HESITANT, PERFECT }
  */
 object ReviewScheduler {
 
-    /** Stumbles recorded during the self-test cap the grade: a stumbled "Perfect" is Hesitant. */
-    fun effectiveGrade(grade: ReviewGrade, stumbleCount: Int): ReviewGrade =
-        if (grade == ReviewGrade.PERFECT && stumbleCount > 0) ReviewGrade.HESITANT else grade
+    /**
+     * Stumbles recorded during the self-test cap the grade: a stumbled
+     * "Perfect" is treated as Hesitant — unless the user disabled the rule.
+     */
+    fun effectiveGrade(grade: ReviewGrade, stumbleCount: Int, autoLower: Boolean = true): ReviewGrade =
+        if (autoLower && grade == ReviewGrade.PERFECT && stumbleCount > 0) ReviewGrade.HESITANT else grade
 
-    fun nextIntervalDays(currentIntervalDays: Int, grade: ReviewGrade): Int = when (grade) {
+    fun nextIntervalDays(
+        currentIntervalDays: Int,
+        grade: ReviewGrade,
+        growthFactor: Double = GROWTH_FACTOR,
+    ): Int = when (grade) {
         ReviewGrade.FORGOT -> 1
         ReviewGrade.HESITANT -> 3
-        ReviewGrade.PERFECT -> max(4, (currentIntervalDays * GROWTH_FACTOR).roundToInt())
+        ReviewGrade.PERFECT -> max(4, (currentIntervalDays * growthFactor).roundToInt())
     }
 
     fun intervalLabel(days: Int): String = when {
