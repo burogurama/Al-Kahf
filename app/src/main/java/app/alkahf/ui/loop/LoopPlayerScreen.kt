@@ -78,9 +78,10 @@ import app.alkahf.data.audio.AudioStore
 import app.alkahf.data.toArabicIndic
 import app.alkahf.ui.theme.AlkahfColors
 import app.alkahf.ui.theme.KfgqpcHafs
+import kotlinx.coroutines.launch
 
 @Composable
-fun LoopPlayerScreen(onBack: () -> Unit = {}) {
+fun LoopPlayerScreen(presetId: Long? = null, onBack: () -> Unit = {}) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val repository = remember { (context.applicationContext as AlkahfApplication).repository }
@@ -90,11 +91,15 @@ fun LoopPlayerScreen(onBack: () -> Unit = {}) {
             audioStore = AudioStore(context.applicationContext),
             player = ExoPlayer.Builder(context).build(),
             scope = scope,
-            initialPreset = repository.loopPreset,
         )
     }
+    var loadedPreset by remember { mutableStateOf<app.alkahf.data.LoopPreset?>(null) }
     DisposableEffect(Unit) {
-        controller.start()
+        scope.launch {
+            val preset = presetId?.let { repository.presetById(it) } ?: repository.defaultPreset()
+            loadedPreset = preset
+            controller.applyPreset(preset)
+        }
         onDispose { controller.release() }
     }
     val state by controller.state.collectAsState()
@@ -104,13 +109,21 @@ fun LoopPlayerScreen(onBack: () -> Unit = {}) {
     }
 
     if (showEditor && surahs.isNotEmpty()) {
+        val base = loadedPreset
         BackHandler { showEditor = false }
         PresetEditor(
-            initial = state.toPreset(),
+            initial = state.toPreset().copy(
+                id = base?.id ?: 0L,
+                name = base?.name ?: "Drill",
+                isDefault = base?.isDefault ?: false,
+            ),
             surahs = surahs,
             onSave = { preset ->
-                repository.loopPreset = preset
-                controller.applyPreset(preset)
+                scope.launch {
+                    val id = repository.savePreset(preset, makeDefault = preset.isDefault)
+                    loadedPreset = preset.copy(id = id)
+                    controller.applyPreset(preset)
+                }
                 showEditor = false
             },
             onDismiss = { showEditor = false },

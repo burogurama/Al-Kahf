@@ -12,6 +12,7 @@ import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.Update
 
 /** A word the user stumbled on during a self-test. */
 @Entity(
@@ -51,6 +52,24 @@ data class PracticeEventEntity(
     @ColumnInfo(name = "duration_ms") val durationMs: Long,
     @ColumnInfo(name = "epoch_day") val epochDay: Long,
     @ColumnInfo(name = "created_at") val createdAt: Long,
+)
+
+/** A saved loop drill routine (one row per preset). */
+@Entity(tableName = "loop_presets")
+data class LoopPresetEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val name: String,
+    val surah: Int,
+    @ColumnInfo(name = "surah_name") val surahName: String,
+    @ColumnInfo(name = "ayah_from") val ayahFrom: Int,
+    @ColumnInfo(name = "ayah_to") val ayahTo: Int,
+    @ColumnInfo(name = "reciter_path") val reciterPath: String,
+    @ColumnInfo(name = "reciter_name") val reciterName: String,
+    @ColumnInfo(name = "per_ayah") val perAyah: Int,
+    @ColumnInfo(name = "per_chain") val perChain: Int,
+    @ColumnInfo(name = "gap_multiplier") val gapMultiplier: Float,
+    val speed: Float,
+    @ColumnInfo(name = "is_default") val isDefault: Boolean,
 )
 
 /** A memorized portion tracked by the spaced-repetition scheduler. */
@@ -113,6 +132,30 @@ interface UserDao {
 
     @Query("SELECT COALESCE(SUM(duration_ms), 0) FROM practice_events")
     suspend fun totalPracticeMs(): Long
+
+    @Query("SELECT * FROM loop_presets ORDER BY is_default DESC, id")
+    suspend fun allPresets(): List<LoopPresetEntity>
+
+    @Query("SELECT * FROM loop_presets WHERE is_default = 1 LIMIT 1")
+    suspend fun defaultPreset(): LoopPresetEntity?
+
+    @Query("SELECT COUNT(*) FROM loop_presets")
+    suspend fun presetCount(): Int
+
+    @Insert
+    suspend fun insertPreset(preset: LoopPresetEntity): Long
+
+    @Update
+    suspend fun updatePreset(preset: LoopPresetEntity)
+
+    @Query("UPDATE loop_presets SET is_default = 0")
+    suspend fun clearDefaultPresets()
+
+    @Query("UPDATE loop_presets SET is_default = 1 WHERE id = :id")
+    suspend fun markDefaultPreset(id: Long)
+
+    @Query("DELETE FROM loop_presets WHERE id = :id")
+    suspend fun deletePreset(id: Long)
 }
 
 @Database(
@@ -122,8 +165,9 @@ interface UserDao {
         RevealStateEntity::class,
         AyahStateEntity::class,
         PracticeEventEntity::class,
+        LoopPresetEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = false,
 )
 abstract class UserDatabase : RoomDatabase() {

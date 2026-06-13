@@ -182,14 +182,14 @@ fun MushafScreen(
     }
 
     val audioController = remember {
-        val preset = repository.loopPreset
+        val reciter = repository.activeReciter
         MushafAudioController(
             repository = repository,
             audioStore = AudioStore(context.applicationContext),
             player = ExoPlayer.Builder(context).build(),
             coroutineScope = scope,
-            reciterPath = preset?.reciterPath ?: AudioStore.DEFAULT_RECITER,
-            reciterName = preset?.reciterName ?: "Ḥuṣarī",
+            reciterPath = reciter.path,
+            reciterName = reciter.displayName,
         )
     }
     DisposableEffect(Unit) {

@@ -1,0 +1,499 @@
+package app.alkahf.ui.library
+
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Download
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import app.alkahf.AlkahfApplication
+import app.alkahf.data.DownloadedSurah
+import app.alkahf.data.LoopPreset
+import app.alkahf.data.QuranRepository
+import app.alkahf.data.ReciterStatus
+import app.alkahf.data.StorageInfo
+import app.alkahf.ui.components.AlkahfBottomNav
+import app.alkahf.ui.components.AlkahfTab
+import app.alkahf.ui.theme.AlkahfColors
+import app.alkahf.ui.theme.AmiriQuran
+import kotlinx.coroutines.launch
+
+@Composable
+fun LibraryScreen(
+    onOpenPreset: (Long) -> Unit = {},
+    onNewPreset: () -> Unit = {},
+    onSelectTab: (AlkahfTab) -> Unit = {},
+) {
+    val context = LocalContext.current
+    val repository = remember { (context.applicationContext as AlkahfApplication).repository }
+    val scope = rememberCoroutineScope()
+
+    var storage by remember { mutableStateOf<StorageInfo?>(null) }
+    var reciters by remember { mutableStateOf<List<ReciterStatus>>(emptyList()) }
+    var activeReciterPath by remember { mutableStateOf(repository.activeReciterPath) }
+    var downloads by remember { mutableStateOf<List<DownloadedSurah>>(emptyList()) }
+    var presets by remember { mutableStateOf<List<LoopPreset>>(emptyList()) }
+    val surahProgress = remember { mutableStateMapOf<Int, Float>() }
+    var refreshKey by remember { mutableStateOf(0) }
+
+    suspend fun reload() {
+        storage = repository.storageInfo()
+        reciters = repository.reciterStatuses()
+        downloads = repository.downloadedSurahs(activeReciterPath)
+        presets = repository.presets()
+    }
+    androidx.compose.runtime.LaunchedEffect(refreshKey, activeReciterPath) { reload() }
+
+    Scaffold(
+        containerColor = AlkahfColors.Paper,
+        bottomBar = { AlkahfBottomNav(selected = AlkahfTab.LIBRARY, onSelect = onSelectTab) },
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 18.dp),
+        ) {
+            LibraryHeader()
+            storage?.let { StorageMeter(it) }
+            SectionCaption("RECITERS")
+            reciters.forEach { reciter ->
+                ReciterRow(
+                    reciter = reciter,
+                    onActivate = {
+                        repository.setActiveReciter(reciter.path)
+                        activeReciterPath = reciter.path
+                    },
+                    onDownload = {
+                        // Download the active reciter's currently-read surah set is
+                        // open-ended; here we fetch al-Fātiḥah as a quick starter and
+                        // let per-surah management grow it. Downloads Al-Fātiḥah (1).
+                        scope.launch {
+                            surahProgress[reciter.path.hashCode()] = 0f
+                            repository.downloadSurah(reciter.path, 1) { p ->
+                                surahProgress[reciter.path.hashCode()] = p
+                            }
+                            surahProgress.remove(reciter.path.hashCode())
+                            refreshKey++
+                        }
+                    },
+                    downloadProgress = surahProgress[reciter.path.hashCode()],
+                )
+            }
+            SectionCaption("DOWNLOADS · ${activeReciterName(reciters, activeReciterPath)}")
+            if (downloads.isEmpty()) {
+                EmptyHint("No audio downloaded yet for this reciter")
+            }
+            downloads.forEach { surah ->
+                DownloadRow(
+                    surah = surah,
+                    progress = surahProgress[surah.surah],
+                    onDelete = {
+                        scope.launch {
+                            repository.deleteSurahAudio(activeReciterPath, surah.surah)
+                            refreshKey++
+                        }
+                    },
+                )
+            }
+            SectionCaption("DRILL PRESETS")
+            presets.forEach { preset ->
+                PresetRow(preset = preset, onClick = { onOpenPreset(preset.id) })
+            }
+            NewPresetButton(onClick = onNewPreset)
+            Box(Modifier.height(12.dp))
+        }
+    }
+}
+
+private fun activeReciterName(reciters: List<ReciterStatus>, path: String): String =
+    reciters.firstOrNull { it.path == path }?.displayName?.uppercase() ?: ""
+
+@Composable
+private fun LibraryHeader() {
+    Column(Modifier.padding(start = 4.dp, top = 10.dp, end = 4.dp, bottom = 4.dp)) {
+        Text(
+            text = "Library",
+            fontSize = 31.sp,
+            fontWeight = FontWeight.Bold,
+            color = AlkahfColors.Ink,
+            letterSpacing = (-0.5).sp,
+        )
+        Text(
+            text = "Reciters, downloads & presets",
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Medium,
+            color = AlkahfColors.InkFaint,
+        )
+    }
+}
+
+@Composable
+private fun StorageMeter(storage: StorageInfo) {
+    Surface(
+        shape = RoundedCornerShape(18.dp),
+        color = AlkahfColors.Surface,
+        border = BorderStroke(1.dp, AlkahfColors.CardBorder),
+        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+    ) {
+        Column(Modifier.padding(horizontal = 16.dp, vertical = 13.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(
+                    text = "Offline audio",
+                    fontSize = 12.5.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = AlkahfColors.InkSecondaryDark,
+                )
+                Text(
+                    text = "${formatBytes(storage.usedBytes)} of ${formatBytes(storage.totalBytes)}",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = AlkahfColors.InkFaint,
+                    maxLines = 1,
+                )
+            }
+            val fraction = if (storage.totalBytes > 0) {
+                (storage.usedBytes.toFloat() / storage.totalBytes).coerceIn(0.002f, 1f)
+            } else {
+                0f
+            }
+            Box(
+                Modifier.fillMaxWidth().height(6.dp).padding(top = 8.dp)
+                    .background(AlkahfColors.MapEmpty, RoundedCornerShape(3.dp)),
+            ) {
+                Box(
+                    Modifier.fillMaxWidth(fraction).height(6.dp)
+                        .background(AlkahfColors.Accent, RoundedCornerShape(3.dp)),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SectionCaption(text: String) {
+    Text(
+        text = text,
+        fontSize = 11.sp,
+        fontWeight = FontWeight.Bold,
+        letterSpacing = 1.4.sp,
+        color = AlkahfColors.InkFooter,
+        modifier = Modifier.padding(start = 4.dp, top = 18.dp, bottom = 10.dp),
+    )
+}
+
+@Composable
+private fun EmptyHint(text: String) {
+    Text(
+        text = text,
+        fontSize = 12.5.sp,
+        fontWeight = FontWeight.Medium,
+        color = AlkahfColors.InkFaint,
+        modifier = Modifier.padding(start = 4.dp, bottom = 4.dp),
+    )
+}
+
+@Composable
+private fun ReciterRow(
+    reciter: ReciterStatus,
+    onActivate: () -> Unit,
+    onDownload: () -> Unit,
+    downloadProgress: Float?,
+) {
+    Surface(
+        onClick = onActivate,
+        shape = RoundedCornerShape(18.dp),
+        color = if (reciter.isActive) AlkahfColors.SurfaceHero else AlkahfColors.Surface,
+        border = BorderStroke(
+            1.dp,
+            if (reciter.isActive) AlkahfColors.CardBorderHero else AlkahfColors.CardBorder,
+        ),
+        modifier = Modifier.fillMaxWidth().padding(bottom = 9.dp),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 15.dp, vertical = 13.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                Modifier.size(46.dp).background(
+                    if (reciter.isActive) AlkahfColors.Accent else AlkahfColors.NotStarted,
+                    CircleShape,
+                ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = reciter.arabicInitial,
+                    fontFamily = AmiriQuran,
+                    fontSize = 19.sp,
+                    color = if (reciter.isActive) AlkahfColors.OnAccent else AlkahfColors.InkMuted,
+                )
+            }
+            Column(Modifier.weight(1f).padding(start = 13.dp)) {
+                Text(
+                    text = reciter.displayName,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = AlkahfColors.Ink,
+                )
+                Text(
+                    text = reciterSubtitle(reciter),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = if (reciter.isActive) AlkahfColors.InkSecondary else AlkahfColors.InkFaint,
+                    maxLines = 1,
+                )
+            }
+            when {
+                reciter.isActive -> Surface(shape = CircleShape, color = AlkahfColors.AccentTint) {
+                    Text(
+                        text = "ACTIVE",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = AlkahfColors.AccentDeep,
+                        modifier = Modifier.padding(horizontal = 11.dp, vertical = 5.dp),
+                    )
+                }
+                downloadProgress != null -> CircularProgressIndicator(
+                    progress = { downloadProgress },
+                    modifier = Modifier.size(28.dp),
+                    color = AlkahfColors.Accent,
+                    strokeWidth = 2.5.dp,
+                )
+                else -> Surface(
+                    onClick = onDownload,
+                    shape = CircleShape,
+                    color = AlkahfColors.Surface,
+                    border = BorderStroke(1.dp, AlkahfColors.Chevron),
+                    modifier = Modifier.size(36.dp),
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Outlined.Download,
+                            contentDescription = "Download",
+                            tint = AlkahfColors.InkChrome,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun reciterSubtitle(reciter: ReciterStatus): String = when {
+    reciter.isActive -> "Murattal · teaching recitation"
+    reciter.downloadedSurahs > 0 ->
+        "${reciter.downloadedSurahs} of 114 sūrahs · ${formatBytes(reciter.bytes)}"
+    else -> "Not downloaded"
+}
+
+@Composable
+private fun DownloadRow(surah: DownloadedSurah, progress: Float?, onDelete: () -> Unit) {
+    val complete = surah.downloadedAyahs >= surah.totalAyahs
+    Surface(
+        shape = RoundedCornerShape(18.dp),
+        color = AlkahfColors.Surface,
+        border = BorderStroke(1.dp, AlkahfColors.CardBorder),
+        modifier = Modifier.fillMaxWidth().padding(bottom = 9.dp),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 15.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                Modifier.size(40.dp).background(
+                    if (complete) AlkahfColors.AccentTint2 else AlkahfColors.SegmentedTrack,
+                    RoundedCornerShape(11.dp),
+                ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = if (complete) Icons.Outlined.Check else Icons.Outlined.Download,
+                    contentDescription = null,
+                    tint = if (complete) AlkahfColors.AccentDeep else AlkahfColors.StumbleInk,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+            Column(Modifier.weight(1f).padding(start = 13.dp)) {
+                Text(
+                    text = "Sūrat ${surah.nameLatin}",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = AlkahfColors.Ink,
+                )
+                Text(
+                    text = if (complete) {
+                        "Downloaded · ${formatBytes(surah.bytes)}"
+                    } else {
+                        "${surah.downloadedAyahs} of ${surah.totalAyahs} āyāt · ${formatBytes(surah.bytes)}"
+                    },
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = AlkahfColors.InkFaint,
+                    maxLines = 1,
+                )
+            }
+            Surface(
+                onClick = onDelete,
+                shape = CircleShape,
+                color = AlkahfColors.Surface,
+                modifier = Modifier.size(36.dp),
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Outlined.Delete,
+                        contentDescription = "Delete download",
+                        tint = AlkahfColors.Chevron,
+                        modifier = Modifier.size(19.dp),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PresetRow(preset: LoopPreset, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(18.dp),
+        color = AlkahfColors.Surface,
+        border = BorderStroke(1.dp, AlkahfColors.CardBorder),
+        modifier = Modifier.fillMaxWidth().padding(bottom = 9.dp),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 15.dp, vertical = 13.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                Modifier.size(40.dp).background(AlkahfColors.Ink, RoundedCornerShape(11.dp)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.PlayArrow,
+                    contentDescription = null,
+                    tint = AlkahfColors.Paper,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+            Column(Modifier.weight(1f).padding(start = 13.dp)) {
+                Text(
+                    text = preset.name,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = AlkahfColors.Ink,
+                )
+                Text(
+                    text = "${preset.reciterName} · ${formatFactor(preset.gapMultiplier)} gap · ${formatFactor(preset.speed)} speed",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = AlkahfColors.InkFaint,
+                    maxLines = 1,
+                )
+            }
+            if (preset.isDefault) {
+                Surface(shape = CircleShape, color = AlkahfColors.AccentTint) {
+                    Text(
+                        text = "DEFAULT",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = AlkahfColors.AccentDeep,
+                        modifier = Modifier.padding(horizontal = 11.dp, vertical = 5.dp),
+                    )
+                }
+            } else {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = AlkahfColors.Chevron,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun NewPresetButton(onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(52.dp)
+            .clickable(onClick = onClick)
+            .drawBehind {
+                drawRoundRect(
+                    color = AlkahfColors.DashedNode,
+                    style = Stroke(
+                        width = 1.5.dp.toPx(),
+                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 8f)),
+                    ),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(18.dp.toPx()),
+                )
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                imageVector = Icons.Outlined.Add,
+                contentDescription = null,
+                tint = AlkahfColors.InkMuted,
+                modifier = Modifier.size(18.dp),
+            )
+            Text(
+                text = "New preset",
+                fontSize = 13.5.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = AlkahfColors.InkMuted,
+                modifier = Modifier.padding(start = 6.dp),
+            )
+        }
+    }
+}
+
+private fun formatFactor(value: Float): String =
+    if (value == value.toInt().toFloat()) "${value.toInt()}×" else "$value×"
+
+private fun formatBytes(bytes: Long): String = when {
+    bytes >= 1_000_000_000 -> "%.1f GB".format(bytes / 1_000_000_000.0)
+    bytes >= 1_000_000 -> "%.0f MB".format(bytes / 1_000_000.0)
+    bytes >= 1_000 -> "%.0f KB".format(bytes / 1_000.0)
+    else -> "$bytes B"
+}

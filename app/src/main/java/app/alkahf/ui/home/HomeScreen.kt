@@ -61,6 +61,7 @@ fun HomeScreen(
     onOpenLoop: () -> Unit = {},
     onOpenReview: () -> Unit = {},
     onOpenProgress: () -> Unit = {},
+    onOpenLibrary: () -> Unit = {},
 ) {
     Scaffold(
         containerColor = AlkahfColors.Paper,
@@ -70,6 +71,7 @@ fun HomeScreen(
                     AlkahfTab.MUSHAF -> onOpenMushaf()
                     AlkahfTab.REVIEW -> onOpenReview()
                     AlkahfTab.PROGRESS -> onOpenProgress()
+                    AlkahfTab.LIBRARY -> onOpenLibrary()
                     else -> {}
                 }
             }

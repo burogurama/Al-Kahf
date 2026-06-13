@@ -4,7 +4,11 @@ import android.content.Context
 import app.alkahf.data.quran.QuranDatabase
 import app.alkahf.data.review.ReviewGrade
 import app.alkahf.data.review.ReviewScheduler
+import app.alkahf.data.audio.AudioStore
+import app.alkahf.data.audio.RECITERS
+import app.alkahf.data.audio.Reciter
 import app.alkahf.data.user.AyahStateEntity
+import app.alkahf.data.user.LoopPresetEntity
 import app.alkahf.data.user.PracticeEventEntity
 import app.alkahf.data.user.RevealStateEntity
 import app.alkahf.data.user.ReviewPortionEntity
@@ -80,6 +84,8 @@ data class ProgressSnapshot(
 
 /** Saved drill configuration for the loop player. */
 data class LoopPreset(
+    val id: Long = 0,
+    val name: String = "Drill",
     val surah: Int,
     val surahNameLatin: String,
     val ayahFrom: Int,
@@ -90,7 +96,30 @@ data class LoopPreset(
     val perChain: Int,
     val gapMultiplier: Float,
     val speed: Float,
+    val isDefault: Boolean = false,
 )
+
+/** A downloadable/active reciter voice and its on-device download summary. */
+data class ReciterStatus(
+    val path: String,
+    val displayName: String,
+    val arabicInitial: String,
+    val isActive: Boolean,
+    val downloadedSurahs: Int,
+    val bytes: Long,
+)
+
+/** A surah's downloaded audio for the active reciter. */
+data class DownloadedSurah(
+    val surah: Int,
+    val nameLatin: String,
+    val downloadedAyahs: Int,
+    val totalAyahs: Int,
+    val bytes: Long,
+)
+
+/** Storage occupied by offline audio vs. total device storage. */
+data class StorageInfo(val usedBytes: Long, val totalBytes: Long)
 
 /** A surah picker entry. */
 data class SurahOption(val number: Int, val nameLatin: String, val ayahCount: Int)
@@ -113,6 +142,8 @@ class QuranRepository(context: Context) {
     private val quranDao = QuranDatabase.open(context).quranDao()
     private val userDao = UserDatabase.open(context).userDao()
     private val prefs = context.getSharedPreferences("alkahf_prefs", Context.MODE_PRIVATE)
+    private val audioStore = AudioStore(context)
+    private val filesDir = context.filesDir
     private var cachedBasmala: String? = null
 
     /** Last page open in the Mushaf, so reading resumes where the user left off. */
@@ -159,38 +190,138 @@ class QuranRepository(context: Context) {
         )
     }
 
-    /** Last saved loop preset, or null before the user ever saves one. */
-    var loopPreset: LoopPreset?
-        get() {
-            if (!prefs.contains("preset_surah")) return null
-            return LoopPreset(
-                surah = prefs.getInt("preset_surah", 18),
-                surahNameLatin = prefs.getString("preset_surah_name", "Al-Kahf") ?: "Al-Kahf",
-                ayahFrom = prefs.getInt("preset_from", 1),
-                ayahTo = prefs.getInt("preset_to", 5),
-                reciterPath = prefs.getString("preset_reciter_path", "Husary_128kbps") ?: "Husary_128kbps",
-                reciterName = prefs.getString("preset_reciter_name", "Ḥuṣarī") ?: "Ḥuṣarī",
-                perAyah = prefs.getInt("preset_per_ayah", 3),
-                perChain = prefs.getInt("preset_per_chain", 5),
-                gapMultiplier = prefs.getFloat("preset_gap", 1.5f),
-                speed = prefs.getFloat("preset_speed", 1.0f),
+    // --- Active reciter (the voice used by Review and Mushaf listening) ---
+
+    val activeReciterPath: String
+        get() = prefs.getString(KEY_ACTIVE_RECITER, RECITERS.first().path) ?: RECITERS.first().path
+
+    val activeReciter: Reciter
+        get() = RECITERS.firstOrNull { it.path == activeReciterPath } ?: RECITERS.first()
+
+    fun setActiveReciter(path: String) {
+        prefs.edit().putString(KEY_ACTIVE_RECITER, path).apply()
+    }
+
+    // --- Loop presets (Room-backed; one is the default) ---
+
+    suspend fun presets(): List<LoopPreset> {
+        ensurePresetSeed()
+        return userDao.allPresets().map { it.toLoopPreset() }
+    }
+
+    suspend fun defaultPreset(): LoopPreset {
+        ensurePresetSeed()
+        return (userDao.defaultPreset() ?: userDao.allPresets().first()).toLoopPreset()
+    }
+
+    /** Inserts a new preset, or updates it in place when it already has an id. */
+    suspend fun savePreset(preset: LoopPreset, makeDefault: Boolean): Long {
+        val entity = LoopPresetEntity(
+            id = preset.id,
+            name = preset.name,
+            surah = preset.surah,
+            surahName = preset.surahNameLatin,
+            ayahFrom = preset.ayahFrom,
+            ayahTo = preset.ayahTo,
+            reciterPath = preset.reciterPath,
+            reciterName = preset.reciterName,
+            perAyah = preset.perAyah,
+            perChain = preset.perChain,
+            gapMultiplier = preset.gapMultiplier,
+            speed = preset.speed,
+            isDefault = preset.isDefault,
+        )
+        val id = if (preset.id == 0L) {
+            userDao.insertPreset(entity)
+        } else {
+            userDao.updatePreset(entity)
+            preset.id
+        }
+        if (makeDefault) setDefaultPreset(id)
+        return id
+    }
+
+    suspend fun presetById(id: Long): LoopPreset? =
+        userDao.allPresets().firstOrNull { it.id == id }?.toLoopPreset()
+
+    suspend fun setDefaultPreset(id: Long) {
+        userDao.clearDefaultPresets()
+        userDao.markDefaultPreset(id)
+    }
+
+    suspend fun deletePreset(id: Long) {
+        userDao.deletePreset(id)
+        if (userDao.defaultPreset() == null) {
+            userDao.allPresets().firstOrNull()?.let { userDao.markDefaultPreset(it.id) }
+        }
+    }
+
+    private suspend fun ensurePresetSeed() {
+        if (userDao.presetCount() > 0) return
+        val reciter = activeReciter
+        userDao.insertPreset(
+            LoopPresetEntity(
+                name = "Al-Kahf opening",
+                surah = 18,
+                surahName = "Al-Kahf",
+                ayahFrom = 1,
+                ayahTo = 5,
+                reciterPath = reciter.path,
+                reciterName = reciter.displayName,
+                perAyah = 3,
+                perChain = 5,
+                gapMultiplier = 1.5f,
+                speed = 1.0f,
+                isDefault = true,
+            ),
+        )
+    }
+
+    // --- Audio downloads / storage ---
+
+    suspend fun reciterStatuses(): List<ReciterStatus> {
+        val active = activeReciterPath
+        return RECITERS.map { reciter ->
+            ReciterStatus(
+                path = reciter.path,
+                displayName = reciter.displayName,
+                arabicInitial = reciterInitial(reciter.path),
+                isActive = reciter.path == active,
+                downloadedSurahs = audioStore.downloadedSurahs(reciter.path).size,
+                bytes = audioStore.reciterBytes(reciter.path),
             )
         }
-        set(value) {
-            if (value == null) return
-            prefs.edit()
-                .putInt("preset_surah", value.surah)
-                .putString("preset_surah_name", value.surahNameLatin)
-                .putInt("preset_from", value.ayahFrom)
-                .putInt("preset_to", value.ayahTo)
-                .putString("preset_reciter_path", value.reciterPath)
-                .putString("preset_reciter_name", value.reciterName)
-                .putInt("preset_per_ayah", value.perAyah)
-                .putInt("preset_per_chain", value.perChain)
-                .putFloat("preset_gap", value.gapMultiplier)
-                .putFloat("preset_speed", value.speed)
-                .apply()
+    }
+
+    suspend fun downloadedSurahs(reciterPath: String): List<DownloadedSurah> {
+        val surahs = quranDao.allSurahs().associateBy { it.number }
+        return audioStore.downloadedSurahs(reciterPath).mapNotNull { surahNumber ->
+            val surah = surahs[surahNumber] ?: return@mapNotNull null
+            DownloadedSurah(
+                surah = surahNumber,
+                nameLatin = surah.nameLatin,
+                downloadedAyahs = audioStore.downloadedAyahCount(reciterPath, surahNumber),
+                totalAyahs = surah.ayahCount,
+                bytes = audioStore.surahBytes(reciterPath, surahNumber),
+            )
         }
+    }
+
+    suspend fun downloadSurah(reciterPath: String, surah: Int, onProgress: (Float) -> Unit) {
+        val ayahCount = quranDao.surah(surah).ayahCount
+        audioStore.downloadSurah(reciterPath, surah, ayahCount, onProgress)
+    }
+
+    suspend fun deleteSurahAudio(reciterPath: String, surah: Int) =
+        audioStore.deleteSurah(reciterPath, surah)
+
+    fun storageInfo(): StorageInfo {
+        val stat = android.os.StatFs(filesDir.absolutePath)
+        return StorageInfo(
+            usedBytes = audioStore.totalDownloadedBytes(),
+            totalBytes = stat.blockCountLong * stat.blockSizeLong,
+        )
+    }
 
     suspend fun surahOptions(): List<SurahOption> =
         quranDao.allSurahs().map { SurahOption(it.number, it.nameLatin, it.ayahCount) }
@@ -391,9 +522,34 @@ class QuranRepository(context: Context) {
         return "$place · $ayahCount ĀYĀT"
     }
 
+    private fun LoopPresetEntity.toLoopPreset() = LoopPreset(
+        id = id,
+        name = name,
+        surah = surah,
+        surahNameLatin = surahName,
+        ayahFrom = ayahFrom,
+        ayahTo = ayahTo,
+        reciterPath = reciterPath,
+        reciterName = reciterName,
+        perAyah = perAyah,
+        perChain = perChain,
+        gapMultiplier = gapMultiplier,
+        speed = speed,
+        isDefault = isDefault,
+    )
+
+    private fun reciterInitial(reciterPath: String): String = when {
+        reciterPath.startsWith("Husary") -> "ح"
+        reciterPath.startsWith("Alafasy") -> "ع"
+        reciterPath.startsWith("Abdul_Basit") -> "ع"
+        reciterPath.startsWith("Minshawy") -> "م"
+        else -> "ق"
+    }
+
     companion object {
         const val PAGE_COUNT = 604
         const val TOTAL_AYAH_COUNT = 6236
         private const val KEY_LAST_MUSHAF_PAGE = "last_mushaf_page"
+        private const val KEY_ACTIVE_RECITER = "active_reciter"
     }
 }

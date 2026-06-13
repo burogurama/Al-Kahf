@@ -28,6 +28,62 @@ class AudioStore(private val context: Context) {
             file
         }
 
+    private fun reciterDir(reciter: String): File = File(context.filesDir, "audio/$reciter")
+
+    /** Count of downloaded ayah files for a surah under a reciter. */
+    fun downloadedAyahCount(reciter: String, surah: Int): Int {
+        val prefix = String.format(Locale.ROOT, "%03d", surah)
+        return reciterDir(reciter).listFiles { f ->
+            f.name.startsWith(prefix) && f.name.endsWith(".mp3")
+        }?.size ?: 0
+    }
+
+    /** Total bytes of all downloaded audio across reciters. */
+    fun totalDownloadedBytes(): Long =
+        File(context.filesDir, "audio").walkBottomUp()
+            .filter { it.isFile && it.name.endsWith(".mp3") }
+            .sumOf { it.length() }
+
+    fun reciterBytes(reciter: String): Long =
+        reciterDir(reciter).listFiles { f -> f.name.endsWith(".mp3") }
+            ?.sumOf { it.length() } ?: 0L
+
+    fun surahBytes(reciter: String, surah: Int): Long {
+        val prefix = String.format(Locale.ROOT, "%03d", surah)
+        return reciterDir(reciter).listFiles { f ->
+            f.name.startsWith(prefix) && f.name.endsWith(".mp3")
+        }?.sumOf { it.length() } ?: 0L
+    }
+
+    /** Surah numbers that have at least one downloaded ayah for a reciter. */
+    fun downloadedSurahs(reciter: String): List<Int> =
+        reciterDir(reciter).listFiles { f -> f.name.endsWith(".mp3") }
+            ?.mapNotNull { it.name.take(3).toIntOrNull() }
+            ?.distinct()
+            ?.sorted()
+            ?: emptyList()
+
+    /** Downloads every ayah of a surah, reporting progress 0f..1f. */
+    suspend fun downloadSurah(
+        reciter: String,
+        surah: Int,
+        ayahCount: Int,
+        onProgress: (Float) -> Unit,
+    ) {
+        for (ayah in 1..ayahCount) {
+            ayahFile(surah, ayah, reciter)
+            onProgress(ayah.toFloat() / ayahCount)
+        }
+    }
+
+    suspend fun deleteSurah(reciter: String, surah: Int) = withContext(Dispatchers.IO) {
+        val prefix = String.format(Locale.ROOT, "%03d", surah)
+        reciterDir(reciter).listFiles { f ->
+            f.name.startsWith(prefix) && f.name.endsWith(".mp3")
+        }?.forEach { it.delete() }
+        Unit
+    }
+
     companion object {
         private const val BASE_URL = "https://everyayah.com/data"
         const val DEFAULT_RECITER = "Husary_128kbps"
