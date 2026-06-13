@@ -9,11 +9,10 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -25,8 +24,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -42,6 +43,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -58,6 +60,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -314,7 +317,6 @@ private fun Modifier.stepperBorder(): Modifier =
         )
     }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun NodeTrack(state: LoopUiState) {
     val inChain: (Int) -> Boolean = { ayah ->
@@ -323,19 +325,25 @@ private fun NodeTrack(state: LoopUiState) {
             else -> ayah in state.spanStart..state.spanEnd
         }
     }
+    val scrollState = rememberScrollState()
+    val density = LocalDensity.current
+    // Keep the sounding node in view on long ranges (one node + link ≈ 60dp).
+    LaunchedEffect(state.currentAyah, state.rangeStart, state.rangeEnd) {
+        val stepPx = with(density) { 60.dp.toPx() }
+        val target = ((state.currentAyah - state.rangeStart) * stepPx -
+            scrollState.viewportSize / 2f + stepPx / 2f).toInt()
+        scrollState.animateScrollTo(target.coerceIn(0, scrollState.maxValue))
+    }
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
-        FlowRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.Center,
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+        Box(
+            modifier = Modifier.fillMaxWidth().horizontalScroll(scrollState),
+            contentAlignment = Alignment.Center,
         ) {
-            (state.rangeStart..state.rangeEnd).forEach { ayah ->
-                if (ayah != state.rangeStart) {
-                    Box(Modifier.height(40.dp), contentAlignment = Alignment.Center) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                (state.rangeStart..state.rangeEnd).forEach { ayah ->
+                    if (ayah != state.rangeStart) {
                         LinkBar(solid = inChain(ayah) && inChain(ayah - 1))
                     }
-                }
-                Box(Modifier.height(40.dp), contentAlignment = Alignment.Center) {
                     AyahNode(
                         number = ayah,
                         built = inChain(ayah),
@@ -547,14 +555,17 @@ private fun AyahText(state: LoopUiState) {
         withStyle(SpanStyle(color = AlkahfColors.ConcealedMedallion)) { append(ayah.marker) }
     }
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
-        Text(
-            text = annotated,
-            fontFamily = KfgqpcHafs,
-            fontSize = 28.sp,
-            lineHeight = 55.sp,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth().padding(top = 16.dp, start = 4.dp, end = 4.dp),
-        )
+        // Long ayat scroll within the card rather than squeezing the layout.
+        Box(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
+            Text(
+                text = annotated,
+                fontFamily = KfgqpcHafs,
+                fontSize = 28.sp,
+                lineHeight = 55.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth().padding(top = 16.dp, start = 4.dp, end = 4.dp),
+            )
+        }
     }
 }
 
