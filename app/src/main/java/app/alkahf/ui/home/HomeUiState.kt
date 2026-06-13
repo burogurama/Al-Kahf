@@ -14,6 +14,7 @@ data class WeekDay(val letter: String, val activity: DayActivity)
 data class HomeUiState(
     val greeting: String = "Assalāmu ʿalaykum",
     val streakDays: Int = 0,
+    val hasSabaq: Boolean = false,
     val sabaqReference: String = "",
     val sabaqAyahText: String = "",
     val sabaqAyahMarker: String = "",

@@ -257,6 +257,17 @@ fun MushafScreen(
             ?.let { range -> ayahs.slice(range).map { it.id }.toSet() }
     } ?: emptySet()
     var showStateSheet by remember { mutableStateOf(false) }
+    // The surah whose "start learning" confirmation is open (header tapped).
+    var learnSurah by remember { mutableStateOf<Pair<Int, String>?>(null) }
+
+    // Re-pull the current page's memorization states after a bulk change.
+    suspend fun reloadMemStates() {
+        currentSession?.let { s ->
+            val st = repository.ayahStatesForPage(s.page.ayahs.map { it.id })
+            s.memStates.clear()
+            s.memStates.putAll(st)
+        }
+    }
 
     val onSelectAyah: (Int) -> Unit = onSelect@{ ayahId ->
         val ayahs = currentSession?.page?.ayahs ?: return@onSelect
@@ -322,6 +333,7 @@ fun MushafScreen(
                         onSessionReady = { sessions[pageIndex + 1] = it },
                         persistReveal = persistReveal,
                         onSelectAyah = onSelectAyah,
+                        onLearnSurah = { surah, name -> learnSurah = surah to name },
                         playingAyahId = audioState.currentAyahId,
                         onAudioTap = onAudioTap,
                         highlightIds = highlightIds,
@@ -363,6 +375,17 @@ fun MushafScreen(
             selectedIds.isNotEmpty() -> SelectionDock(
                 count = selectedIds.size,
                 onSetState = { showStateSheet = true },
+                onSetSabaq = {
+                    val session = currentSession ?: return@SelectionDock
+                    val picked = session.page.ayahs.filter { it.id in selectedIds }
+                    val surah = picked.first().surah
+                    val nums = picked.filter { it.surah == surah }.map { it.number }
+                    scope.launch {
+                        repository.setSabaqToRange(surah, nums.min(), nums.max())
+                        reloadMemStates()
+                    }
+                    selection = null
+                },
                 onClear = { selection = null },
             )
             hideMode -> SelfTestDock(session = currentSession)
@@ -376,14 +399,32 @@ fun MushafScreen(
             title = if (selectedIds.size == 1) "Mark āyah" else "Mark ${selectedIds.size} āyāt",
             current = currentStates.distinct().singleOrNull(),
             onPick = { state ->
-                selectedIds.forEach { id ->
-                    session.memStates[id] = state
-                    scope.launch { repository.setAyahState(id, state) }
+                val ids = selectedIds.toList()
+                ids.forEach { session.memStates[it] = state }
+                scope.launch {
+                    ids.forEach { repository.setAyahState(it, state) }
+                    // Memorizing the sabaq's ayat may complete its section.
+                    repository.maybeAdvanceSabaq()
                 }
                 showStateSheet = false
                 selection = null
             },
             onDismiss = { showStateSheet = false },
+        )
+    }
+
+    val prompt = learnSurah
+    if (prompt != null) {
+        LearnSurahSheet(
+            surahName = prompt.second,
+            onConfirm = {
+                scope.launch {
+                    repository.startLearningSurah(prompt.first)
+                    reloadMemStates()
+                }
+                learnSurah = null
+            },
+            onDismiss = { learnSurah = null },
         )
     }
 }
@@ -520,6 +561,7 @@ private fun MushafPageView(
     onSessionReady: (SelfTestSession) -> Unit,
     persistReveal: (Int, Int) -> Unit,
     onSelectAyah: (Int) -> Unit,
+    onLearnSurah: (Int, String) -> Unit,
     playingAyahId: Int?,
     onAudioTap: (Int) -> Boolean,
     highlightIds: Set<Int>,
@@ -575,6 +617,7 @@ private fun MushafPageView(
                             playingAyahId = playingAyahId,
                             onAudioTap = onAudioTap,
                             onSelectAyah = onSelectAyah,
+                            onLearnSurah = onLearnSurah,
                             highlightIds = highlightIds,
                             selectedIds = selectedIds,
                         )
@@ -594,11 +637,12 @@ private fun PageGroupView(
     playingAyahId: Int?,
     onAudioTap: (Int) -> Boolean,
     onSelectAyah: (Int) -> Unit,
+    onLearnSurah: (Int, String) -> Unit,
     highlightIds: Set<Int>,
     selectedIds: Set<Int>,
 ) {
     if (group.showSurahHeader) {
-        SurahHeaderBand(group)
+        SurahHeaderBand(group, onClick = { onLearnSurah(group.surahNumber, group.surahNameLatin) })
     }
     if (group.basmala != null) {
         Text(
@@ -616,9 +660,9 @@ private fun PageGroupView(
 }
 
 @Composable
-private fun SurahHeaderBand(group: PageGroup) {
+private fun SurahHeaderBand(group: PageGroup, onClick: () -> Unit) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(top = 2.dp),
         horizontalArrangement = Arrangement.spacedBy(14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -940,48 +984,72 @@ private fun recitingLabel(session: SelfTestSession?): String {
 }
 
 @Composable
-private fun SelectionDock(count: Int, onSetState: () -> Unit, onClear: () -> Unit) {
+private fun SelectionDock(
+    count: Int,
+    onSetState: () -> Unit,
+    onSetSabaq: () -> Unit,
+    onClear: () -> Unit,
+) {
     Column(Modifier.fillMaxWidth().background(AlkahfColors.NavSurface)) {
         HorizontalDivider(thickness = 1.dp, color = AlkahfColors.DockBorder)
-        Row(
+        Column(
             modifier = Modifier
                 .navigationBarsPadding()
                 .padding(start = 16.dp, top = 12.dp, end = 16.dp, bottom = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text = "$count āyah${if (count > 1) "āt" else ""} selected",
-                fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = AlkahfColors.Ink,
-                modifier = Modifier.weight(1f),
-            )
-            Box(
-                modifier = Modifier.clickable(onClick = onClear).padding(horizontal = 12.dp, vertical = 8.dp),
-            ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = "Clear",
+                    text = "$count āyah${if (count > 1) "āt" else ""} selected",
                     fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color = AlkahfColors.InkMuted,
+                    color = AlkahfColors.Ink,
+                    modifier = Modifier.weight(1f),
                 )
-            }
-            Surface(
-                onClick = onSetState,
-                shape = RoundedCornerShape(14.dp),
-                color = AlkahfColors.Accent,
-                modifier = Modifier.height(44.dp),
-            ) {
                 Box(
-                    Modifier.padding(horizontal = 18.dp).fillMaxHeight(),
-                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.clickable(onClick = onClear).padding(horizontal = 12.dp, vertical = 8.dp),
                 ) {
                     Text(
-                        text = "Set state",
-                        fontSize = 14.5.sp,
+                        text = "Clear",
+                        fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = AlkahfColors.OnAccent,
+                        color = AlkahfColors.InkMuted,
                     )
+                }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Surface(
+                    onClick = onSetSabaq,
+                    shape = RoundedCornerShape(14.dp),
+                    color = AlkahfColors.Surface,
+                    border = BorderStroke(1.dp, AlkahfColors.CardBorderHero),
+                    modifier = Modifier.weight(1f).height(44.dp),
+                ) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text(
+                            text = "Set as sabaq",
+                            fontSize = 14.5.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = AlkahfColors.AccentDeep,
+                        )
+                    }
+                }
+                Surface(
+                    onClick = onSetState,
+                    shape = RoundedCornerShape(14.dp),
+                    color = AlkahfColors.Accent,
+                    modifier = Modifier.weight(1f).height(44.dp).padding(start = 10.dp),
+                ) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text(
+                            text = "Set state",
+                            fontSize = 14.5.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = AlkahfColors.OnAccent,
+                        )
+                    }
                 }
             }
         }
@@ -1063,6 +1131,84 @@ private fun MemorizationSheet(
                                     color = AlkahfColors.AccentDeep,
                                 )
                             }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LearnSurahSheet(
+    surahName: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    Box(
+        Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.34f))
+            .clickable(onClick = onDismiss),
+        contentAlignment = Alignment.BottomCenter,
+    ) {
+        Surface(
+            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+            color = AlkahfColors.Paper,
+            modifier = Modifier.fillMaxWidth().clickable(enabled = false) {},
+        ) {
+            Column(
+                Modifier.navigationBarsPadding()
+                    .padding(start = 20.dp, top = 12.dp, end = 20.dp, bottom = 20.dp),
+            ) {
+                Box(
+                    Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Box(Modifier.width(38.dp).height(4.dp).background(AlkahfColors.DashedNode, RoundedCornerShape(2.dp)))
+                }
+                Text(
+                    text = "Start learning Sūrat $surahName",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = AlkahfColors.Ink,
+                    modifier = Modifier.padding(bottom = 6.dp),
+                )
+                Text(
+                    text = "Every āyah not yet memorized will be marked as learning, the sūrah will be split into sections, and the first section becomes your sabaq.",
+                    fontSize = 13.5.sp,
+                    color = AlkahfColors.InkMuted,
+                    lineHeight = 19.sp,
+                    modifier = Modifier.padding(bottom = 16.dp),
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Surface(
+                        onClick = onDismiss,
+                        shape = RoundedCornerShape(14.dp),
+                        color = AlkahfColors.Surface,
+                        border = BorderStroke(1.dp, AlkahfColors.CardBorder),
+                        modifier = Modifier.weight(1f).height(48.dp),
+                    ) {
+                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Text(
+                                text = "Cancel",
+                                fontSize = 14.5.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = AlkahfColors.Ink,
+                            )
+                        }
+                    }
+                    Surface(
+                        onClick = onConfirm,
+                        shape = RoundedCornerShape(14.dp),
+                        color = AlkahfColors.Accent,
+                        modifier = Modifier.weight(1f).height(48.dp).padding(start = 10.dp),
+                    ) {
+                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Text(
+                                text = "Set as sabaq",
+                                fontSize = 14.5.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = AlkahfColors.OnAccent,
+                            )
                         }
                     }
                 }

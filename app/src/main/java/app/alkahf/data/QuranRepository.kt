@@ -180,7 +180,7 @@ data class WeekSummary(
 /** Everything the Home/Today dashboard shows, from real local data. */
 data class HomeData(
     val streakDays: Int,
-    val sabaq: SabaqCard,
+    val sabaq: SabaqCard?,
     val review: ReviewSummary,
     val week: WeekSummary,
 )
@@ -243,13 +243,72 @@ class QuranRepository(context: Context) {
             prefs.edit().putBoolean(KEY_LAST_HIDE_MODE, value).apply()
         }
 
-    /** The surah + ayah range of the current sabaq. */
-    val sabaqRange: AyahRange
-        get() = AyahRange(
-            surah = prefs.getInt(KEY_SABAQ_SURAH, 18),
-            from = prefs.getInt(KEY_SABAQ_FROM, 1),
-            to = prefs.getInt(KEY_SABAQ_TO, 5),
-        )
+    /** The current sabaq range, or null when no sabaq is active. */
+    val sabaqRange: AyahRange?
+        get() {
+            val surah = prefs.getInt(KEY_SABAQ_SURAH, 0)
+            if (surah == 0) return null
+            return AyahRange(surah, prefs.getInt(KEY_SABAQ_FROM, 1), prefs.getInt(KEY_SABAQ_TO, 5))
+        }
+
+    private val sectionLength: Int get() = prefs.getInt(KEY_NEW_PER_DAY, 5).coerceIn(1, 20)
+
+    /** Marks a whole surah as learning and starts its sabaq at the first section. */
+    suspend fun startLearningSurah(surah: Int) {
+        val len = quranDao.surah(surah).ayahCount
+        val ids = (1..len).map { surah * 1000 + it }
+        val states = ayahStatesForPage(ids)
+        val toLearning = ids
+            .filter { (states[it] ?: MemorizationState.NOT_STARTED).value < MemorizationState.MEMORIZED.value }
+            .map { AyahStateEntity(it, MemorizationState.LEARNING.value) }
+        if (toLearning.isNotEmpty()) userDao.upsertAyahStates(toLearning)
+        setSabaq(surah, 1, minOf(sectionLength, len))
+        maybeAdvanceSabaq()
+    }
+
+    /** Manually sets a range as the sabaq (ensuring it holds a learning ayah). */
+    suspend fun setSabaqToRange(surah: Int, from: Int, to: Int) {
+        val ids = (from..to).map { surah * 1000 + it }
+        val states = ayahStatesForPage(ids)
+        val toLearning = ids
+            .filter { (states[it] ?: MemorizationState.NOT_STARTED) == MemorizationState.NOT_STARTED }
+            .map { AyahStateEntity(it, MemorizationState.LEARNING.value) }
+        if (toLearning.isNotEmpty()) userDao.upsertAyahStates(toLearning)
+        setSabaq(surah, from, to)
+    }
+
+    /**
+     * Advances the sabaq past any fully-memorized section: the sabaq steps
+     * forward by the section length until it lands on a section that still has
+     * an unmemorized ayah, or clears when it runs off the end of the surah.
+     */
+    suspend fun maybeAdvanceSabaq() {
+        var range = sabaqRange ?: return
+        val len = quranDao.surah(range.surah).ayahCount
+        val l = sectionLength
+        while (true) {
+            val ids = (range.from..range.to).map { range.surah * 1000 + it }
+            val states = ayahStatesForPage(ids)
+            val allDone = ids.all {
+                (states[it] ?: MemorizationState.NOT_STARTED).value >= MemorizationState.MEMORIZED.value
+            }
+            if (!allDone) break
+            val nextFrom = range.to + 1
+            if (nextFrom > len) {
+                setSabaq(0, 0, 0) // surah complete — no active sabaq
+                return
+            }
+            range = AyahRange(range.surah, nextFrom, minOf(nextFrom + l - 1, len))
+        }
+        // Ensure the landing section holds a learning ayah, then persist it.
+        val ids = (range.from..range.to).map { range.surah * 1000 + it }
+        val states = ayahStatesForPage(ids)
+        val toLearning = ids
+            .filter { (states[it] ?: MemorizationState.NOT_STARTED) == MemorizationState.NOT_STARTED }
+            .map { AyahStateEntity(it, MemorizationState.LEARNING.value) }
+        if (toLearning.isNotEmpty()) userDao.upsertAyahStates(toLearning)
+        setSabaq(range.surah, range.from, range.to)
+    }
 
     suspend fun pageOfAyah(surah: Int, ayah: Int): Int = quranDao.pageOfAyahId(surah * 1000 + ayah)
 
@@ -263,6 +322,7 @@ class QuranRepository(context: Context) {
 
     suspend fun homeData(): HomeData {
         ensureSeeded()
+        maybeAdvanceSabaq()
         val today = LocalDate.now()
         return HomeData(
             streakDays = currentStreak(),
@@ -272,17 +332,16 @@ class QuranRepository(context: Context) {
         )
     }
 
-    private suspend fun sabaqCard(): SabaqCard {
-        val surah = prefs.getInt(KEY_SABAQ_SURAH, 18)
-        val from = prefs.getInt(KEY_SABAQ_FROM, 1)
-        val to = prefs.getInt(KEY_SABAQ_TO, 5)
-        val nameLatin = quranDao.surah(surah).nameLatin
-        val ayahs = ayahsForRange(surah, from, to)
+    private suspend fun sabaqCard(): SabaqCard? {
+        val range = sabaqRange ?: return null
+        val nameLatin = quranDao.surah(range.surah).nameLatin
+        val ayahs = ayahsForRange(range.surah, range.from, range.to)
+        if (ayahs.isEmpty()) return null
         val states = userDao.allAyahStates().associate { it.ayahId to it.state }
         val first = ayahs.first()
         return SabaqCard(
-            surah = surah,
-            reference = "Sūrat $nameLatin · $from–$to",
+            surah = range.surah,
+            reference = "Sūrat $nameLatin · ${range.from}–${range.to}",
             firstAyahText = first.words.joinToString(" "),
             firstAyahMarker = first.marker,
             states = ayahs.map { MemorizationState.of(states[it.id] ?: 0) },
@@ -869,14 +928,9 @@ class QuranRepository(context: Context) {
                 AyahStateEntity(portion.surah * 1000 + ayah, MemorizationState.MEMORIZED.value)
             }
         }
-        // Sabaq: Al-Kahf 1–5, partway learned (ayat 1–2 held, 3 learning, 4–5 fresh).
-        val sabaq = listOf(
-            AyahStateEntity(18001, MemorizationState.MEMORIZED.value),
-            AyahStateEntity(18002, MemorizationState.MEMORIZED.value),
-            AyahStateEntity(18003, MemorizationState.LEARNING.value),
-        )
-        userDao.upsertAyahStates(memorized + sabaq)
-        setSabaq(surah = 18, from = 1, to = 5)
+        // No sabaq is seeded: the hafiz creates it by marking a sūrah (or a
+        // selected range) as learning from the Mushaf.
+        userDao.upsertAyahStates(memorized)
     }
 
     private fun surahMeta(revelationType: String, ayahCount: Int): String {

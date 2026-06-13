@@ -187,7 +187,45 @@ private fun StreakChip(days: Int) {
 }
 
 @Composable
+private fun NoSabaqCard(onOpenMushaf: () -> Unit) {
+    Surface(
+        onClick = onOpenMushaf,
+        shape = RoundedCornerShape(24.dp),
+        color = AlkahfColors.Surface,
+        border = BorderStroke(1.dp, AlkahfColors.CardBorder),
+    ) {
+        Column(Modifier.padding(20.dp)) {
+            Text(
+                text = "NEW · SABAQ",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.4.sp,
+                color = AlkahfColors.InkMuted,
+            )
+            Text(
+                text = "No sabaq yet",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = AlkahfColors.Ink,
+                modifier = Modifier.padding(top = 8.dp),
+            )
+            Text(
+                text = "Open a surah in the Mushaf and tap its name to start learning it.",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium,
+                color = AlkahfColors.InkFaint,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+        }
+    }
+}
+
+@Composable
 private fun SabaqCard(state: HomeUiState, onOpenMushaf: () -> Unit) {
+    if (!state.hasSabaq) {
+        NoSabaqCard(onOpenMushaf)
+        return
+    }
     Surface(
         shape = RoundedCornerShape(24.dp),
         color = AlkahfColors.SurfaceHero,

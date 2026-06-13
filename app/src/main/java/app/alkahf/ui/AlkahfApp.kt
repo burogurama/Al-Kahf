@@ -34,12 +34,14 @@ private enum class AlkahfDestination {
 
 private fun buildHomeUiState(data: HomeData, preset: LoopPreset): HomeUiState {
     val names = data.review.names
+    val sabaq = data.sabaq
     return HomeUiState(
         streakDays = data.streakDays,
-        sabaqReference = data.sabaq.reference,
-        sabaqAyahText = data.sabaq.firstAyahText,
-        sabaqAyahMarker = data.sabaq.firstAyahMarker,
-        sabaqAyahStates = data.sabaq.states.map { it.toHomeState() },
+        hasSabaq = sabaq != null,
+        sabaqReference = sabaq?.reference ?: "",
+        sabaqAyahText = sabaq?.firstAyahText ?: "",
+        sabaqAyahMarker = sabaq?.firstAyahMarker ?: "",
+        sabaqAyahStates = sabaq?.states?.map { it.toHomeState() } ?: emptyList(),
         reviewPortionCount = data.review.count,
         reviewEstimatedMinutes = data.review.minutes,
         reviewPortionNames = names.take(4),
@@ -116,6 +118,7 @@ fun AlkahfApp(
             state = homeState,
             onOpenMushaf = { openMushaf(null, null) },
             onOpenSabaq = { openMushaf(null, null, highlight = repository.sabaqRange) },
+            // (sabaqRange is null when there's no sabaq → opens the Mushaf normally)
             onOpenLoop = {
                 loopPresetId = null
                 destination = AlkahfDestination.Loop
