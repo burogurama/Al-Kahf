@@ -54,6 +54,26 @@ data class PracticeEventEntity(
     @ColumnInfo(name = "created_at") val createdAt: Long,
 )
 
+/**
+ * A Tawqīt timing track: ayah end-times (CSV of ms, 1× scale) aligning one
+ * audio source to a portion of the mushaf for the read-along highlight.
+ */
+@Entity(tableName = "timing_tracks")
+data class TimingTrackEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    @ColumnInfo(name = "source_type") val sourceType: String, // "import" | "reciter"
+    @ColumnInfo(name = "source_ref") val sourceRef: String, // file URI or reciter path
+    @ColumnInfo(name = "source_label") val sourceLabel: String,
+    val surah: Int,
+    @ColumnInfo(name = "surah_name") val surahName: String,
+    @ColumnInfo(name = "ayah_from") val ayahFrom: Int,
+    @ColumnInfo(name = "ayah_to") val ayahTo: Int,
+    @ColumnInfo(name = "end_times") val endTimesCsv: String,
+    @ColumnInfo(name = "global_offset_ms") val globalOffsetMs: Long,
+    val complete: Boolean,
+    @ColumnInfo(name = "updated_at") val updatedAt: Long,
+)
+
 /** A saved loop drill routine (one row per preset). */
 @Entity(tableName = "loop_presets")
 data class LoopPresetEntity(
@@ -156,6 +176,21 @@ interface UserDao {
 
     @Query("DELETE FROM loop_presets WHERE id = :id")
     suspend fun deletePreset(id: Long)
+
+    @Query("SELECT * FROM timing_tracks ORDER BY updated_at DESC")
+    suspend fun allTimingTracks(): List<TimingTrackEntity>
+
+    @Query("SELECT * FROM timing_tracks WHERE id = :id")
+    suspend fun timingTrack(id: Long): TimingTrackEntity?
+
+    @Insert
+    suspend fun insertTimingTrack(track: TimingTrackEntity): Long
+
+    @Update
+    suspend fun updateTimingTrack(track: TimingTrackEntity)
+
+    @Query("DELETE FROM timing_tracks WHERE id = :id")
+    suspend fun deleteTimingTrack(id: Long)
 }
 
 @Database(
@@ -166,8 +201,9 @@ interface UserDao {
         AyahStateEntity::class,
         PracticeEventEntity::class,
         LoopPresetEntity::class,
+        TimingTrackEntity::class,
     ],
-    version = 5,
+    version = 6,
     exportSchema = false,
 )
 abstract class UserDatabase : RoomDatabase() {

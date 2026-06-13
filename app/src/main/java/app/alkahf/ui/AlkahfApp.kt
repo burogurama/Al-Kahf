@@ -18,8 +18,12 @@ import app.alkahf.ui.loop.LoopPlayerScreen
 import app.alkahf.ui.mushaf.MushafScreen
 import app.alkahf.ui.progress.ProgressScreen
 import app.alkahf.ui.review.ReviewScreen
+import app.alkahf.ui.tawqit.TawqitHubScreen
+import app.alkahf.ui.tawqit.TawqitTaggingScreen
 
-private enum class AlkahfDestination { Home, Mushaf, Loop, Review, Progress, Library, ReciterDownloads }
+private enum class AlkahfDestination {
+    Home, Mushaf, Loop, Review, Progress, Library, ReciterDownloads, TawqitHub, TawqitTagging
+}
 
 /** The current sabaq surah; becomes dynamic once sabaq state is user-configurable. */
 private const val SABAQ_SURAH = 18
@@ -35,6 +39,8 @@ fun AlkahfApp() {
     var loopPresetId by remember { mutableStateOf<Long?>(null) }
     // The reciter whose downloads are being managed.
     var manageReciter by remember { mutableStateOf<Pair<String, String>?>(null) }
+    // The Tawqīt track being tagged (a fresh draft or an existing track).
+    var tawqitDraft by remember { mutableStateOf<app.alkahf.data.TawqitTrack?>(null) }
     val repository = (LocalContext.current.applicationContext as AlkahfApplication).repository
 
     fun openMushaf(surah: Int?, page: Int?) {
@@ -119,8 +125,29 @@ fun AlkahfApp() {
                     manageReciter = path to name
                     destination = AlkahfDestination.ReciterDownloads
                 },
+                onOpenTawqit = { destination = AlkahfDestination.TawqitHub },
                 onSelectTab = ::onTab,
             )
+        }
+        AlkahfDestination.TawqitHub -> {
+            BackHandler { destination = AlkahfDestination.Library }
+            TawqitHubScreen(
+                onBack = { destination = AlkahfDestination.Library },
+                onOpenTrack = { track ->
+                    tawqitDraft = track
+                    destination = AlkahfDestination.TawqitTagging
+                },
+            )
+        }
+        AlkahfDestination.TawqitTagging -> {
+            BackHandler { destination = AlkahfDestination.TawqitHub }
+            tawqitDraft?.let { draft ->
+                TawqitTaggingScreen(
+                    draft = draft,
+                    onSaved = { destination = AlkahfDestination.TawqitHub },
+                    onClose = { destination = AlkahfDestination.TawqitHub },
+                )
+            }
         }
         AlkahfDestination.ReciterDownloads -> {
             BackHandler { destination = AlkahfDestination.Library }

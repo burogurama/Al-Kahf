@@ -79,4 +79,11 @@ object AlkahfColors {
 
     // Progress screen tokens (design_handoff_progress/README.md).
     val MapEmpty = Color(0xFFEAE2D0)
+
+    // Tawqīt tokens (design_handoff_tawqit/README.md).
+    val WaveformBg = Color(0xFFF1EADC)
+    val WaveformPlayed = Color(0xFF6FA395)
+    val WaveformUnplayed = Color(0xFFDAD0BC)
+    val TawqitCurrentInk = Color(0xFF1F4F45)
+    val TaggedText = Color(0xFF9A917F)
 }

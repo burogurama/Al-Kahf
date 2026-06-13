@@ -11,6 +11,7 @@ import app.alkahf.data.user.AyahStateEntity
 import app.alkahf.data.user.LoopPresetEntity
 import app.alkahf.data.user.PracticeEventEntity
 import app.alkahf.data.user.RevealStateEntity
+import app.alkahf.data.user.TimingTrackEntity
 import app.alkahf.data.user.ReviewPortionEntity
 import app.alkahf.data.user.StumbleEntity
 import app.alkahf.data.user.UserDatabase
@@ -120,6 +121,25 @@ data class DownloadedSurah(
 
 /** Storage occupied by offline audio vs. total device storage. */
 data class StorageInfo(val usedBytes: Long, val totalBytes: Long)
+
+enum class TawqitSourceType { IMPORT, RECITER }
+
+/** A Tawqīt timing track aligning an audio source to a portion of the mushaf. */
+data class TawqitTrack(
+    val id: Long = 0,
+    val sourceType: TawqitSourceType,
+    val sourceRef: String,
+    val sourceLabel: String,
+    val surah: Int,
+    val surahNameLatin: String,
+    val ayahFrom: Int,
+    val ayahTo: Int,
+    val endTimesMs: List<Long>,
+    val globalOffsetMs: Long,
+    val complete: Boolean,
+) {
+    val ayahCount: Int get() = ayahTo - ayahFrom + 1
+}
 
 /** A surah picker entry. */
 data class SurahOption(val number: Int, val nameLatin: String, val ayahCount: Int)
@@ -338,6 +358,59 @@ class QuranRepository(context: Context) {
             totalBytes = stat.blockCountLong * stat.blockSizeLong,
         )
     }
+
+    // --- Tawqīt timing tracks ---
+
+    suspend fun tawqitTracks(): List<TawqitTrack> =
+        userDao.allTimingTracks().map { it.toTawqitTrack() }
+
+    suspend fun tawqitTrack(id: Long): TawqitTrack? =
+        userDao.timingTrack(id)?.toTawqitTrack()
+
+    suspend fun saveTawqitTrack(track: TawqitTrack): Long {
+        val entity = TimingTrackEntity(
+            id = track.id,
+            sourceType = if (track.sourceType == TawqitSourceType.IMPORT) "import" else "reciter",
+            sourceRef = track.sourceRef,
+            sourceLabel = track.sourceLabel,
+            surah = track.surah,
+            surahName = track.surahNameLatin,
+            ayahFrom = track.ayahFrom,
+            ayahTo = track.ayahTo,
+            endTimesCsv = track.endTimesMs.joinToString(","),
+            globalOffsetMs = track.globalOffsetMs,
+            complete = track.complete,
+            updatedAt = System.currentTimeMillis(),
+        )
+        return if (track.id == 0L) {
+            userDao.insertTimingTrack(entity)
+        } else {
+            userDao.updateTimingTrack(entity)
+            track.id
+        }
+    }
+
+    suspend fun deleteTawqitTrack(id: Long) = userDao.deleteTimingTrack(id)
+
+    /** Resolves the per-ayah audio files for a reciter source (downloads as needed). */
+    suspend fun reciterAyahUris(reciterPath: String, surah: Int, from: Int, to: Int): List<String> =
+        (from..to).map { ayah ->
+            android.net.Uri.fromFile(audioStore.ayahFile(surah, ayah, reciterPath)).toString()
+        }
+
+    private fun TimingTrackEntity.toTawqitTrack() = TawqitTrack(
+        id = id,
+        sourceType = if (sourceType == "import") TawqitSourceType.IMPORT else TawqitSourceType.RECITER,
+        sourceRef = sourceRef,
+        sourceLabel = sourceLabel,
+        surah = surah,
+        surahNameLatin = surahName,
+        ayahFrom = ayahFrom,
+        ayahTo = ayahTo,
+        endTimesMs = endTimesCsv.split(",").filter { it.isNotBlank() }.map { it.toLong() },
+        globalOffsetMs = globalOffsetMs,
+        complete = complete,
+    )
 
     suspend fun surahOptions(): List<SurahOption> =
         quranDao.allSurahs().map { SurahOption(it.number, it.nameLatin, it.ayahCount) }

@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -54,6 +55,7 @@ fun LibraryScreen(
     onOpenPreset: (Long) -> Unit = {},
     onNewPreset: () -> Unit = {},
     onManageReciter: (String, String) -> Unit = { _, _ -> },
+    onOpenTawqit: () -> Unit = {},
     onSelectTab: (AlkahfTab) -> Unit = {},
 ) {
     val context = LocalContext.current
@@ -63,12 +65,15 @@ fun LibraryScreen(
     var reciters by remember { mutableStateOf<List<ReciterStatus>>(emptyList()) }
     var activeReciterPath by remember { mutableStateOf(repository.activeReciterPath) }
     var presets by remember { mutableStateOf<List<LoopPreset>>(emptyList()) }
+    var tawqitCount by remember { mutableStateOf(0 to 0) } // total to in-progress
     var refreshKey by remember { mutableStateOf(0) }
 
     androidx.compose.runtime.LaunchedEffect(refreshKey, activeReciterPath) {
         storage = repository.storageInfo()
         reciters = repository.reciterStatuses()
         presets = repository.presets()
+        val tracks = repository.tawqitTracks()
+        tawqitCount = tracks.size to tracks.count { !it.complete }
     }
 
     Scaffold(
@@ -95,6 +100,12 @@ fun LibraryScreen(
                     onManage = { onManageReciter(reciter.path, reciter.displayName) },
                 )
             }
+            SectionCaption("TAWQĪT · AUDIO SYNC")
+            TawqitEntryRow(
+                total = tawqitCount.first,
+                inProgress = tawqitCount.second,
+                onClick = onOpenTawqit,
+            )
             SectionCaption("DRILL PRESETS")
             presets.forEach { preset ->
                 PresetRow(preset = preset, onClick = { onOpenPreset(preset.id) })
@@ -104,6 +115,66 @@ fun LibraryScreen(
         }
     }
 }
+
+@Composable
+private fun TawqitEntryRow(total: Int, inProgress: Int, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(18.dp),
+        color = AlkahfColors.Surface,
+        border = BorderStroke(1.dp, AlkahfColors.CardBorder),
+        modifier = Modifier.fillMaxWidth().padding(bottom = 9.dp),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 15.dp, vertical = 13.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                Modifier.size(40.dp).background(AlkahfColors.SurfaceHero, RoundedCornerShape(11.dp)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.height(16.dp),
+                ) {
+                    listOf(7.dp, 13.dp, 16.dp, 10.dp, 6.dp).forEach { h ->
+                        Box(
+                            Modifier.width(2.dp).height(h)
+                                .background(AlkahfColors.AccentDeep, RoundedCornerShape(1.dp)),
+                        )
+                    }
+                }
+            }
+            Column(Modifier.weight(1f).padding(start = 13.dp)) {
+                Text(
+                    text = "Sync recitation to the page",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = AlkahfColors.Ink,
+                )
+                Text(
+                    text = when {
+                        total == 0 -> "Tag any recitation by ear"
+                        inProgress > 0 -> "$total timing track${plural(total)} · $inProgress in progress"
+                        else -> "$total timing track${plural(total)}"
+                    },
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = AlkahfColors.InkFaint,
+                    maxLines = 1,
+                )
+            }
+            Icon(
+                imageVector = androidx.compose.material.icons.Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                contentDescription = null,
+                tint = AlkahfColors.Chevron,
+            )
+        }
+    }
+}
+
+private fun plural(n: Int): String = if (n == 1) "" else "s"
 
 @Composable
 private fun LibraryHeader() {

@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Amiri+Quran&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body { background: #E7E1D4; font-family: 'Hanken Grotesk', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+    .scr { scrollbar-width: none; }
+    .scr::-webkit-scrollbar { display: none; }
+    @keyframes nowPulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+  </style>
+</helmet>
+
+<div style="min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 28px; background: radial-gradient(120% 90% at 50% 0%, #EDE7DB 0%, #E4DDCF 60%, #DED6C6 100%);">
+  <div style="width: 412px; height: 892px; background: #14110D; border-radius: 46px; padding: 11px; box-shadow: 0 40px 90px rgba(40,34,22,0.30), 0 8px 24px rgba(40,34,22,0.16);">
+    <div style="width: 100%; height: 100%; background: #F5F0E6; border-radius: 36px; overflow: hidden; display: flex; flex-direction: column; position: relative;">
+
+      <!-- STATUS BAR -->
+      <div style="height: 44px; flex: 0 0 44px; display: flex; align-items: center; justify-content: space-between; padding: 0 24px 0 28px;">
+        <span style="font-size: 14px; font-weight: 600; color: #2A2620; letter-spacing: 0.2px;">9:41</span>
+        <div style="position: absolute; left: 50%; top: 11px; transform: translateX(-50%); width: 22px; height: 22px; border-radius: 50%; background: #14110D;"></div>
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <svg width="17" height="12" viewBox="0 0 17 12"><rect x="0" y="7" width="2.6" height="5" rx="0.8" fill="#2A2620"/><rect x="4" y="5" width="2.6" height="7" rx="0.8" fill="#2A2620"/><rect x="8" y="2.5" width="2.6" height="9.5" rx="0.8" fill="#2A2620"/><rect x="12" y="0" width="2.6" height="12" rx="0.8" fill="#2A2620"/></svg>
+          <svg width="16" height="12" viewBox="0 0 16 12"><path d="M8 11.2 0.6 3.9a10.4 10.4 0 0 1 14.8 0L8 11.2Z" fill="#2A2620"/></svg>
+          <svg width="22" height="12" viewBox="0 0 22 12"><rect x="0.5" y="0.5" width="18" height="11" rx="3" fill="none" stroke="#2A2620" stroke-opacity="0.5"/><rect x="2" y="2" width="13.5" height="8" rx="1.6" fill="#2A2620"/><rect x="19.5" y="4" width="1.6" height="4" rx="0.8" fill="#2A2620" fill-opacity="0.5"/></svg>
+        </div>
+      </div>
+
+      <!-- TOP BAR -->
+      <div style="flex: 0 0 auto; height: 54px; display: flex; align-items: center; gap: 6px; padding: 0 10px; border-bottom: 1px solid #ECE5D6;">
+        <div style="width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+          <svg width="16" height="16" viewBox="0 0 16 16"><path d="M2 2l12 12M14 2 2 14" fill="none" stroke="#5C5648" stroke-width="2" stroke-linecap="round"/></svg>
+        </div>
+        <div style="flex: 1; text-align: center;">
+          <div style="display: flex; align-items: center; justify-content: center; gap: 7px;">
+            <span dir="rtl" lang="ar" style="font-family: 'Amiri Quran', serif; font-size: 17px; color: #2A2620; line-height: 1;">توقيت</span>
+            <span style="font-size: 15px; font-weight: 700; color: #2A2620; letter-spacing: -0.2px;">Tawqīt</span>
+          </div>
+          <div style="font-size: 11px; font-weight: 500; color: #A39A8B; margin-top: 1px; white-space: nowrap;">Mishary (imported) · Al-Kahf 1–6</div>
+        </div>
+        <div style="width: 52px; height: 40px; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+          <span style="font-size: 14px; font-weight: 700; color: #2F6055;">Save</span>
+        </div>
+      </div>
+
+      <!-- AYAH LIST -->
+      <div class="scr" style="flex: 1; overflow: auto; background: #FBF7ED; display: flex; flex-direction: column; padding: 14px 20px 8px;">
+
+        <div style="font-size: 11px; font-weight: 700; letter-spacing: 1.4px; color: #B0A691; text-align: center; margin-bottom: 4px;">TAGGING AYAH ENDS · {{ progressText }}</div>
+
+        <!-- done ayat -->
+        <sc-for list="{{ done }}" as="a" hint-placeholder-count="3">
+          <div style="display: flex; align-items: flex-start; gap: 10px; padding: 9px 0; opacity: 0.7;">
+            <span style="flex: 0 0 auto; font-size: 11px; font-weight: 700; color: #2F6055; background: #E2EDE8; border-radius: 7px; padding: 3px 7px; margin-top: 4px; white-space: nowrap;">{{ a.time }}</span>
+            <div dir="rtl" lang="ar" style="flex: 1; font-family: 'Amiri Quran', serif; font-size: 18px; line-height: 1.85; color: #9A917F; text-align: right;">{{ a.text }}<span style="color: #BBB2A0; padding: 0 2px;">{{ a.mark }}</span></div>
+          </div>
+        </sc-for>
+
+        <!-- current ayah (highlighted) -->
+        <div style="background: #EBF1ED; border: 1px solid #CFE0D7; border-radius: 18px; padding: 14px 15px; margin: 6px 0 8px;">
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 9px;">
+            <span style="width: 7px; height: 7px; border-radius: 50%; background: #3E7D6E; animation: nowPulse 1.4s ease-in-out infinite;"></span>
+            <span style="font-size: 10.5px; font-weight: 700; letter-spacing: 1.2px; color: #2F6055; white-space: nowrap;">NOW PLAYING · ĀYAH {{ cur.num }}</span>
+          </div>
+          <div dir="rtl" lang="ar" style="font-family: 'Amiri Quran', serif; font-size: 25px; line-height: 1.95; color: #1F4F45; text-align: right; word-spacing: 1px;">{{ cur.text }}<span style="color: #3E7D6E; padding: 0 3px;">{{ cur.medallion }}</span></div>
+        </div>
+
+        <!-- next preview -->
+        <sc-if value="{{ hasNext }}" hint-placeholder-val="{{ true }}">
+        <div style="display: flex; align-items: flex-start; gap: 10px; padding: 6px 0; opacity: 0.5;">
+          <span style="flex: 0 0 auto; font-size: 10px; font-weight: 700; color: #B0A691; border: 1px dashed #CBC1AC; border-radius: 7px; padding: 3px 7px; margin-top: 4px; white-space: nowrap;">next</span>
+          <div dir="rtl" lang="ar" style="flex: 1; font-family: 'Amiri Quran', serif; font-size: 18px; line-height: 1.85; color: #B3AA98; text-align: right;">{{ nxt.text }}<span style="padding: 0 2px;">{{ nxt.mark }}</span></div>
+        </div>
+        </sc-if>
+
+        <div style="flex: 1;"></div>
+      </div>
+
+      <!-- DOCK -->
+      <div style="flex: 0 0 auto; background: #F8F3EA; border-top: 1px solid #E7DFCF; padding: 12px 16px 8px; box-shadow: 0 -6px 18px rgba(40,34,22,0.05);">
+
+        <!-- waveform -->
+        <div style="position: relative; height: 44px; border-radius: 11px; background: #F1EADC; padding: 0 10px; display: flex; align-items: center; gap: 2px; overflow: hidden;">
+          <sc-for list="{{ bars }}" as="b" hint-placeholder-count="56">
+            <div style="flex: 1; height: {{ b.h }}; border-radius: 1px; background: {{ b.color }};"></div>
+          </sc-for>
+          <!-- markers -->
+          <sc-for list="{{ markers }}" as="m" hint-placeholder-count="3">
+            <div style="position: absolute; top: 4px; bottom: 4px; left: {{ m.left }}; width: 2px; background: #2F6055; border-radius: 1px;"></div>
+          </sc-for>
+          <!-- playhead -->
+          <div style="position: absolute; top: 0; bottom: 0; left: {{ playheadLeft }}; width: 2px; background: #C2410C;"></div>
+        </div>
+
+        <!-- clock row -->
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 8px;">
+          <span style="font-size: 13px; font-weight: 700; color: #2A2620; font-variant-numeric: tabular-nums;">{{ clock }} <span style="color: #B0A691; font-weight: 500;">/ {{ totalClock }}</span></span>
+          <span onClick="{{ cycleSpeed }}" style="font-size: 11.5px; font-weight: 600; color: #5C5648; background: #F0E8D6; border: 1px solid #E2DAC9; border-radius: 8px; padding: 4px 10px; cursor: pointer; white-space: nowrap;">Tagging at {{ speedLabel }}</span>
+        </div>
+
+        <!-- transport -->
+        <div style="display: flex; align-items: center; gap: 10px; margin-top: 11px;">
+          <button onClick="{{ back }}" style="width: 54px; height: 56px; flex: 0 0 54px; border-radius: 15px; border: 1px solid #E2DAC9; background: #FBF7ED; cursor: pointer; display: flex; align-items: center; justify-content: center;" style-active="background: #F0E9D8;">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#5C5648" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5 4 10l5 5"/><path d="M4 10h11a5 5 0 0 1 0 10h-3"/></svg>
+          </button>
+          <button onClick="{{ toggle }}" style="width: 54px; height: 56px; flex: 0 0 54px; border-radius: 15px; border: 1px solid #E2DAC9; background: #FBF7ED; cursor: pointer; display: flex; align-items: center; justify-content: center;" style-active="background: #F0E9D8;">
+            <sc-if value="{{ playing }}" hint-placeholder-val="{{ false }}">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="#2A2620"><rect x="6" y="4" width="4" height="16" rx="1.2"/><rect x="14" y="4" width="4" height="16" rx="1.2"/></svg>
+            </sc-if>
+            <sc-if value="{{ paused }}" hint-placeholder-val="{{ true }}">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="#2A2620"><path d="M6 4.5v15a.5.5 0 0 0 .8.4l11-7.5a.5.5 0 0 0 0-.8l-11-7.5a.5.5 0 0 0-.8.4Z"/></svg>
+            </sc-if>
+          </button>
+          <button onClick="{{ mark }}" style="flex: 1; height: 56px; border: none; border-radius: 15px; background: #3E7D6E; color: #FBFAF5; font-family: inherit; font-size: 15.5px; font-weight: 700; letter-spacing: 0.2px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 9px; box-shadow: 0 4px 13px rgba(62,125,110,0.28);" style-active="transform: translateY(1px); box-shadow: 0 2px 6px rgba(62,125,110,0.28);">
+            <span style="width: 9px; height: 9px; border-radius: 50%; background: #FBFAF5;"></span>
+            Mark āyah end
+          </button>
+        </div>
+
+        <!-- hint + offset nudge -->
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 9px;">
+          <span style="font-size: 11px; font-weight: 500; color: #B0A691; white-space: nowrap;">Tap when āyah {{ cur.num }} finishes</span>
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <span style="font-size: 10.5px; font-weight: 600; color: #B0A691; letter-spacing: 0.3px;">NUDGE ALL</span>
+            <button onClick="{{ nudgeBack }}" style="width: 26px; height: 22px; border-radius: 7px; border: 1px solid #E2DAC9; background: #FBF7ED; cursor: pointer; font-family: inherit; font-size: 12px; font-weight: 700; color: #5C5648; display: flex; align-items: center; justify-content: center;">−</button>
+            <span style="font-size: 11px; font-weight: 700; color: #5C5648; min-width: 42px; text-align: center; font-variant-numeric: tabular-nums;">{{ offsetLabel }}</span>
+            <button onClick="{{ nudgeFwd }}" style="width: 26px; height: 22px; border-radius: 7px; border: 1px solid #E2DAC9; background: #FBF7ED; cursor: pointer; font-family: inherit; font-size: 12px; font-weight: 700; color: #5C5648; display: flex; align-items: center; justify-content: center;">+</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- gesture pill -->
+      <div style="flex: 0 0 auto; height: 22px; display: flex; align-items: center; justify-content: center; background: #F8F3EA;">
+        <div style="width: 108px; height: 4px; border-radius: 2px; background: #2A2620; opacity: 0.35;"></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;: {&quot;width&quot;: 472, &quot;height&quot;: 948}}">
+class Component extends DCLogic {
+  state = { idx: 3, marks: [12.4, 34.1, 41.6], t: 41.6, playing: false, speed: 0.75, offset: 0 };
+  total = 92;
+  ayat = [
+    { n: 1, text: "ٱلْحَمْدُ لِلَّهِ ٱلَّذِىٓ أَنزَلَ عَلَىٰ عَبْدِهِ ٱلْكِتَٰبَ وَلَمْ يَجْعَل لَّهُۥ عِوَجَا" },
+    { n: 2, text: "قَيِّمًا لِّيُنذِرَ بَأْسًا شَدِيدًا مِّن لَّدُنْهُ وَيُبَشِّرَ ٱلْمُؤْمِنِينَ ٱلَّذِينَ يَعْمَلُونَ ٱلصَّٰلِحَٰتِ أَنَّ لَهُمْ أَجْرًا حَسَنًا" },
+    { n: 3, text: "مَّٰكِثِينَ فِيهِ أَبَدًا" },
+    { n: 4, text: "وَيُنذِرَ ٱلَّذِينَ قَالُوا۟ ٱتَّخَذَ ٱللَّهُ وَلَدًا" },
+    { n: 5, text: "مَّا لَهُم بِهِۦ مِنْ عِلْمٍ وَلَا لِءَابَآئِهِمْ كَبُرَتْ كَلِمَةً تَخْرُجُ مِنْ أَفْوَٰهِهِمْ إِن يَقُولُونَ إِلَّا كَذِبًا" },
+    { n: 6, text: "فَلَعَلَّكَ بَٰخِعٌ نَّفْسَكَ عَلَىٰٓ ءَاثَٰرِهِمْ إِن لَّمْ يُؤْمِنُوا۟ بِهَٰذَا ٱلْحَدِيثِ أَسَفًا" },
+  ];
+  componentDidMount() {
+    this.timer = setInterval(() => {
+      if (!this.state.playing) return;
+      this.setState(s => {
+        const nt = Math.min(this.total, s.t + 0.1 * s.speed * 2);
+        return { t: nt, playing: nt < this.total };
+      });
+    }, 100);
+  }
+  componentWillUnmount() { clearInterval(this.timer); }
+  ai(n) { return String(n).replace(/[0-9]/g, d => "٠١٢٣٤٥٦٧٨٩"[d]); }
+  fmt(s) { const m = Math.floor(s / 60), x = Math.floor(s % 60); return m + ":" + String(x).padStart(2, "0"); }
+  renderVals() {
+    const { idx, marks, t, playing, speed, offset } = this.state;
+    const done = this.ayat.slice(0, idx).map((a, i) => ({ text: a.text, mark: "۝" + this.ai(a.n), time: this.fmt((marks[i] || 0) + offset) }));
+    const cur = { text: this.ayat[idx].text, num: this.ai(this.ayat[idx].n), medallion: "۝" + this.ai(this.ayat[idx].n) };
+    const hasNext = idx + 1 < this.ayat.length;
+    const nxt = hasNext ? { text: this.ayat[idx + 1].text, mark: "۝" + this.ai(this.ayat[idx + 1].n) } : { text: "", mark: "" };
+    const bars = Array.from({ length: 56 }, (_, i) => {
+      const h = 6 + Math.abs(Math.sin(i * 1.7) * 14 + Math.cos(i * 0.6) * 8) + (i % 3) * 2;
+      const played = (i / 56) * this.total <= t;
+      return { h: Math.round(h) + "px", color: played ? "#6FA395" : "#DAD0BC" };
+    });
+    const markers = marks.map(m => ({ left: "calc(10px + " + ((m / this.total) * 100) + "% - " + ((m / this.total) * 20) + "px)" }));
+    return {
+      progressText: "Āyah " + (idx + 1) + " of " + this.ayat.length,
+      done, cur, hasNext, nxt,
+      bars, markers,
+      playheadLeft: "calc(10px + " + ((t / this.total) * 100) + "% - " + ((t / this.total) * 20) + "px)",
+      clock: this.fmt(t), totalClock: this.fmt(this.total),
+      playing, paused: !playing,
+      speedLabel: speed + "×",
+      offsetLabel: (offset >= 0 ? "+" : "") + offset.toFixed(2) + "s",
+      toggle: () => this.setState(s => ({ playing: !s.playing })),
+      cycleSpeed: () => this.setState(s => ({ speed: s.speed === 0.5 ? 0.75 : s.speed === 0.75 ? 1 : 0.5 })),
+      mark: () => this.setState(s => {
+        if (s.idx + 1 >= this.ayat.length) return {};
+        return { marks: [...s.marks.slice(0, s.idx), s.t], idx: s.idx + 1 };
+      }),
+      back: () => this.setState(s => {
+        if (s.idx === 0) return {};
+        const m = s.marks.slice(0, s.idx - 1);
+        return { idx: s.idx - 1, t: s.marks[s.idx - 1] || s.t, marks: m };
+      }),
+      nudgeBack: () => this.setState(s => ({ offset: Math.round((s.offset - 0.05) * 100) / 100 })),
+      nudgeFwd: () => this.setState(s => ({ offset: Math.round((s.offset + 0.05) * 100) / 100 })),
+    };
+  }
+}
+</script>
+</body>
+</html>
