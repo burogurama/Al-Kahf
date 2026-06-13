@@ -845,7 +845,10 @@ private fun AyatBody(
     val layoutResult = remember { mutableStateOf<TextLayoutResult?>(null) }
     var coords by remember { mutableStateOf<LayoutCoordinates?>(null) }
     val bodySize = LocalMushafTextSize.current.sp
-    val fill = AlkahfColors.AyahHighlightFill
+    // The sabaq range gets its own fill; selection and playback share another so
+    // the sabaq stays visually distinct from whatever you're acting on.
+    val rangeFill = AlkahfColors.AyahHighlightFill
+    val sabaqFill = AlkahfColors.SabaqHighlight
 
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
         Text(
@@ -869,6 +872,12 @@ private fun AyatBody(
                     litIds.forEach { ayahId ->
                         val ayahSpans = groupText.spans.filter { it.ayahId == ayahId }
                         if (ayahSpans.isEmpty()) return@forEach
+                        // Selection/playback win over the sabaq fill when they overlap.
+                        val fill = when {
+                            ayahId in selectedIds || ayahId == playingAyahId -> rangeFill
+                            ayahId in highlightIds -> sabaqFill
+                            else -> rangeFill
+                        }
                         val start = ayahSpans.minOf { it.start }
                         val end = ayahSpans.maxOf { it.end }
                         // One rounded rect per wrapped line the ayah covers.
