@@ -459,14 +459,14 @@ private fun ResumeDrillCard(state: HomeUiState, onOpenLoop: () -> Unit) {
         ) {
             Surface(
                 shape = CircleShape,
-                color = AlkahfColors.Ink,
+                color = AlkahfColors.PlayTile,
                 modifier = Modifier.size(50.dp),
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
                         imageVector = Icons.Filled.PlayArrow,
                         contentDescription = "Resume drill",
-                        tint = AlkahfColors.Paper,
+                        tint = AlkahfColors.PlayTileInk,
                         modifier = Modifier.size(22.dp),
                     )
                 }

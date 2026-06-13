@@ -342,6 +342,13 @@ class QuranRepository(context: Context) {
         prefs.edit().putString(KEY_ACTIVE_RECITER, path).apply()
     }
 
+    /** "light" | "dark" | "system" (default). */
+    var themeMode: String
+        get() = prefs.getString(KEY_THEME_MODE, "system") ?: "system"
+        set(value) {
+            prefs.edit().putString(KEY_THEME_MODE, value).apply()
+        }
+
     // --- Loop presets (Room-backed; one is the default) ---
 
     suspend fun presets(): List<LoopPreset> {
@@ -848,6 +855,7 @@ class QuranRepository(context: Context) {
         const val TOTAL_AYAH_COUNT = 6236
         private const val KEY_LAST_MUSHAF_PAGE = "last_mushaf_page"
         private const val KEY_ACTIVE_RECITER = "active_reciter"
+        private const val KEY_THEME_MODE = "theme_mode"
         private const val KEY_SABAQ_SURAH = "sabaq_surah"
         private const val KEY_SABAQ_FROM = "sabaq_from"
         private const val KEY_SABAQ_TO = "sabaq_to"

@@ -32,6 +32,15 @@ private enum class AlkahfDestination {
     Home, Mushaf, Loop, Review, Progress, Library, ReciterDownloads, TawqitTagging
 }
 
+@Composable
+fun AlkahfApp(
+    themeMode: app.alkahf.ui.theme.ThemeMode,
+    onThemeModeChange: (app.alkahf.ui.theme.ThemeMode) -> Unit,
+) {
+    // themeMode / onThemeModeChange are consumed by the Settings screen.
+    AlkahfApp()
+}
+
 private fun buildHomeUiState(data: HomeData, preset: LoopPreset): HomeUiState {
     val names = data.review.names
     return HomeUiState(

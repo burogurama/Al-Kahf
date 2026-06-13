@@ -367,13 +367,13 @@ private fun PresetRow(preset: LoopPreset, onClick: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
-                Modifier.size(40.dp).background(AlkahfColors.Ink, RoundedCornerShape(11.dp)),
+                Modifier.size(40.dp).background(AlkahfColors.PlayTile, RoundedCornerShape(11.dp)),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     imageVector = Icons.Filled.PlayArrow,
                     contentDescription = null,
-                    tint = AlkahfColors.Paper,
+                    tint = AlkahfColors.PlayTileInk,
                     modifier = Modifier.size(20.dp),
                 )
             }
