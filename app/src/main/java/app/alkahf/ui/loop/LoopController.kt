@@ -9,6 +9,7 @@ import app.alkahf.audio.LoopStep
 import app.alkahf.audio.PlayResult
 import app.alkahf.data.LoopPreset
 import app.alkahf.data.Riwayah
+import app.alkahf.data.isCustomReciter
 import app.alkahf.data.PageAyah
 import app.alkahf.R
 import app.alkahf.data.QuranRepository
@@ -217,7 +218,7 @@ class LoopController(
         }
         // An imported reciter plays from its single timed file; resolve it once.
         val reciterPath = _state.value.reciterPath
-        importedAudio = if (reciterPath.startsWith("custom:")) {
+        importedAudio = if (isCustomReciter(reciterPath)) {
             repository.importedSurahAudio(reciterPath, _state.value.surah)
         } else {
             null
@@ -275,7 +276,7 @@ class LoopController(
      * a jump interrupted it), or null when the audio couldn't be obtained.
      */
     private suspend fun playAyah(step: LoopStep): Boolean? {
-        if (_state.value.reciterPath.startsWith("custom:")) {
+        if (isCustomReciter(_state.value.reciterPath)) {
             val segment = importedAudio?.segments?.get(step.ayah)
             if (importedAudio == null || segment == null) {
                 // The imported reciter hasn't timed this āyah — nothing to play.

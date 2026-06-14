@@ -12,7 +12,6 @@ import app.alkahf.data.user.ImportedSurahEntity
 import app.alkahf.data.user.LoopPresetEntity
 import app.alkahf.data.user.PracticeEventEntity
 import app.alkahf.data.user.RevealStateEntity
-import app.alkahf.data.user.TimingTrackEntity
 import app.alkahf.data.user.ReviewPortionEntity
 import app.alkahf.data.user.StumbleEntity
 import app.alkahf.data.user.UserDatabase
@@ -255,6 +254,7 @@ class QuranRepository(context: Context) {
     // can briefly show the other reading by passing an explicit riwāyah.
     private val quranText = QuranTextStore(context) { settings.riwayah }
     private val userDao = UserDatabase.open(context).userDao()
+    private val tawqit = TawqitStore(userDao, quranText)
     private val audioStore = AudioStore(context)
     private val filesDir = context.filesDir
 
@@ -569,7 +569,7 @@ class QuranRepository(context: Context) {
         }
         // The sabaq drill follows the system riwāyah: convert its reading and (if
         // needed) reciter when the system reading toggled, and track the sabaq range.
-        val reciterValid = existing.reciterPath.startsWith("custom:") ||
+        val reciterValid = isCustomReciter(existing.reciterPath) ||
             recitersFor(riwayah).any { it.path == existing.reciterPath }
         val reciter = if (existing.riwayah != riwayah.key || !reciterValid) activeReciter else null
         userDao.updatePreset(
@@ -637,7 +637,7 @@ class QuranRepository(context: Context) {
         }
         val customs = userDao.customRecitersForRiwayah(riwayah.key).map { reciter ->
             ReciterStatus(
-                key = "custom:${reciter.id}",
+                key = customReciterKey(reciter.id),
                 displayName = reciter.name,
                 arabicInitial = reciter.initial,
                 isActive = false,
@@ -659,7 +659,7 @@ class QuranRepository(context: Context) {
                 riwayah = riwayah.key,
             ),
         )
-        return "custom:$id"
+        return customReciterKey(id)
     }
 
     /** Re-tags an imported reciter with a riwāyah. */
@@ -684,9 +684,6 @@ class QuranRepository(context: Context) {
         val id = customReciterId(reciterKey) ?: return
         userDao.deleteImportedSurah(id, surah)
     }
-
-    private fun customReciterId(key: String): Long? =
-        key.removePrefix("custom:").toLongOrNull().takeIf { key.startsWith("custom:") }
 
     /** Per-surah rows for a reciter's surah list (download or import state). */
     suspend fun reciterSurahItems(reciterKey: String): List<ReciterSurahItem> {
@@ -730,26 +727,8 @@ class QuranRepository(context: Context) {
     }
 
     /** A Tawqīt draft (new or resumed) for an imported surah of a custom reciter. */
-    suspend fun tawqitDraftForImport(reciterKey: String, surah: Int): TawqitTrack? {
-        val id = customReciterId(reciterKey) ?: return null
-        val import = userDao.importedSurah(id, surah) ?: return null
-        val surahRow = quranText.surah(surah)
-        val reciterName = userDao.customReciters().firstOrNull { it.id == id }?.name ?: "Imported"
-        val existing = userDao.allTimingTracks()
-            .firstOrNull { it.sourceRef == import.uri && it.surah == surah }
-        return existing?.toTawqitTrack() ?: TawqitTrack(
-            sourceType = TawqitSourceType.IMPORT,
-            sourceRef = import.uri,
-            sourceLabel = "$reciterName (imported)",
-            surah = surah,
-            surahNameLatin = surahRow.nameLatin,
-            ayahFrom = 1,
-            ayahTo = surahRow.ayahCount,
-            endTimesMs = emptyList(),
-            globalOffsetMs = 0,
-            complete = false,
-        )
-    }
+    suspend fun tawqitDraftForImport(reciterKey: String, surah: Int): TawqitTrack? =
+        tawqit.draftForImport(reciterKey, surah)
 
     suspend fun downloadSurah(reciterPath: String, surah: Int, onProgress: (Float) -> Unit) {
         val ayahCount = quranText.surahAyahCount(surah)
@@ -826,36 +805,13 @@ class QuranRepository(context: Context) {
 
     // --- Tawqīt timing tracks ---
 
-    suspend fun tawqitTracks(): List<TawqitTrack> =
-        userDao.allTimingTracks().map { it.toTawqitTrack() }
+    suspend fun tawqitTracks(): List<TawqitTrack> = tawqit.tracks()
 
-    suspend fun tawqitTrack(id: Long): TawqitTrack? =
-        userDao.timingTrack(id)?.toTawqitTrack()
+    suspend fun tawqitTrack(id: Long): TawqitTrack? = tawqit.track(id)
 
-    suspend fun saveTawqitTrack(track: TawqitTrack): Long {
-        val entity = TimingTrackEntity(
-            id = track.id,
-            sourceType = if (track.sourceType == TawqitSourceType.IMPORT) "import" else "reciter",
-            sourceRef = track.sourceRef,
-            sourceLabel = track.sourceLabel,
-            surah = track.surah,
-            surahName = track.surahNameLatin,
-            ayahFrom = track.ayahFrom,
-            ayahTo = track.ayahTo,
-            endTimesCsv = track.endTimesMs.joinToString(","),
-            globalOffsetMs = track.globalOffsetMs,
-            complete = track.complete,
-            updatedAt = System.currentTimeMillis(),
-        )
-        return if (track.id == 0L) {
-            userDao.insertTimingTrack(entity)
-        } else {
-            userDao.updateTimingTrack(entity)
-            track.id
-        }
-    }
+    suspend fun saveTawqitTrack(track: TawqitTrack): Long = tawqit.saveTrack(track)
 
-    suspend fun deleteTawqitTrack(id: Long) = userDao.deleteTimingTrack(id)
+    suspend fun deleteTawqitTrack(id: Long) = tawqit.deleteTrack(id)
 
     /** Resolves the per-ayah audio files for a reciter source (downloads as needed). */
     suspend fun reciterAyahUris(reciterPath: String, surah: Int, from: Int, to: Int): List<String> =
@@ -875,74 +831,20 @@ class QuranRepository(context: Context) {
         surah: Int,
         from: Int,
         to: Int,
-    ): ImportedPlayback? {
-        val customId = customReciterId(reciterKey) ?: return null
-        val import = userDao.importedSurah(customId, surah) ?: return null
-        val track = userDao.allTimingTracks()
-            .firstOrNull { it.sourceRef == import.uri && it.surah == surah }
-            ?.toTawqitTrack() ?: return null
-        val ends = track.endTimesMs
-        val firstTimed = track.ayahFrom
-        val lastTimed = firstTimed + ends.size - 1
-        if (ends.isEmpty() || from < firstTimed || to > lastTimed) return null
-        val offset = track.globalOffsetMs
-        val segments = (from..to).map { n ->
-            val startMs = if (n == firstTimed) 0L else ends[n - firstTimed - 1]
-            val endMs = ends[n - firstTimed]
-            (startMs + offset).coerceAtLeast(0L)..(endMs + offset).coerceAtLeast(0L)
-        }
-        return ImportedPlayback(
-            fileUri = import.uri,
-            ayahIds = (from..to).map { surah * 1000 + it },
-            segments = segments,
-        )
-    }
+    ): ImportedPlayback? = tawqit.rangePlayback(reciterKey, surah, from, to)
 
     /**
      * The imported file for [reciterKey]'s [surah] plus the start..end segment of
      * every timed āyah (keyed by āyah number). Null when the reciter hasn't
      * imported/timed that sūrah. Used to play imported audio in the drill.
      */
-    suspend fun importedSurahAudio(reciterKey: String, surah: Int): ImportedSurahAudio? {
-        val customId = customReciterId(reciterKey) ?: return null
-        val import = userDao.importedSurah(customId, surah) ?: return null
-        val track = userDao.allTimingTracks()
-            .firstOrNull { it.sourceRef == import.uri && it.surah == surah }
-            ?.toTawqitTrack() ?: return null
-        val ends = track.endTimesMs
-        if (ends.isEmpty()) return null
-        val firstTimed = track.ayahFrom
-        val offset = track.globalOffsetMs
-        val segments = buildMap {
-            for (i in ends.indices) {
-                val startMs = if (i == 0) 0L else ends[i - 1]
-                put(
-                    firstTimed + i,
-                    (startMs + offset).coerceAtLeast(0L)..(ends[i] + offset).coerceAtLeast(0L),
-                )
-            }
-        }
-        return ImportedSurahAudio(import.uri, segments)
-    }
+    suspend fun importedSurahAudio(reciterKey: String, surah: Int): ImportedSurahAudio? =
+        tawqit.surahAudio(reciterKey, surah)
 
     /** A riwāyah's reciters (built-in + imported), for drill/Mushaf pickers. */
     suspend fun allReciters(riwayah: Riwayah = this.riwayah): List<Reciter> =
         recitersFor(riwayah) +
-            userDao.customRecitersForRiwayah(riwayah.key).map { Reciter("custom:${it.id}", it.name) }
-
-    private fun TimingTrackEntity.toTawqitTrack() = TawqitTrack(
-        id = id,
-        sourceType = if (sourceType == "import") TawqitSourceType.IMPORT else TawqitSourceType.RECITER,
-        sourceRef = sourceRef,
-        sourceLabel = sourceLabel,
-        surah = surah,
-        surahNameLatin = surahName,
-        ayahFrom = ayahFrom,
-        ayahTo = ayahTo,
-        endTimesMs = endTimesCsv.split(",").filter { it.isNotBlank() }.map { it.toLong() },
-        globalOffsetMs = globalOffsetMs,
-        complete = complete,
-    )
+            userDao.customRecitersForRiwayah(riwayah.key).map { Reciter(customReciterKey(it.id), it.name) }
 
     suspend fun surahOptions(): List<SurahOption> = quranText.surahOptions()
 
