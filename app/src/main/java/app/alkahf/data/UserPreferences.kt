@@ -18,9 +18,10 @@ class UserPreferences(context: Context) {
             prefs.edit().putInt(KEY_LAST_MUSHAF_PAGE, value ?: 0).apply()
         }
 
-    /** Whether the Mushaf was last in hide/self-test mode, so it reopens the same way. */
+    /** Whether the Mushaf was last in hide/self-test mode, so it reopens the same way.
+     *  Defaults to false so a first-time user opens the Mushaf reading (text shown). */
     var lastMushafHideMode: Boolean
-        get() = prefs.getBoolean(KEY_LAST_HIDE_MODE, true)
+        get() = prefs.getBoolean(KEY_LAST_HIDE_MODE, false)
         set(value) {
             prefs.edit().putBoolean(KEY_LAST_HIDE_MODE, value).apply()
         }
