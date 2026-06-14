@@ -2,18 +2,12 @@ package app.alkahf.data
 
 import android.content.Context
 import app.alkahf.data.review.ReviewGrade
-import app.alkahf.data.review.ReviewScheduler
 import app.alkahf.data.audio.AudioStore
 import app.alkahf.data.audio.Reciter
 import app.alkahf.data.audio.recitersFor
-import app.alkahf.data.user.AyahStateEntity
 import app.alkahf.data.user.CustomReciterEntity
 import app.alkahf.data.user.ImportedSurahEntity
 import app.alkahf.data.user.LoopPresetEntity
-import app.alkahf.data.user.PracticeEventEntity
-import app.alkahf.data.user.RevealStateEntity
-import app.alkahf.data.user.ReviewPortionEntity
-import app.alkahf.data.user.StumbleEntity
 import app.alkahf.data.user.UserDatabase
 import java.time.LocalDate
 
@@ -254,6 +248,8 @@ class QuranRepository(context: Context) {
     // can briefly show the other reading by passing an explicit riwāyah.
     private val quranText = QuranTextStore(context) { settings.riwayah }
     private val userDao = UserDatabase.open(context).userDao()
+    private val memorization = MemorizationStore(userDao)
+    private val review = ReviewStore(userDao, quranText, memorization, settings)
     private val tawqit = TawqitStore(userDao, quranText)
     private val audioStore = AudioStore(context)
     private val filesDir = context.filesDir
@@ -277,11 +273,10 @@ class QuranRepository(context: Context) {
     suspend fun startLearningSurah(surah: Int) {
         val len = quranText.surahAyahCount(surah)
         val ids = (1..len).map { surah * 1000 + it }
-        val states = ayahStatesForPage(ids)
+        val states = memorization.statesFor(ids)
         val toLearning = ids
             .filter { (states[it] ?: MemorizationState.NOT_STARTED).value < MemorizationState.MEMORIZED.value }
-            .map { AyahStateEntity(it, MemorizationState.LEARNING.value) }
-        if (toLearning.isNotEmpty()) userDao.upsertAyahStates(toLearning)
+        memorization.markStates(toLearning, MemorizationState.LEARNING)
         // Begin at the first not-yet-memorized āyah so already-memorized leading
         // āyāt aren't re-served as new material; sections then align from there.
         val start = (1..len).firstOrNull {
@@ -298,11 +293,10 @@ class QuranRepository(context: Context) {
     /** Manually sets a range as the sabaq (ensuring it holds a learning ayah). */
     suspend fun setSabaqToRange(surah: Int, from: Int, to: Int) {
         val ids = (from..to).map { surah * 1000 + it }
-        val states = ayahStatesForPage(ids)
+        val states = memorization.statesFor(ids)
         val toLearning = ids
             .filter { (states[it] ?: MemorizationState.NOT_STARTED) == MemorizationState.NOT_STARTED }
-            .map { AyahStateEntity(it, MemorizationState.LEARNING.value) }
-        if (toLearning.isNotEmpty()) userDao.upsertAyahStates(toLearning)
+        memorization.markStates(toLearning, MemorizationState.LEARNING)
         setSabaq(surah, from, to)
     }
 
@@ -314,33 +308,12 @@ class QuranRepository(context: Context) {
     suspend fun markSabaqMemorized() {
         val range = sabaqRange ?: return
         val ids = range.ayahIds.toList()
-        val states = ayahStatesForPage(ids)
+        val states = memorization.statesFor(ids)
         // Only upgrade āyāt not yet memorized; never demote a "strong" āyah.
         val toMark = ids
             .filter { (states[it] ?: MemorizationState.NOT_STARTED).value < MemorizationState.MEMORIZED.value }
-            .map { AyahStateEntity(it, MemorizationState.MEMORIZED.value) }
-        if (toMark.isNotEmpty()) userDao.upsertAyahStates(toMark)
+        memorization.markStates(toMark, MemorizationState.MEMORIZED)
         maybeAdvanceSabaq()
-    }
-
-    /**
-     * Registers a memorized range for spaced-repetition review (idempotent). The
-     * first review is scheduled for the same day so the just-memorized portion
-     * joins today's murājaʿah, then SM-2 spaces it out from there.
-     */
-    private suspend fun enrollReviewPortion(surah: Int, from: Int, to: Int) {
-        if (userDao.portionFor(surah, from, to) != null) return
-        userDao.insertPortions(
-            listOf(
-                ReviewPortionEntity(
-                    surah = surah,
-                    ayahFrom = from,
-                    ayahTo = to,
-                    intervalDays = 1,
-                    dueEpochDay = LocalDate.now().toEpochDay(),
-                ),
-            ),
-        )
     }
 
     /**
@@ -354,13 +327,13 @@ class QuranRepository(context: Context) {
         val l = sectionLength
         while (true) {
             val ids = (range.from..range.to).map { range.surah * 1000 + it }
-            val states = ayahStatesForPage(ids)
+            val states = memorization.statesFor(ids)
             val allDone = ids.all {
                 (states[it] ?: MemorizationState.NOT_STARTED).value >= MemorizationState.MEMORIZED.value
             }
             if (!allDone) break
             // A fully-memorized section graduates into spaced-repetition review.
-            enrollReviewPortion(range.surah, range.from, range.to)
+            review.enrollPortion(range.surah, range.from, range.to)
             val nextFrom = range.to + 1
             if (nextFrom > len) {
                 setSabaq(0, 0, 0)
@@ -370,11 +343,10 @@ class QuranRepository(context: Context) {
         }
         // Ensure the landing section holds a learning ayah, then persist it.
         val ids = (range.from..range.to).map { range.surah * 1000 + it }
-        val states = ayahStatesForPage(ids)
+        val states = memorization.statesFor(ids)
         val toLearning = ids
             .filter { (states[it] ?: MemorizationState.NOT_STARTED) == MemorizationState.NOT_STARTED }
-            .map { AyahStateEntity(it, MemorizationState.LEARNING.value) }
-        if (toLearning.isNotEmpty()) userDao.upsertAyahStates(toLearning)
+        memorization.markStates(toLearning, MemorizationState.LEARNING)
         setSabaq(range.surah, range.from, range.to)
     }
 
@@ -395,11 +367,11 @@ class QuranRepository(context: Context) {
         syncSabaqDrill()
         val today = LocalDate.now()
         return HomeData(
-            streakDays = currentStreak(),
+            streakDays = review.currentStreak(),
             sabaq = sabaqCard(),
             drill = sabaqDrill(),
-            review = reviewSummary(),
-            week = weekSummary(today),
+            review = review.reviewSummary(),
+            week = review.weekSummary(today),
         )
     }
 
@@ -408,7 +380,7 @@ class QuranRepository(context: Context) {
         val nameLatin = quranText.surahNameLatin(range.surah)
         val ayahs = ayahsForRange(range.surah, range.from, range.to)
         if (ayahs.isEmpty()) return null
-        val states = userDao.allAyahStates().associate { it.ayahId to it.state }
+        val states = memorization.allStates()
         val first = ayahs.first()
         return SabaqCard(
             surah = range.surah,
@@ -418,29 +390,6 @@ class QuranRepository(context: Context) {
             firstAyahText = first.words.joinToString(" "),
             firstAyahMarker = first.marker,
             states = ayahs.map { MemorizationState.of(states[it.id] ?: 0) },
-        )
-    }
-
-    private suspend fun reviewSummary(): ReviewSummary {
-        val due = userDao.duePortions(LocalDate.now().toEpochDay())
-        val names = due.map { quranText.surahNameLatin(it.surah) }
-        return ReviewSummary(
-            count = due.size,
-            minutes = (due.size * 1.6f + 0.5f).toInt().coerceAtLeast(if (due.isEmpty()) 0 else 1),
-            names = names,
-        )
-    }
-
-    private suspend fun weekSummary(today: LocalDate): WeekSummary {
-        val practicedDays = userDao.practiceDays().toSet()
-        val days = (6 downTo 0).map { today.minusDays(it.toLong()) }
-        val letters = days.map { it.dayOfWeek.getDisplayName(java.time.format.TextStyle.NARROW, java.util.Locale.ENGLISH) }
-        val practiced = days.map { it.toEpochDay() in practicedDays }
-        return WeekSummary(
-            dayLetters = letters,
-            practiced = practiced,
-            ayatThisWeek = userDao.ayahCountSince(today.toEpochDay() - 6),
-            daysPracticed = practiced.count { it },
         )
     }
 
@@ -858,170 +807,36 @@ class QuranRepository(context: Context) {
     suspend fun surahNameLatin(surah: Int): String = quranText.surahNameLatin(surah)
 
     suspend fun stumblesForPage(page: MushafPage): List<WordStumble> =
-        userDao.stumblesForAyahs(page.ayahs.map { it.id })
-            .map { WordStumble(it.ayahId, it.wordIndex) }
+        memorization.stumblesFor(page.ayahs.map { it.id })
 
-    suspend fun addStumble(stumble: WordStumble) {
-        userDao.addStumble(
-            StumbleEntity(
-                ayahId = stumble.ayahId,
-                wordIndex = stumble.wordIndex,
-                createdAt = System.currentTimeMillis(),
-            ),
-        )
-    }
+    suspend fun addStumble(stumble: WordStumble) = memorization.addStumble(stumble)
 
-    suspend fun removeStumble(stumble: WordStumble) {
-        userDao.deleteStumble(stumble.ayahId, stumble.wordIndex)
-    }
+    suspend fun removeStumble(stumble: WordStumble) = memorization.removeStumble(stumble)
 
     suspend fun revealStates(ayahIds: List<Int>): Map<Int, Int> =
-        userDao.revealStatesForAyahs(ayahIds).associate { it.ayahId to it.revealedCount }
+        memorization.revealStates(ayahIds)
 
     suspend fun ayahStatesForPage(ayahIds: List<Int>): Map<Int, MemorizationState> =
-        userDao.ayahStatesIn(ayahIds).associate { it.ayahId to MemorizationState.of(it.state) }
+        memorization.statesFor(ayahIds)
 
-    suspend fun setAyahState(ayahId: Int, state: MemorizationState) {
-        userDao.upsertAyahStates(listOf(AyahStateEntity(ayahId, state.value)))
-    }
+    suspend fun setAyahState(ayahId: Int, state: MemorizationState) =
+        memorization.setState(ayahId, state)
 
-    suspend fun saveRevealState(ayahId: Int, revealedCount: Int) {
-        userDao.upsertRevealState(RevealStateEntity(ayahId, revealedCount))
-    }
+    suspend fun saveRevealState(ayahId: Int, revealedCount: Int) =
+        memorization.saveRevealState(ayahId, revealedCount)
 
-    suspend fun clearRevealStates(ayahIds: List<Int>) {
-        userDao.clearRevealStates(ayahIds)
-    }
+    suspend fun clearRevealStates(ayahIds: List<Int>) =
+        memorization.clearRevealStates(ayahIds)
 
-    suspend fun dueReviewPortions(): List<ReviewPortion> {
-        // Cap the queue to the daily time budget (≈1.6 min per portion).
-        val budgetLimit = (dailyBudgetMin / 1.6f).toInt().coerceAtLeast(1)
-        return userDao.duePortions(LocalDate.now().toEpochDay()).take(budgetLimit).map { entity ->
-            val surahRow = quranText.surah(entity.surah)
-            val surahLen = surahRow.ayahCount
-            // Load two āyāt of context on each side (shown, not concealed) so the
-            // hafiz can place the portion they're reciting from memory.
-            ReviewPortion(
-                id = entity.id,
-                surah = entity.surah,
-                surahNameLatin = surahRow.nameLatin,
-                ayahFrom = entity.ayahFrom,
-                ayahTo = entity.ayahTo,
-                intervalDays = entity.intervalDays,
-                ayahs = ayahsForRange(
-                    entity.surah,
-                    (entity.ayahFrom - 2).coerceAtLeast(1),
-                    (entity.ayahTo + 2).coerceAtMost(surahLen),
-                ),
-            )
-        }
-    }
+    suspend fun dueReviewPortions(): List<ReviewPortion> = review.duePortions()
 
-    suspend fun commitReviewGrade(portion: ReviewPortion, grade: ReviewGrade) {
-        val nextInterval = ReviewScheduler.nextIntervalDays(
-            portion.intervalDays, grade, reviewPacing.growthFactor,
-        )
-        userDao.updateSchedule(
-            id = portion.id,
-            intervalDays = nextInterval,
-            dueEpochDay = LocalDate.now().toEpochDay() + nextInterval,
-        )
-        // The grade is also the honest signal of the portion's ayah states.
-        val state = when (grade) {
-            ReviewGrade.FORGOT -> MemorizationState.LEARNING
-            ReviewGrade.HESITANT -> MemorizationState.MEMORIZED
-            ReviewGrade.PERFECT -> MemorizationState.STRONG
-        }
-        userDao.upsertAyahStates(portion.ayahs.map { AyahStateEntity(it.id, state.value) })
-        logPractice(type = "review", ayahCount = portion.ayahs.size, durationMs = 0)
-    }
+    suspend fun commitReviewGrade(portion: ReviewPortion, grade: ReviewGrade) =
+        review.commitGrade(portion, grade)
 
-    suspend fun logPractice(type: String, ayahCount: Int, durationMs: Long) {
-        userDao.addPracticeEvent(
-            PracticeEventEntity(
-                type = type,
-                ayahCount = ayahCount,
-                durationMs = durationMs,
-                epochDay = LocalDate.now().toEpochDay(),
-                createdAt = System.currentTimeMillis(),
-            ),
-        )
-    }
+    suspend fun logPractice(type: String, ayahCount: Int, durationMs: Long) =
+        review.logPractice(type, ayahCount, durationMs)
 
-    suspend fun progressSnapshot(): ProgressSnapshot {
-        val states = userDao.allAyahStates().associate { it.ayahId to it.state }
-        val locations = quranText.ayahLocations()
-
-        val pageWeakest = IntArray(PAGE_COUNT) { MemorizationState.STRONG.value }
-        val pageTouched = BooleanArray(PAGE_COUNT)
-        val juzTotals = IntArray(31)
-        val juzMemorized = IntArray(31)
-        val juzLearning = IntArray(31)
-        for (location in locations) {
-            val state = states[location.id] ?: 0
-            val pageIndex = location.page - 1
-            if (state > 0) pageTouched[pageIndex] = true
-            if (state < pageWeakest[pageIndex]) pageWeakest[pageIndex] = state
-            juzTotals[location.juz]++
-            if (state >= MemorizationState.MEMORIZED.value) juzMemorized[location.juz]++
-            if (state == MemorizationState.LEARNING.value) juzLearning[location.juz]++
-        }
-
-        // Rollup honesty rule: a page shows the WEAKEST state among its ayat;
-        // any not-started or learning ayah on a touched page shows Learning.
-        val pageStates = (0 until PAGE_COUNT).map { index ->
-            when {
-                !pageTouched[index] -> MemorizationState.NOT_STARTED
-                pageWeakest[index] <= MemorizationState.LEARNING.value -> MemorizationState.LEARNING
-                pageWeakest[index] == MemorizationState.MEMORIZED.value -> MemorizationState.MEMORIZED
-                else -> MemorizationState.STRONG
-            }
-        }
-
-        val juzProgress = (1..30)
-            .filter { juzMemorized[it] + juzLearning[it] > 0 }
-            .map { juz ->
-                val memorizedFraction = juzMemorized[juz].toFloat() / juzTotals[juz]
-                when {
-                    juzMemorized[juz] == juzTotals[juz] ->
-                        JuzProgress(juz, 1f, 100, JuzStatus.COMPLETE)
-                    juzLearning[juz] > juzMemorized[juz] -> {
-                        val touchedFraction =
-                            (juzMemorized[juz] + juzLearning[juz]).toFloat() / juzTotals[juz]
-                        JuzProgress(juz, touchedFraction, (touchedFraction * 100).toInt(), JuzStatus.LEARNING)
-                    }
-                    else ->
-                        JuzProgress(juz, memorizedFraction, (memorizedFraction * 100).toInt(), JuzStatus.IN_PROGRESS)
-                }
-            }
-            .sortedByDescending { it.fillFraction }
-
-        val memorizedAyahCount = states.values.count { it >= MemorizationState.MEMORIZED.value }
-        return ProgressSnapshot(
-            memorizedAyahCount = memorizedAyahCount,
-            percentOfQuran = memorizedAyahCount * 100f / TOTAL_AYAH_COUNT,
-            pageStates = pageStates,
-            memorizedPageCount = pageStates.count { it >= MemorizationState.MEMORIZED },
-            juzProgress = juzProgress,
-            streakDays = currentStreak(),
-            weekAyahCount = userDao.ayahCountSince(LocalDate.now().toEpochDay() - 6),
-            totalPracticeMs = userDao.totalPracticeMs(),
-        )
-    }
-
-    private suspend fun currentStreak(): Int {
-        val days = userDao.practiceDays()
-        if (days.isEmpty()) return 0
-        val today = LocalDate.now().toEpochDay()
-        var expected = if (days.first() == today) today else today - 1
-        var streak = 0
-        for (day in days) {
-            if (day != expected) break
-            streak++
-            expected--
-        }
-        return streak
-    }
+    suspend fun progressSnapshot(): ProgressSnapshot = review.progressSnapshot()
 
     private fun LoopPresetEntity.toLoopPreset() = LoopPreset(
         id = id,
