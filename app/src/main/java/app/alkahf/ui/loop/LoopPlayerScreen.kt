@@ -80,9 +80,8 @@ import app.alkahf.data.SurahOption
 import app.alkahf.data.audio.AudioStore
 import app.alkahf.data.toArabicIndic
 import app.alkahf.ui.theme.AlkahfColors
-import app.alkahf.ui.theme.KfgqpcHafs
-import app.alkahf.ui.theme.KfgqpcWarsh
-import app.alkahf.ui.theme.quranFont
+import app.alkahf.ui.theme.LocalQuranFont
+import app.alkahf.ui.theme.quranFontFor
 import kotlinx.coroutines.launch
 
 @Composable
@@ -113,15 +112,6 @@ fun LoopPlayerScreen(presetId: Long? = null, newPreset: Boolean = false, onBack:
         onDispose { controller.release() }
     }
     val state by controller.state.collectAsState()
-    // The drill renders in its own riwāyah's script; restore the app font on exit.
-    LaunchedEffect(state.riwayah) {
-        quranFont = if (state.riwayah == "warsh") KfgqpcWarsh else KfgqpcHafs
-    }
-    DisposableEffect(Unit) {
-        onDispose {
-            quranFont = if (repository.riwayah == "warsh") KfgqpcWarsh else KfgqpcHafs
-        }
-    }
     // "New preset" opens straight into the editor in create mode (id 0 → save
     // inserts a new preset rather than editing/playing the default one).
     var creatingNew by remember { mutableStateOf(newPreset) }
@@ -164,20 +154,23 @@ fun LoopPlayerScreen(presetId: Long? = null, newPreset: Boolean = false, onBack:
         return
     }
 
-    Column(
-        Modifier
-            .fillMaxSize()
-            .background(AlkahfColors.SessionBg)
-            .statusBarsPadding()
-            .navigationBarsPadding(),
-    ) {
-        LoopTopBar(state, onBack, onOpenEditor = { showEditor = true })
-        Column(Modifier.fillMaxSize().padding(start = 20.dp, end = 20.dp, top = 6.dp)) {
-            ChainCard(state, controller)
-            AyahCard(state, Modifier.weight(1f).padding(top = 11.dp))
-            ProgressSection(state)
-            TransportRow(state, controller)
-            PresetStrip(state, onOpenEditor = { showEditor = true })
+    // The drill renders in its own riwāyah's script.
+    CompositionLocalProvider(LocalQuranFont provides quranFontFor(state.riwayah)) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .background(AlkahfColors.SessionBg)
+                .statusBarsPadding()
+                .navigationBarsPadding(),
+        ) {
+            LoopTopBar(state, onBack, onOpenEditor = { showEditor = true })
+            Column(Modifier.fillMaxSize().padding(start = 20.dp, end = 20.dp, top = 6.dp)) {
+                ChainCard(state, controller)
+                AyahCard(state, Modifier.weight(1f).padding(top = 11.dp))
+                ProgressSection(state)
+                TransportRow(state, controller)
+                PresetStrip(state, onOpenEditor = { showEditor = true })
+            }
         }
     }
 }
@@ -473,7 +466,7 @@ private fun AyahNode(number: Int, built: Boolean, sounding: Boolean) {
         ) {
             Text(
                 text = number.toArabicIndic(),
-                fontFamily = quranFont,
+                fontFamily = LocalQuranFont.current,
                 fontSize = if (sounding) 18.sp else 16.sp,
                 color = if (built) AlkahfColors.OnAccent else AlkahfColors.QueuedNumeral,
             )
@@ -638,7 +631,7 @@ private fun AyahText(state: LoopUiState) {
         Box(Modifier.fillMaxWidth().verticalScroll(scrollState)) {
             Text(
                 text = annotated,
-                fontFamily = quranFont,
+                fontFamily = LocalQuranFont.current,
                 fontSize = 28.sp,
                 lineHeight = 55.sp,
                 textAlign = TextAlign.Center,

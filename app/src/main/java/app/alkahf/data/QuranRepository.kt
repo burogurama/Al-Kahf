@@ -516,11 +516,8 @@ class QuranRepository(context: Context) {
     /** "hafs" (default) | "warsh". Drives the Qur'an DB, font, and reciter list. */
     var riwayah: String
         get() = prefs.getString(KEY_RIWAYAH, "hafs") ?: "hafs"
-        // commit() (not apply()) so the value is on disk before the caller
-        // restarts the process to reload the DB/font.
-        @android.annotation.SuppressLint("ApplySharedPref")
         set(value) {
-            prefs.edit().putString(KEY_RIWAYAH, value).commit()
+            prefs.edit().putString(KEY_RIWAYAH, value).apply()
         }
 
     /** Built-in reciters available for the active riwāyah. */

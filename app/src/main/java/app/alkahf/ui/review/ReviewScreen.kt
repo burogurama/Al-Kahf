@@ -74,7 +74,7 @@ import app.alkahf.data.WordStumble
 import app.alkahf.data.review.ReviewGrade
 import app.alkahf.data.review.ReviewScheduler
 import app.alkahf.ui.theme.AlkahfColors
-import app.alkahf.ui.theme.quranFont
+import app.alkahf.ui.theme.LocalQuranFont
 import kotlinx.coroutines.launch
 
 private const val MINUTES_PER_PORTION = 1.6f
@@ -389,7 +389,7 @@ private fun PassageText(
         Text(
             text = passage.annotated,
             style = TextStyle(
-                fontFamily = quranFont,
+                fontFamily = LocalQuranFont.current,
                 fontSize = 23.sp,
                 lineHeight = 45.sp,
                 color = AlkahfColors.Ink,

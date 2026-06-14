@@ -115,9 +115,8 @@ import app.alkahf.data.ReciterStatus
 import app.alkahf.data.SurahOption
 import app.alkahf.data.audio.AudioStore
 import app.alkahf.ui.theme.AlkahfColors
-import app.alkahf.ui.theme.KfgqpcHafs
-import app.alkahf.ui.theme.KfgqpcWarsh
-import app.alkahf.ui.theme.quranFont
+import app.alkahf.ui.theme.LocalQuranFont
+import app.alkahf.ui.theme.quranFontFor
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 
@@ -260,9 +259,6 @@ fun MushafScreen(
     // A temporary peek at the other reading — local to this Mushaf; it never
     // changes the saved riwāyah. Text, font, reciters and audio follow it here.
     var displayRiwayah by remember { mutableStateOf(repository.riwayah) }
-    DisposableEffect(Unit) {
-        onDispose { quranFont = if (repository.riwayah == "warsh") KfgqpcWarsh else KfgqpcHafs }
-    }
 
     LaunchedEffect(pagerState) {
         snapshotFlow { pagerState.currentPage }.collect { page ->
@@ -336,10 +332,10 @@ fun MushafScreen(
             }
         }
     }
-    // Toggling the reading reloads the page text/font, the reciter list, and the
-    // audio mapping — all just for this Mushaf.
+    // Toggling the reading updates the reciter list and the audio mapping for
+    // this Mushaf; the page text reloads via the toggle handler and the font
+    // follows LocalQuranFont below.
     LaunchedEffect(displayRiwayah) {
-        quranFont = if (displayRiwayah == "warsh") KfgqpcWarsh else KfgqpcHafs
         audioController.setRiwayah(displayRiwayah)
         reciters = repository.reciterStatuses(displayRiwayah)
         rangeReciterKey = reciters.firstOrNull { it.key == rangeReciterKey }?.key
@@ -542,220 +538,219 @@ fun MushafScreen(
         }
     }
 
-    Column(Modifier.fillMaxSize().background(AlkahfColors.Paper)) {
-        MushafTopBar(
-            title = currentSession?.page?.primarySurahLatin ?: "",
-            location = currentSession?.page?.let {
-                stringResource(R.string.mushaf_location, it.juz, it.number)
-            } ?: "",
-            // Tapping the title opens "go to"; the locked sabaq view can't jump.
-            onTitleClick = { showJump = true }.takeIf { !sabaqMode },
-            hideMode = hideMode,
-            audioActive = audioDockOpen || rangeAudioOpen,
-            onAudioTap = onHeadsetTap,
-            onAudioDoubleTap = onHeadsetDoubleTap,
-            onAudioLongPress = onHeadsetLongPress,
-            onBack = onBack,
-            onToggleHideMode = {
-                val turningOn = !hideMode
-                hideMode = turningOn
-                repository.lastMushafHideMode = turningOn
-                selection = null
-                // Re-entering hide mode starts a fresh self-test on this page.
-                if (turningOn) {
-                    currentSession?.let { session ->
-                        session.resetReveals()
-                        scope.launch {
-                            repository.clearRevealStates(session.page.ayahs.map { it.id })
-                        }
-                    }
-                }
-            },
-            // Temporary reading toggle — hidden in the locked sabaq view.
-            riwayahLabel = if (sabaqMode) {
-                null
-            } else {
-                stringResource(
-                    if (displayRiwayah == "warsh") R.string.settings_riwayah_warsh else R.string.settings_riwayah_hafs,
-                )
-            },
-            onToggleRiwayah = {
-                // Clear sessions in the same frame as the riwāyah change so the
-                // page reloads with the new text (the load guard checks session),
-                // and set the font now so the reloaded text renders correctly.
-                sessions.clear()
-                val next = if (displayRiwayah == "warsh") "hafs" else "warsh"
-                quranFont = if (next == "warsh") KfgqpcWarsh else KfgqpcHafs
-                displayRiwayah = next
-            }.takeIf { !sabaqMode },
-        )
-        // RTL pager: swiping toward the right turns to the next page, as in a
-        // physical mushaf. Page content restores LTR for its own chrome.
-        CompositionLocalProvider(
-            LocalLayoutDirection provides LayoutDirection.Rtl,
-            LocalMushafTextSize provides settings.arabicTextSizePt,
-        ) {
-            HorizontalPager(
-                state = pagerState,
-                modifier = Modifier.weight(1f).fillMaxWidth(),
-            ) { pageIndex ->
-                CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-                    val pageNumber = pageIndex + windowStart
-                    MushafPageView(
-                        pageNumber = pageNumber,
-                        riwayah = displayRiwayah,
-                        repository = repository,
-                        hideMode = hideMode,
-                        session = sessions[pageNumber],
-                        onSessionReady = { sessions[pageNumber] = it },
-                        persistReveal = persistReveal,
-                        onSelectAyah = onSelectAyah,
-                        onAyahLongPress = onAyahLongPress,
-                        // The surah header can't start a new sabaq from inside the
-                        // focused sabaq view.
-                        onLearnSurah = if (sabaqMode) {
-                            { _, _ -> }
-                        } else {
-                            { surah, name -> learnSurah = surah to name }
-                        },
-                        playingAyahId = audioState.currentAyahId,
-                        onAudioTap = onAudioTap,
-                        sabaqIds = sabaqIds,
-                        contextIds = contextIds,
-                        selectedIds = if (pageNumber == currentPageNumber) selectedIds else emptySet(),
-                        scrollToAyahId = scrollToAyahId,
-                    )
-                }
-            }
-        }
-        when {
-            rangeAudioOpen -> RangeAudioDock(
-                mode = rangeMode,
-                speed = rangeSpeed,
-                times = rangeTimes,
-                reciters = reciters,
-                selectedReciterKey = rangeReciterKey,
-                onMode = { rangeMode = it },
-                onSpeed = { rangeSpeed = it },
-                onTimes = { rangeTimes = it },
-                onReciter = { rangeReciterKey = it },
-                onListen = { onRangeListen() },
-            )
-            audioDockOpen -> MushafAudioDock(
-                state = audioState,
-                onMode = audioController::setMode,
-                onScope = audioController::setScope,
-                onPlayPause = {
-                    if (audioState.phase != MushafAudioPhase.IDLE) {
-                        audioController.togglePause()
-                    } else {
-                        val session = currentSession
-                        when {
-                            audioState.mode == MushafAudioMode.TAP -> {}
-                            audioState.scope == MushafAudioScope.PAGE -> session?.let {
-                                audioController.playAyahIds(it.page.ayahs.map { ayah -> ayah.id })
+    CompositionLocalProvider(LocalQuranFont provides quranFontFor(displayRiwayah)) {
+        Column(Modifier.fillMaxSize().background(AlkahfColors.Paper)) {
+            MushafTopBar(
+                title = currentSession?.page?.primarySurahLatin ?: "",
+                location = currentSession?.page?.let {
+                    stringResource(R.string.mushaf_location, it.juz, it.number)
+                } ?: "",
+                // Tapping the title opens "go to"; the locked sabaq view can't jump.
+                onTitleClick = { showJump = true }.takeIf { !sabaqMode },
+                hideMode = hideMode,
+                audioActive = audioDockOpen || rangeAudioOpen,
+                onAudioTap = onHeadsetTap,
+                onAudioDoubleTap = onHeadsetDoubleTap,
+                onAudioLongPress = onHeadsetLongPress,
+                onBack = onBack,
+                onToggleHideMode = {
+                    val turningOn = !hideMode
+                    hideMode = turningOn
+                    repository.lastMushafHideMode = turningOn
+                    selection = null
+                    // Re-entering hide mode starts a fresh self-test on this page.
+                    if (turningOn) {
+                        currentSession?.let { session ->
+                            session.resetReveals()
+                            scope.launch {
+                                repository.clearRevealStates(session.page.ayahs.map { it.id })
                             }
-                            audioState.scope == MushafAudioScope.SURAH -> session?.let {
-                                val surah = it.page.ayahs.first().surah
-                                scope.launch {
-                                    audioController.playAyahIds(
-                                        repository.ayahsForRange(surah, 1, 300).map { ayah -> ayah.id },
-                                    )
-                                }
-                            }
-                            else -> {}
                         }
                     }
                 },
-                onStop = audioController::stop,
+                // Temporary reading toggle — hidden in the locked sabaq view.
+                riwayahLabel = if (sabaqMode) {
+                    null
+                } else {
+                    stringResource(
+                        if (displayRiwayah == "warsh") R.string.settings_riwayah_warsh else R.string.settings_riwayah_hafs,
+                    )
+                },
+                onToggleRiwayah = {
+                    // Clear sessions in the same frame as the riwāyah change so the
+                    // page reloads with the new text (the load guard checks session).
+                    sessions.clear()
+                    displayRiwayah = if (displayRiwayah == "warsh") "hafs" else "warsh"
+                }.takeIf { !sabaqMode },
             )
-            selectedIds.isNotEmpty() -> SelectionHintBar(
-                count = selectedIds.size,
-                playing = audioState.phase != MushafAudioPhase.IDLE,
-                onStop = audioController::stop,
-                onClear = { selection = null },
-            )
-            hideMode -> SelfTestDock(session = currentSession)
-        }
-    }
-
-    val anchor = menuAnchor
-    val menuSession = currentSession
-    if (anchor != null && menuSession != null && selectedIds.isNotEmpty()) {
-        val currentState = selectedIds
-            .map { menuSession.memStates[it] ?: MemorizationState.NOT_STARTED }
-            .distinct()
-            .singleOrNull()
-        SelectionContextMenu(
-            anchor = anchor,
-            currentState = currentState,
-            onListen = {
-                playRange(MushafAudioMode.LISTEN)
-                menuAnchor = null
-            },
-            onSetSabaq = {
-                val picked = menuSession.page.ayahs.filter { it.id in selectedIds }
-                if (picked.isNotEmpty()) {
-                    val surah = picked.first().surah
-                    val nums = picked.filter { it.surah == surah }.map { it.number }
-                    scope.launch {
-                        repository.setSabaqToRange(surah, nums.min(), nums.max())
-                        reloadMemStates()
+            // RTL pager: swiping toward the right turns to the next page, as in a
+            // physical mushaf. Page content restores LTR for its own chrome.
+            CompositionLocalProvider(
+                LocalLayoutDirection provides LayoutDirection.Rtl,
+                LocalMushafTextSize provides settings.arabicTextSizePt,
+            ) {
+                HorizontalPager(
+                    state = pagerState,
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                ) { pageIndex ->
+                    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                        val pageNumber = pageIndex + windowStart
+                        MushafPageView(
+                            pageNumber = pageNumber,
+                            riwayah = displayRiwayah,
+                            repository = repository,
+                            hideMode = hideMode,
+                            session = sessions[pageNumber],
+                            onSessionReady = { sessions[pageNumber] = it },
+                            persistReveal = persistReveal,
+                            onSelectAyah = onSelectAyah,
+                            onAyahLongPress = onAyahLongPress,
+                            // The surah header can't start a new sabaq from inside the
+                            // focused sabaq view.
+                            onLearnSurah = if (sabaqMode) {
+                                { _, _ -> }
+                            } else {
+                                { surah, name -> learnSurah = surah to name }
+                            },
+                            playingAyahId = audioState.currentAyahId,
+                            onAudioTap = onAudioTap,
+                            sabaqIds = sabaqIds,
+                            contextIds = contextIds,
+                            selectedIds = if (pageNumber == currentPageNumber) selectedIds else emptySet(),
+                            scrollToAyahId = scrollToAyahId,
+                        )
                     }
                 }
-                selection = null
-                menuAnchor = null
-            },
-            onSetState = { state ->
-                val ids = selectedIds.toList()
-                ids.forEach { menuSession.memStates[it] = state }
-                scope.launch {
-                    ids.forEach { repository.setAyahState(it, state) }
-                    // Memorizing the sabaq's ayat may complete its section.
-                    repository.maybeAdvanceSabaq()
-                }
-                selection = null
-                menuAnchor = null
-            },
-            onDismiss = { menuAnchor = null },
-        )
-    }
+            }
+            when {
+                rangeAudioOpen -> RangeAudioDock(
+                    mode = rangeMode,
+                    speed = rangeSpeed,
+                    times = rangeTimes,
+                    reciters = reciters,
+                    selectedReciterKey = rangeReciterKey,
+                    onMode = { rangeMode = it },
+                    onSpeed = { rangeSpeed = it },
+                    onTimes = { rangeTimes = it },
+                    onReciter = { rangeReciterKey = it },
+                    onListen = { onRangeListen() },
+                )
+                audioDockOpen -> MushafAudioDock(
+                    state = audioState,
+                    onMode = audioController::setMode,
+                    onScope = audioController::setScope,
+                    onPlayPause = {
+                        if (audioState.phase != MushafAudioPhase.IDLE) {
+                            audioController.togglePause()
+                        } else {
+                            val session = currentSession
+                            when {
+                                audioState.mode == MushafAudioMode.TAP -> {}
+                                audioState.scope == MushafAudioScope.PAGE -> session?.let {
+                                    audioController.playAyahIds(it.page.ayahs.map { ayah -> ayah.id })
+                                }
+                                audioState.scope == MushafAudioScope.SURAH -> session?.let {
+                                    val surah = it.page.ayahs.first().surah
+                                    scope.launch {
+                                        audioController.playAyahIds(
+                                            repository.ayahsForRange(surah, 1, 300).map { ayah -> ayah.id },
+                                        )
+                                    }
+                                }
+                                else -> {}
+                            }
+                        }
+                    },
+                    onStop = audioController::stop,
+                )
+                selectedIds.isNotEmpty() -> SelectionHintBar(
+                    count = selectedIds.size,
+                    playing = audioState.phase != MushafAudioPhase.IDLE,
+                    onStop = audioController::stop,
+                    onClear = { selection = null },
+                )
+                hideMode -> SelfTestDock(session = currentSession)
+            }
+        }
 
-    val prompt = learnSurah
-    if (prompt != null) {
-        LearnSurahSheet(
-            surahName = prompt.second,
-            onConfirm = {
-                scope.launch {
-                    repository.startLearningSurah(prompt.first)
-                    reloadMemStates()
-                }
-                learnSurah = null
-            },
-            onDismiss = { learnSurah = null },
-        )
-    }
+        val anchor = menuAnchor
+        val menuSession = currentSession
+        if (anchor != null && menuSession != null && selectedIds.isNotEmpty()) {
+            val currentState = selectedIds
+                .map { menuSession.memStates[it] ?: MemorizationState.NOT_STARTED }
+                .distinct()
+                .singleOrNull()
+            SelectionContextMenu(
+                anchor = anchor,
+                currentState = currentState,
+                onListen = {
+                    playRange(MushafAudioMode.LISTEN)
+                    menuAnchor = null
+                },
+                onSetSabaq = {
+                    val picked = menuSession.page.ayahs.filter { it.id in selectedIds }
+                    if (picked.isNotEmpty()) {
+                        val surah = picked.first().surah
+                        val nums = picked.filter { it.surah == surah }.map { it.number }
+                        scope.launch {
+                            repository.setSabaqToRange(surah, nums.min(), nums.max())
+                            reloadMemStates()
+                        }
+                    }
+                    selection = null
+                    menuAnchor = null
+                },
+                onSetState = { state ->
+                    val ids = selectedIds.toList()
+                    ids.forEach { menuSession.memStates[it] = state }
+                    scope.launch {
+                        ids.forEach { repository.setAyahState(it, state) }
+                        // Memorizing the sabaq's ayat may complete its section.
+                        repository.maybeAdvanceSabaq()
+                    }
+                    selection = null
+                    menuAnchor = null
+                },
+                onDismiss = { menuAnchor = null },
+            )
+        }
 
-    if (showJump) {
-        GoToSheet(
-            surahs = surahOptions,
-            onPickSurah = { surah ->
-                scope.launch { jumpToPage(repository.firstPageOfSurah(surah)) }
-            },
-            onPickPage = { page -> jumpToPage(page) },
-            onDismiss = { showJump = false },
-        )
-    }
+        val prompt = learnSurah
+        if (prompt != null) {
+            LearnSurahSheet(
+                surahName = prompt.second,
+                onConfirm = {
+                    scope.launch {
+                        repository.startLearningSurah(prompt.first)
+                        reloadMemStates()
+                    }
+                    learnSurah = null
+                },
+                onDismiss = { learnSurah = null },
+            )
+        }
 
-    val request = downloadPrompt
-    if (request != null) {
-        RangeDownloadDialog(
-            reciterName = request.reciterName,
-            count = request.count,
-            progress = downloadProgress,
-            onConfirm = { startRangeDownload(request) },
-            onCancel = { cancelRangeDownload() },
-        )
+        if (showJump) {
+            GoToSheet(
+                surahs = surahOptions,
+                onPickSurah = { surah ->
+                    scope.launch { jumpToPage(repository.firstPageOfSurah(surah)) }
+                },
+                onPickPage = { page -> jumpToPage(page) },
+                onDismiss = { showJump = false },
+            )
+        }
+
+        val request = downloadPrompt
+        if (request != null) {
+            RangeDownloadDialog(
+                reciterName = request.reciterName,
+                count = request.count,
+                progress = downloadProgress,
+                onConfirm = { startRangeDownload(request) },
+                onCancel = { cancelRangeDownload() },
+            )
+        }
     }
 }
 
@@ -1045,7 +1040,7 @@ private fun PageGroupView(
     if (group.basmala != null) {
         Text(
             text = group.basmala,
-            fontFamily = quranFont,
+            fontFamily = LocalQuranFont.current,
             fontSize = 20.sp,
             color = AlkahfColors.InkChrome,
             textAlign = TextAlign.Center,
@@ -1077,7 +1072,7 @@ private fun SurahHeaderBand(group: PageGroup, onClick: () -> Unit) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
                 text = group.surahNameArabic,
-                fontFamily = quranFont,
+                fontFamily = LocalQuranFont.current,
                 fontSize = 25.sp,
                 lineHeight = 34.sp,
                 color = AlkahfColors.Ink,
@@ -1143,7 +1138,7 @@ private fun AyatBody(
         Text(
             text = groupText.annotated,
             style = TextStyle(
-                fontFamily = quranFont,
+                fontFamily = LocalQuranFont.current,
                 fontSize = bodySize,
                 lineHeight = bodySize * 1.9f,
                 color = AlkahfColors.Ink,
@@ -1756,7 +1751,7 @@ private fun ReciterChip(
             ) {
                 Text(
                     text = reciter.arabicInitial,
-                    fontFamily = quranFont,
+                    fontFamily = LocalQuranFont.current,
                     fontSize = 14.sp,
                     color = if (selected) AlkahfColors.OnAccent else AlkahfColors.InkChrome,
                 )
@@ -2184,7 +2179,7 @@ private fun SurahRow(s: SurahOption, onClick: () -> Unit) {
         )
         Text(
             text = s.nameArabic,
-            fontFamily = quranFont,
+            fontFamily = LocalQuranFont.current,
             fontSize = 19.sp,
             color = AlkahfColors.InkChrome,
         )

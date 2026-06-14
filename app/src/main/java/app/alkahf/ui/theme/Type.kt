@@ -1,6 +1,7 @@
 package app.alkahf.ui.theme
 
 import androidx.compose.material3.Typography
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.text.ExperimentalTextApi
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
@@ -38,11 +39,12 @@ val KfgqpcWarsh = FontFamily(
     Font(R.font.kfgqpc_warsh, weight = FontWeight.Normal),
 )
 
-/**
- * The Qur'an font for the active riwāyah. Set once at process start
- * (AlkahfApplication) so it works in both composable and text-builder code.
- */
-var quranFont: FontFamily = KfgqpcHafs
+/** The mushaf font for a riwāyah ("hafs" | "warsh"). */
+fun quranFontFor(riwayah: String): FontFamily =
+    if (riwayah == "warsh") KfgqpcWarsh else KfgqpcHafs
+
+/** The Qur'an font for the active riwāyah, provided at each screen root. */
+val LocalQuranFont = staticCompositionLocalOf { KfgqpcHafs }
 
 val AlkahfTypography = Typography().run {
     copy(
@@ -64,9 +66,9 @@ val AlkahfTypography = Typography().run {
     )
 }
 
-/** Ayah text style: 25sp, line-height 1.88. */
+/** Ayah text style: 25sp, line-height 1.88. Override fontFamily per riwāyah. */
 val AyahTextStyle = TextStyle(
-    fontFamily = quranFont,
+    fontFamily = KfgqpcHafs,
     fontWeight = FontWeight.Normal,
     fontSize = 25.sp,
     lineHeight = 47.sp,

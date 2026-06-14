@@ -13,9 +13,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import app.alkahf.notify.HifzNotifier
 import app.alkahf.notify.ReminderScheduler
+import androidx.compose.runtime.CompositionLocalProvider
 import app.alkahf.ui.AlkahfApp
 import app.alkahf.ui.theme.AlkahfTheme
+import app.alkahf.ui.theme.LocalQuranFont
 import app.alkahf.ui.theme.ThemeMode
+import app.alkahf.ui.theme.quranFontFor
 
 class MainActivity : ComponentActivity() {
     // Bumped whenever a "Listen" reminder action launches the activity, so the
@@ -38,17 +41,19 @@ class MainActivity : ComponentActivity() {
         setContent {
             var themeMode by remember { mutableStateOf(toThemeMode(repository.themeMode)) }
             AlkahfTheme(mode = themeMode) {
-                AlkahfApp(
-                    playDrillSignal = playDrillSignal.intValue,
-                    onThemeModeChange = { mode ->
-                        themeMode = mode
-                        repository.themeMode = mode.name.lowercase()
-                    },
-                    onLanguageChange = { language ->
-                        repository.appLanguage = language
-                        recreate()
-                    },
-                )
+                CompositionLocalProvider(LocalQuranFont provides quranFontFor(repository.riwayah)) {
+                    AlkahfApp(
+                        playDrillSignal = playDrillSignal.intValue,
+                        onThemeModeChange = { mode ->
+                            themeMode = mode
+                            repository.themeMode = mode.name.lowercase()
+                        },
+                        onLanguageChange = { language ->
+                            repository.appLanguage = language
+                            recreate()
+                        },
+                    )
+                }
             }
         }
     }

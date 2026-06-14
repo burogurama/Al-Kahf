@@ -2,8 +2,8 @@ package app.alkahf.ui.settings
 
 import android.Manifest
 import android.app.TimePickerDialog
+import android.app.Activity
 import android.content.Context
-import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.text.format.DateFormat
@@ -75,15 +75,13 @@ fun SettingsScreen(
     var riwayah by remember { mutableStateOf(repository.riwayah) }
 
     // Switching riwāyah swaps the Qur'an DB, font, and reciter list, all resolved
-    // at process start — so persist the choice and relaunch cleanly.
+    // resolved when the screen tree is rebuilt — recreating the activity reloads
+    // the DB, font, and reciter list for the new reading.
     fun changeRiwayah(value: String) {
         if (value == riwayah) return
         repository.riwayah = value
         riwayah = value
-        val launch = context.packageManager.getLaunchIntentForPackage(context.packageName)
-        launch?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
-        context.startActivity(launch)
-        Runtime.getRuntime().exit(0)
+        (context as? Activity)?.recreate()
     }
 
     fun apply(updated: SettingsData) {

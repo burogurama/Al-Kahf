@@ -54,6 +54,7 @@ import app.alkahf.ui.components.AlkahfBottomNav
 import app.alkahf.ui.components.AlkahfTab
 import app.alkahf.ui.theme.AlkahfColors
 import app.alkahf.ui.theme.AyahTextStyle
+import app.alkahf.ui.theme.LocalQuranFont
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -296,7 +297,7 @@ private fun AyahBlock(state: HomeUiState) {
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
         Text(
             text = ayah,
-            style = AyahTextStyle,
+            style = AyahTextStyle.copy(fontFamily = LocalQuranFont.current),
             textAlign = TextAlign.Start,
             modifier = Modifier
                 .fillMaxWidth()
