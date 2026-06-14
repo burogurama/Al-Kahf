@@ -144,6 +144,9 @@ interface UserDao {
     @Query("SELECT * FROM review_portions WHERE due_epoch_day <= :today ORDER BY id")
     suspend fun duePortions(today: Long): List<ReviewPortionEntity>
 
+    @Query("SELECT * FROM review_portions WHERE surah = :surah AND ayah_from = :from AND ayah_to = :to LIMIT 1")
+    suspend fun portionFor(surah: Int, from: Int, to: Int): ReviewPortionEntity?
+
     @Query("SELECT COUNT(*) FROM review_portions")
     suspend fun portionCount(): Int
 

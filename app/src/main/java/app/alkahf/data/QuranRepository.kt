@@ -303,6 +303,26 @@ class QuranRepository(context: Context) {
     }
 
     /**
+     * Registers a memorized range for spaced-repetition review (idempotent). The
+     * first review is scheduled for the same day so the just-memorized portion
+     * joins today's murājaʿah, then SM-2 spaces it out from there.
+     */
+    private suspend fun enrollReviewPortion(surah: Int, from: Int, to: Int) {
+        if (userDao.portionFor(surah, from, to) != null) return
+        userDao.insertPortions(
+            listOf(
+                ReviewPortionEntity(
+                    surah = surah,
+                    ayahFrom = from,
+                    ayahTo = to,
+                    intervalDays = 1,
+                    dueEpochDay = LocalDate.now().toEpochDay(),
+                ),
+            ),
+        )
+    }
+
+    /**
      * Advances the sabaq past any fully-memorized section: the sabaq steps
      * forward by the section length until it lands on a section that still has
      * an unmemorized ayah, or clears when it runs off the end of the surah.
@@ -318,6 +338,8 @@ class QuranRepository(context: Context) {
                 (states[it] ?: MemorizationState.NOT_STARTED).value >= MemorizationState.MEMORIZED.value
             }
             if (!allDone) break
+            // A fully-memorized section graduates into spaced-repetition review.
+            enrollReviewPortion(range.surah, range.from, range.to)
             val nextFrom = range.to + 1
             if (nextFrom > len) {
                 setSabaq(0, 0, 0) // surah complete — no active sabaq
@@ -955,34 +977,9 @@ class QuranRepository(context: Context) {
     }
 
     private suspend fun ensureSeeded() {
-        if (userDao.portionCount() == 0) {
-            seedDefaultPortions()
-        }
-    }
-
-    /**
-     * Until the Progress feature lets the user mark portions memorized, seed
-     * the scheduler with the short surahs from the product definition.
-     */
-    private suspend fun seedDefaultPortions() {
-        val today = LocalDate.now().toEpochDay()
-        // Five short surahs the user already holds, due for review today.
-        val portions = listOf(
-            ReviewPortionEntity(surah = 1, ayahFrom = 1, ayahTo = 7, intervalDays = 6, dueEpochDay = today),
-            ReviewPortionEntity(surah = 114, ayahFrom = 1, ayahTo = 6, intervalDays = 6, dueEpochDay = today),
-            ReviewPortionEntity(surah = 113, ayahFrom = 1, ayahTo = 5, intervalDays = 6, dueEpochDay = today),
-            ReviewPortionEntity(surah = 112, ayahFrom = 1, ayahTo = 4, intervalDays = 6, dueEpochDay = today),
-            ReviewPortionEntity(surah = 108, ayahFrom = 1, ayahTo = 3, intervalDays = 6, dueEpochDay = today),
-        )
-        userDao.insertPortions(portions)
-        val memorized = portions.flatMap { portion ->
-            (portion.ayahFrom..portion.ayahTo).map { ayah ->
-                AyahStateEntity(portion.surah * 1000 + ayah, MemorizationState.MEMORIZED.value)
-            }
-        }
-        // No sabaq is seeded: the hafiz creates it by marking a sūrah (or a
-        // selected range) as learning from the Mushaf.
-        userDao.upsertAyahStates(memorized)
+        // Nothing is seeded any more: the review queue is built from real hifz —
+        // a sabaq section becomes a review portion once it's fully memorized
+        // (see maybeAdvanceSabaq → enrollReviewPortion).
     }
 
     private fun surahMeta(revelationType: String, ayahCount: Int): String {
