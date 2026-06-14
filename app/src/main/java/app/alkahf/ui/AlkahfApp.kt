@@ -175,7 +175,9 @@ fun AlkahfApp(
             // (sabaqRange is null when there's no sabaq → opens the Mushaf normally)
             onMarkSabaq = {
                 scope.launch {
-                    repository.markSabaqMemorized()
+                    // Only advances when every āyah is memorized/strong; the button
+                    // is shown only then, and the repository rejects it otherwise.
+                    repository.markSabaqDone()
                     homeRefresh++
                 }
             },

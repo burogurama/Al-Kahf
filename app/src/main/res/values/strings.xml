@@ -41,7 +41,7 @@
     <string name="home_ayat_memorized">%1$d of %2$d ayat memorized</string>
     <string name="home_continue_learning">Continue learning</string>
     <string name="home_hide_self_test">Hide &amp; self-test</string>
-    <string name="home_mark_sabaq_memorized">Mark section memorized</string>
+    <string name="home_sabaq_done">Done</string>
     <string name="home_review_murajaah">ISTIḤḌĀR</string>
     <string name="home_due_today">DUE TODAY</string>
     <string name="home_approx_min">≈ %1$d min</string>

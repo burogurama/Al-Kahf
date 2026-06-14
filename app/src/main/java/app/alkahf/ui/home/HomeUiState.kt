@@ -34,4 +34,8 @@ data class HomeUiState(
         get() = sabaqAyahStates.count {
             it == AyahMemorizationState.MEMORIZED || it == AyahMemorizationState.STRONG
         }
+
+    /** True when every āyah in the sabaq is memorized or strong — done is allowed. */
+    val sabaqComplete: Boolean
+        get() = sabaqAyahStates.isNotEmpty() && memorizedInSabaq == sabaqAyahStates.size
 }

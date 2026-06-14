@@ -41,7 +41,7 @@
     <string name="home_ayat_memorized">حُفظت %1$d من %2$d آية</string>
     <string name="home_continue_learning">متابعة الحفظ</string>
     <string name="home_hide_self_test">الإخفاء والاختبار الذاتي</string>
-    <string name="home_mark_sabaq_memorized">تعليم المقطع محفوظًا</string>
+    <string name="home_sabaq_done">تم</string>
     <string name="home_review_murajaah">الاستحضار</string>
     <string name="home_due_today">مستحق اليوم</string>
     <string name="home_approx_min">≈ %1$d د</string>

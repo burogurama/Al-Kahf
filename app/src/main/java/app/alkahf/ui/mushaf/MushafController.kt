@@ -54,8 +54,6 @@ class MushafController(private val repository: QuranRepository) {
 
     suspend fun surahState(surah: Int): MemorizationState = repository.surahState(surah)
 
-    suspend fun maybeAdvanceSabaq() = repository.maybeAdvanceSabaq()
-
     suspend fun setSabaqToRange(surah: Int, from: Int, to: Int) =
         repository.setSabaqToRange(surah, from, to)
 

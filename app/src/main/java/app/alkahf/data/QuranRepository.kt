@@ -284,7 +284,6 @@ class QuranRepository(context: Context) {
             return
         }
         setSabaq(surah, start, minOf(start + sectionLength - 1, len))
-        maybeAdvanceSabaq()
     }
 
     /** Manually sets a range as the sabaq (ensuring it holds a learning ayah). */
@@ -297,28 +296,34 @@ class QuranRepository(context: Context) {
         setSabaq(surah, from, to)
     }
 
-    /**
-     * Marks every āyah in the current sabaq range as memorized in one step, then
-     * advances. The "I've memorized this section" shortcut — independent of how
-     * many pages the range spans or what is selected in the Mushaf.
-     */
-    suspend fun markSabaqMemorized() {
-        val range = sabaqRange ?: return
+    /** True when every āyah in the current sabaq is memorized or strong. */
+    suspend fun isSabaqComplete(): Boolean {
+        val range = sabaqRange ?: return false
         val ids = range.ayahIds.toList()
         val states = memorization.statesFor(ids)
-        // Only upgrade āyāt not yet memorized; never demote a "strong" āyah.
-        val toMark = ids
-            .filter { (states[it] ?: MemorizationState.NOT_STARTED).value < MemorizationState.MEMORIZED.value }
-        memorization.markStates(toMark, MemorizationState.MEMORIZED)
-        maybeAdvanceSabaq()
+        return ids.isNotEmpty() && ids.all {
+            (states[it] ?: MemorizationState.NOT_STARTED).value >= MemorizationState.MEMORIZED.value
+        }
+    }
+
+    /**
+     * Marks the current sabaq section done and advances to the next. Rejected
+     * (returns false, no change) unless every āyah in it is already memorized or
+     * strong — āyāt are marked elsewhere, this only confirms completion.
+     */
+    suspend fun markSabaqDone(): Boolean {
+        if (!isSabaqComplete()) return false
+        advanceSabaq()
+        return true
     }
 
     /**
      * Advances the sabaq past any fully-memorized section: the sabaq steps
      * forward by the section length until it lands on a section that still has
-     * an unmemorized ayah, or clears when it runs off the end of the surah.
+     * an unmemorized ayah, or clears when it runs off the end of the surah. Only
+     * called when the user explicitly marks the sabaq done.
      */
-    suspend fun maybeAdvanceSabaq() {
+    private suspend fun advanceSabaq() {
         var range = sabaqRange ?: return
         val len = quranText.surahAyahCount(range.surah)
         val l = sectionLength
@@ -360,7 +365,6 @@ class QuranRepository(context: Context) {
     fun setSabaq(surah: Int, from: Int, to: Int) = settings.setSabaq(surah, from, to)
 
     suspend fun homeData(): HomeData {
-        maybeAdvanceSabaq()
         syncSabaqDrill()
         val today = LocalDate.now()
         return HomeData(

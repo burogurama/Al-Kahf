@@ -279,7 +279,7 @@ private fun SabaqCard(state: HomeUiState, onOpenMushaf: () -> Unit, onMarkSabaq:
                 }
                 AyahBlock(state)
                 ProgressRow(state)
-                ActionRow(onOpenMushaf, onMarkSabaq)
+                ActionRow(state.sabaqComplete, onOpenMushaf, onMarkSabaq)
             }
         }
     }
@@ -341,17 +341,33 @@ private fun ProgressRow(state: HomeUiState) {
 }
 
 @Composable
-private fun ActionRow(onOpenMushaf: () -> Unit, onMarkSabaq: () -> Unit) {
+private fun ActionRow(sabaqComplete: Boolean, onOpenMushaf: () -> Unit, onMarkSabaq: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(top = 13.dp),
         horizontalArrangement = Arrangement.spacedBy(9.dp),
     ) {
-        Button(
+        // While the sabaq isn't fully memorized, "continue learning" is the
+        // primary action and fills the row; once it's done it steps back to make
+        // room for the green Done button.
+        ContinueLearningButton(
             onClick = onOpenMushaf,
-            modifier = Modifier
-                .weight(1f)
+            emphasized = !sabaqComplete,
+            modifier = Modifier.weight(1f),
+        )
+        if (sabaqComplete) {
+            DoneButton(onClick = onMarkSabaq, modifier = Modifier.weight(1f))
+        }
+    }
+}
+
+@Composable
+private fun ContinueLearningButton(onClick: () -> Unit, emphasized: Boolean, modifier: Modifier = Modifier) {
+    if (emphasized) {
+        Button(
+            onClick = onClick,
+            modifier = modifier
                 .height(48.dp)
                 .shadow(
                     elevation = 4.dp,
@@ -365,11 +381,7 @@ private fun ActionRow(onOpenMushaf: () -> Unit, onMarkSabaq: () -> Unit) {
                 contentColor = AlkahfColors.OnAccent,
             ),
         ) {
-            Icon(
-                imageVector = Icons.Filled.PlayArrow,
-                contentDescription = null,
-                modifier = Modifier.size(17.dp),
-            )
+            Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(17.dp))
             Spacer(Modifier.width(8.dp))
             Text(
                 text = stringResource(R.string.home_continue_learning),
@@ -377,22 +389,63 @@ private fun ActionRow(onOpenMushaf: () -> Unit, onMarkSabaq: () -> Unit) {
                 fontWeight = FontWeight.SemiBold,
             )
         }
+    } else {
+        // De-emphasized: still tappable, but faded so the green Done button leads.
         Surface(
-            onClick = onMarkSabaq,
-            modifier = Modifier.size(48.dp),
+            onClick = onClick,
+            modifier = modifier.height(48.dp),
             shape = RoundedCornerShape(14.dp),
-            color = Color.White.copy(alpha = 0.5f),
+            color = Color.Transparent,
             border = BorderStroke(1.dp, AlkahfColors.SecondaryButtonBorder),
         ) {
-            Box(contentAlignment = Alignment.Center) {
+            Row(
+                Modifier.fillMaxSize(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Icon(
-                    imageVector = Icons.Filled.Check,
-                    contentDescription = stringResource(R.string.home_mark_sabaq_memorized),
-                    tint = AlkahfColors.AccentDeep,
-                    modifier = Modifier.size(22.dp),
+                    Icons.Filled.PlayArrow,
+                    contentDescription = null,
+                    tint = AlkahfColors.Accent.copy(alpha = 0.5f),
+                    modifier = Modifier.size(17.dp),
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = stringResource(R.string.home_continue_learning),
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = AlkahfColors.Accent.copy(alpha = 0.5f),
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun DoneButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Button(
+        onClick = onClick,
+        modifier = modifier
+            .height(48.dp)
+            .shadow(
+                elevation = 5.dp,
+                shape = RoundedCornerShape(14.dp),
+                ambientColor = AlkahfColors.AccentDeep.copy(alpha = 0.34f),
+                spotColor = AlkahfColors.AccentDeep.copy(alpha = 0.34f),
+            ),
+        shape = RoundedCornerShape(14.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = AlkahfColors.AccentDeep,
+            contentColor = AlkahfColors.OnAccent,
+        ),
+    ) {
+        Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(19.dp))
+        Spacer(Modifier.width(7.dp))
+        Text(
+            text = stringResource(R.string.home_sabaq_done),
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Bold,
+        )
     }
 }
 

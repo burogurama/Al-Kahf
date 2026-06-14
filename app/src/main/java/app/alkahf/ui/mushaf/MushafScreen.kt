@@ -612,8 +612,6 @@ fun MushafScreen(
                     ids.forEach { menuSession.memStates[it] = state }
                     scope.launch {
                         ids.forEach { mushaf.setAyahState(it, state) }
-                        // Memorizing the sabaq's ayat may complete its section.
-                        mushaf.maybeAdvanceSabaq()
                     }
                     selection = null
                     menuAnchor = null
@@ -637,8 +635,6 @@ fun MushafScreen(
                 onSetState = { state ->
                     scope.launch {
                         mushaf.setSurahState(prompt.first, state)
-                        // Memorizing the sabaq's sūrah may complete its section.
-                        mushaf.maybeAdvanceSabaq()
                         reloadMemStates()
                     }
                     learnSurah = null
