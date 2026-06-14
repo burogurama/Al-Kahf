@@ -123,6 +123,30 @@ data class ReviewPortionEntity(
     @ColumnInfo(name = "due_epoch_day") val dueEpochDay: Long,
 )
 
+/**
+ * The single active khatam (full cover-to-cover recitation) being tracked.
+ * At most one row carries [active] = true, mirroring the single sabaq drill.
+ * Dates are epoch days (LocalDate.toEpochDay), matching the review/practice
+ * tables; [reminderTime] is minutes after midnight like the daily reminders.
+ */
+@Entity(tableName = "khatam")
+data class KhatamEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    /** Juzʼ per day. */
+    val pace: Int = 1,
+    @ColumnInfo(name = "start_date") val startDate: Long,
+    @ColumnInfo(name = "units_completed") val unitsCompleted: Int = 0,
+    @ColumnInfo(name = "last_logged_date") val lastLoggedDate: Long? = null,
+    @ColumnInfo(name = "streak_days") val streakDays: Int = 0,
+    @ColumnInfo(name = "pages_read") val pagesRead: Int = 0,
+    @ColumnInfo(name = "time_read_seconds") val timeReadSeconds: Long = 0,
+    @ColumnInfo(name = "reminder_enabled") val reminderEnabled: Boolean = false,
+    /** Minutes after midnight, or null when no reminder time is set. */
+    @ColumnInfo(name = "reminder_time") val reminderTime: Int? = null,
+    val riwayah: String = "hafs",
+    val active: Boolean = true,
+)
+
 @Dao
 interface UserDao {
     @Insert
@@ -253,6 +277,18 @@ interface UserDao {
 
     @Query("DELETE FROM imported_surahs WHERE reciter_id = :reciterId AND surah = :surah")
     suspend fun deleteImportedSurah(reciterId: Long, surah: Int)
+
+    @Query("SELECT * FROM khatam WHERE active = 1 ORDER BY id DESC LIMIT 1")
+    suspend fun activeKhatam(): KhatamEntity?
+
+    @Insert
+    suspend fun insertKhatam(khatam: KhatamEntity): Long
+
+    @Update
+    suspend fun updateKhatam(khatam: KhatamEntity)
+
+    @Query("DELETE FROM khatam WHERE active = 1")
+    suspend fun deleteActiveKhatam()
 }
 
 @Database(
@@ -266,8 +302,9 @@ interface UserDao {
         TimingTrackEntity::class,
         CustomReciterEntity::class,
         ImportedSurahEntity::class,
+        KhatamEntity::class,
     ],
-    version = 8,
+    version = 9,
     exportSchema = false,
 )
 abstract class UserDatabase : RoomDatabase() {
@@ -282,9 +319,30 @@ abstract class UserDatabase : RoomDatabase() {
             }
         }
 
+        // v9: adds the khatam table (single active cover-to-cover recitation).
+        private val MIGRATION_8_9 = object : androidx.room.migration.Migration(8, 9) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS khatam (" +
+                        "id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, " +
+                        "pace INTEGER NOT NULL DEFAULT 1, " +
+                        "start_date INTEGER NOT NULL, " +
+                        "units_completed INTEGER NOT NULL DEFAULT 0, " +
+                        "last_logged_date INTEGER, " +
+                        "streak_days INTEGER NOT NULL DEFAULT 0, " +
+                        "pages_read INTEGER NOT NULL DEFAULT 0, " +
+                        "time_read_seconds INTEGER NOT NULL DEFAULT 0, " +
+                        "reminder_enabled INTEGER NOT NULL DEFAULT 0, " +
+                        "reminder_time INTEGER, " +
+                        "riwayah TEXT NOT NULL DEFAULT 'hafs', " +
+                        "active INTEGER NOT NULL DEFAULT 1)",
+                )
+            }
+        }
+
         fun open(context: Context): UserDatabase =
             Room.databaseBuilder(context, UserDatabase::class.java, "user.db")
-                .addMigrations(MIGRATION_7_8)
+                .addMigrations(MIGRATION_7_8, MIGRATION_8_9)
                 // Pre-7 schemas have no migration path and may be recreated; from 7
                 // on, a missing migration must fail loudly rather than wipe data.
                 .fallbackToDestructiveMigrationFrom(1, 2, 3, 4, 5, 6)

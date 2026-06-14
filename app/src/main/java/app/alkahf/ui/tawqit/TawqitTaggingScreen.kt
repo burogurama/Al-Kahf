@@ -54,6 +54,7 @@ import app.alkahf.AlkahfApplication
 import app.alkahf.R
 import app.alkahf.data.PageAyah
 import app.alkahf.data.TawqitTrack
+import app.alkahf.ui.rememberSurahNamer
 import app.alkahf.ui.theme.AlkahfColors
 import app.alkahf.ui.theme.LocalQuranFont
 import kotlinx.coroutines.launch
@@ -85,8 +86,10 @@ fun TawqitTaggingScreen(
         }
     }
 
+    val surahName = rememberSurahNamer()
+
     Column(Modifier.fillMaxSize().background(AlkahfColors.PageSurface).statusBarsPadding()) {
-        TaggingTopBar(draft = draft, onClose = onClose, onSave = ::save)
+        TaggingTopBar(draft = draft, surahName = surahName(draft.surah), onClose = onClose, onSave = ::save)
         Column(
             Modifier.weight(1f).verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp, vertical = 14.dp),
@@ -118,7 +121,7 @@ fun TawqitTaggingScreen(
 }
 
 @Composable
-private fun TaggingTopBar(draft: TawqitTrack, onClose: () -> Unit, onSave: () -> Unit) {
+private fun TaggingTopBar(draft: TawqitTrack, surahName: String, onClose: () -> Unit, onSave: () -> Unit) {
     Column {
         Row(
             modifier = Modifier.fillMaxWidth().height(54.dp).padding(horizontal = 10.dp),
@@ -146,7 +149,7 @@ private fun TaggingTopBar(draft: TawqitTrack, onClose: () -> Unit, onSave: () ->
                     text = stringResource(
                         R.string.tawqit_source_subtitle,
                         draft.sourceLabel,
-                        draft.surahNameLatin,
+                        surahName,
                         draft.ayahFrom,
                         draft.ayahTo,
                     ),

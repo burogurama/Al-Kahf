@@ -5,7 +5,10 @@ import app.alkahf.data.review.ReviewGrade
 import app.alkahf.data.audio.AudioStore
 import app.alkahf.data.audio.Reciter
 import app.alkahf.data.user.UserDatabase
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.time.LocalDate
+import java.util.concurrent.ConcurrentHashMap
 
 /** One ayah as rendered on a mushaf page. */
 data class PageAyah(
@@ -168,7 +171,7 @@ data class AyahRange(val surah: Int, val from: Int, val to: Int) {
 }
 
 /** The sabaq summarised for a reminder notification. */
-data class SabaqReference(val surahNameLatin: String, val from: Int, val to: Int)
+data class SabaqReference(val surahName: String, val from: Int, val to: Int)
 
 /** The current sabaq (portion being learned) for the Home hero card. */
 data class SabaqCard(
@@ -226,6 +229,12 @@ data class SurahOption(
     val ayahCount: Int,
 )
 
+/** A sūrah's display name in both languages (riwāyah-correct Arabic + Latin). */
+data class SurahName(
+    val arabic: String,
+    val latin: String,
+)
+
 /** A portion due for murājaʿah, with its text loaded for the self-test. */
 data class ReviewPortion(
     val id: Long,
@@ -235,6 +244,45 @@ data class ReviewPortion(
     val ayahTo: Int,
     val intervalDays: Int,
     val ayahs: List<PageAyah>,
+)
+
+/**
+ * One juzʼ as a khatam reading portion: its first/last āyah and page span in a
+ * given riwāyah. [pageCount] = pageTo - pageFrom + 1.
+ */
+data class KhatamPortion(
+    val juz: Int,
+    val surahFrom: Int, val ayahFrom: Int,
+    val surahTo: Int, val ayahTo: Int,
+    val pageFrom: Int, val pageTo: Int,
+) {
+    val pageCount: Int get() = pageTo - pageFrom + 1
+}
+
+/**
+ * The active khatam, fully resolved for a tracker UI: the stored counters plus
+ * the derived day/finish/pace values and today's portion. Null is returned (not
+ * an instance of this) when there is no active khatam.
+ */
+data class KhatamState(
+    val pace: Int,
+    val startEpochDay: Long,
+    val unitsCompleted: Int,
+    val totalUnits: Int,
+    val currentDay: Int,
+    val todaysPortionJuz: Int,
+    val todaysPortion: KhatamPortion?,
+    val finishEpochDay: Long,
+    val paceStatus: app.alkahf.data.khatam.PaceStatus,
+    val streakDays: Int,
+    val pagesRead: Int,
+    val timeReadSeconds: Long,
+    val ringFraction: Float,
+    val percent: Int,
+    val reminderEnabled: Boolean,
+    val reminderTime: Int?,
+    val riwayah: Riwayah,
+    val isComplete: Boolean,
 )
 
 fun Int.toArabicIndic(): String =
@@ -251,6 +299,7 @@ class QuranRepository(context: Context) {
     private val tawqit = TawqitStore(userDao, quranText)
     private val reciters = ReciterLibrary(AudioStore(context), userDao, quranText, settings, context.filesDir)
     private val presets = LoopPresetStore(userDao, quranText, reciters, settings)
+    private val khatam = KhatamStore(userDao, quranText, settings)
 
     /** Last page open in the Mushaf, so reading resumes where the user left off. */
     var lastMushafPage: Int?
@@ -357,10 +406,14 @@ class QuranRepository(context: Context) {
 
     suspend fun surahAyahCount(surah: Int): Int = quranText.surahAyahCount(surah)
 
-    /** The current sabaq as a display reference, or null when there's no sabaq. */
-    suspend fun sabaqReference(): SabaqReference? {
+    /**
+     * The current sabaq as a display reference, or null when there's no sabaq.
+     * The sūrah name follows the requested language (Arabic from the active DB so
+     * it stays riwāyah-correct), since the notification renders outside Compose.
+     */
+    suspend fun sabaqReference(arabic: Boolean): SabaqReference? {
         val range = sabaqRange ?: return null
-        return SabaqReference(quranText.surahNameLatin(range.surah), range.from, range.to)
+        return SabaqReference(quranText.surahName(range.surah, arabic), range.from, range.to)
     }
 
     fun setSabaq(surah: Int, from: Int, to: Int) = settings.setSabaq(surah, from, to)
@@ -604,6 +657,42 @@ class QuranRepository(context: Context) {
 
     suspend fun surahOptions(): List<SurahOption> = quranText.surahOptions()
 
+    // Process-wide cache of sūrah display names, keyed by the active riwāyah
+    // (Ḥafṣ / Warsh store different vocalised Arabic names). Both languages are
+    // kept so the same load serves an Arabic or a Latin UI. Switching riwāyah
+    // restarts the process, so a single live entry is enough.
+    //
+    // ConcurrentHashMap: the preload coroutine (IO dispatcher) and the UI (main
+    // thread) both touch this, so it must be safe under concurrent access.
+    private val surahNameCache = ConcurrentHashMap<Riwayah, Map<Int, SurahName>>()
+
+    /**
+     * The cached sūrah names for [riwayah], or `null` if the cache has not been
+     * warmed yet. Never blocks: this is safe to call on the main thread / during
+     * composition. Callers that hit `null` should fall back to [loadSurahNames]
+     * (a suspend load) rather than blocking. Returns immediately on a cache hit,
+     * which is the steady state once startup preload has finished.
+     */
+    fun cachedSurahNames(riwayah: Riwayah = this.riwayah): Map<Int, SurahName>? =
+        surahNameCache[riwayah]
+
+    /**
+     * Loads the sūrah names for [riwayah] off the main thread and caches them.
+     * The 114-row read is done once; later calls hit [cachedSurahNames]. Suspends
+     * rather than blocking, so it is safe from a coroutine launched during
+     * composition.
+     */
+    suspend fun loadSurahNames(riwayah: Riwayah = this.riwayah): Map<Int, SurahName> =
+        surahNameCache[riwayah] ?: withContext(Dispatchers.IO) {
+            quranText.surahOptions(riwayah)
+                .associate { it.number to SurahName(it.nameArabic, it.nameLatin) }
+        }.also { surahNameCache[riwayah] = it }
+
+    /** Warms the cache off the main thread so the first UI read hits memory. */
+    suspend fun preloadSurahNames() {
+        loadSurahNames()
+    }
+
     suspend fun ayahsForRange(
         surah: Int,
         from: Int,
@@ -658,6 +747,49 @@ class QuranRepository(context: Context) {
         review.logPractice(type, ayahCount, durationMs)
 
     suspend fun progressSnapshot(): ProgressSnapshot = review.progressSnapshot()
+
+    // --- Khatam (a full cover-to-cover recitation; at most one active) ---
+
+    /** The portion descriptor for a juzʼ (1–30) in the active (or given) reading. */
+    suspend fun khatamPortion(juz: Int, riwayah: Riwayah = this.riwayah): KhatamPortion? =
+        quranText.khatamPortion(juz, riwayah)
+
+    /** The active khatam fully resolved for the tracker, or null when none. */
+    suspend fun activeKhatam(): KhatamState? = khatam.activeKhatam()
+
+    /**
+     * Programs a new active khatam at [pace] juzʼ/day, starting today, with its
+     * daily reminder. The reminder is mirrored into prefs so [ReminderScheduler]
+     * can read it synchronously.
+     */
+    suspend fun programKhatam(
+        pace: Int,
+        reminderEnabled: Boolean = true,
+        reminderMinute: Int = KhatamStore.DEFAULT_REMINDER_MINUTE,
+    ): KhatamState = khatam.programKhatam(pace, reminderEnabled, reminderMinute)
+
+    /** Logs today's khatam portion (advances a juzʼ, updates streak/pages). */
+    suspend fun logTodayKhatamPortion(): KhatamState? = khatam.logTodayPortion()
+
+    /** Removes the active khatam. */
+    suspend fun cancelKhatam() = khatam.cancelKhatam()
+
+    /** Re-syncs the khatam reminder scheduling mirror from its entity (startup). */
+    suspend fun reconcileKhatamReminder() = khatam.reconcileKhatamReminder()
+
+    /** Updates the active khatam's reminder (entity + the prefs scheduling mirror). */
+    suspend fun setKhatamReminder(enabled: Boolean, minute: Int) =
+        khatam.setKhatamReminder(enabled, minute)
+
+    /** Whether the active khatam's daily reminder is armed (prefs scheduling mirror). */
+    val khatamReminderEnabled: Boolean get() = settings.khatamReminderEnabled
+
+    /** The active khatam's reminder time as minutes after midnight (prefs mirror). */
+    val khatamReminderMinute: Int get() = settings.khatamReminderMinute
+
+    /** Today's khatam portion for the reminder notification, or null when none/complete. */
+    suspend fun khatamPortionReminderRef(arabic: Boolean): KhatamPortionRef? =
+        khatam.khatamPortionReminderRef(arabic)
 
     companion object {
         const val PAGE_COUNT = 604

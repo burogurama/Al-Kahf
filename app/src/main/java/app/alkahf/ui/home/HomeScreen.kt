@@ -1,6 +1,7 @@
 package app.alkahf.ui.home
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -22,6 +23,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.outlined.MenuBook
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.outlined.Settings
@@ -37,7 +40,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -70,6 +76,8 @@ fun HomeScreen(
     onOpenProgress: () -> Unit = {},
     onOpenLibrary: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
+    onBeginKhatam: () -> Unit = {},
+    onOpenKhatam: () -> Unit = {},
 ) {
     Scaffold(
         containerColor = AlkahfColors.Paper,
@@ -94,6 +102,7 @@ fun HomeScreen(
             verticalArrangement = Arrangement.spacedBy(9.dp),
         ) {
             HomeHeader(state, onOpenSettings)
+            KhatamCard(state, onBeginKhatam, onOpenKhatam)
             SabaqCard(state, onOpenSabaq, onMarkSabaq)
             MurajaahCard(state, onOpenReview)
             if (state.hasDrill) {
@@ -627,6 +636,200 @@ private fun ResumeDrillCard(state: HomeUiState, onOpenLoop: () -> Unit) {
                 tint = AlkahfColors.Chevron,
             )
         }
+    }
+}
+
+@Composable
+private fun KhatamCard(state: HomeUiState, onBegin: () -> Unit, onOpen: () -> Unit) {
+    if (state.hasKhatam) {
+        ActiveKhatamCard(state, onOpen)
+    } else {
+        EmptyKhatamCard(onBegin)
+    }
+}
+
+@Composable
+private fun EmptyKhatamCard(onBegin: () -> Unit) {
+    Surface(
+        shape = RoundedCornerShape(24.dp),
+        color = AlkahfColors.Surface,
+        border = BorderStroke(1.dp, AlkahfColors.KhatamCardBorder),
+    ) {
+        Column(Modifier.padding(20.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Outlined.MenuBook,
+                    contentDescription = null,
+                    tint = AlkahfColors.GoldText,
+                    modifier = Modifier.size(18.dp),
+                )
+                Text(
+                    text = stringResource(R.string.khatam_kicker),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.4.sp,
+                    color = AlkahfColors.KhatamGoldDeep,
+                    modifier = Modifier.padding(start = 8.dp),
+                )
+            }
+            // Empty 30-juzʼ dashed track.
+            Surface(
+                shape = RoundedCornerShape(11.dp),
+                color = AlkahfColors.KhatamCardTint.copy(alpha = 0.45f),
+                border = BorderStroke(1.dp, AlkahfColors.KhatamBorderSoft),
+                modifier = Modifier.fillMaxWidth().padding(top = 14.dp),
+            ) {
+                CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+                    Row(
+                        modifier = Modifier.padding(8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    ) {
+                        repeat(30) {
+                            Box(
+                                Modifier
+                                    .weight(1f)
+                                    .height(22.dp)
+                                    .clip(RoundedCornerShape(3.dp))
+                                    .background(AlkahfColors.KhatamUpcoming),
+                            )
+                        }
+                    }
+                }
+            }
+            Text(
+                text = stringResource(R.string.khatam_empty_caption),
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = AlkahfColors.InkFainter,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+            )
+            Text(
+                text = stringResource(R.string.khatam_empty_headline),
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Bold,
+                color = AlkahfColors.Ink,
+                lineHeight = 28.sp,
+                modifier = Modifier.padding(top = 14.dp),
+            )
+            Text(
+                text = stringResource(R.string.khatam_empty_sub),
+                fontSize = 13.5.sp,
+                fontWeight = FontWeight.Medium,
+                color = AlkahfColors.InkSecondary,
+                modifier = Modifier.padding(top = 6.dp),
+            )
+            Button(
+                onClick = onBegin,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 16.dp)
+                    .height(50.dp)
+                    .shadow(
+                        elevation = 4.dp,
+                        shape = RoundedCornerShape(14.dp),
+                        ambientColor = AlkahfColors.Accent.copy(alpha = 0.26f),
+                        spotColor = AlkahfColors.Accent.copy(alpha = 0.26f),
+                    ),
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = AlkahfColors.Accent,
+                    contentColor = AlkahfColors.OnAccent,
+                ),
+            ) {
+                Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = stringResource(R.string.khatam_begin_cta),
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ActiveKhatamCard(state: HomeUiState, onOpen: () -> Unit) {
+    Surface(
+        onClick = onOpen,
+        shape = RoundedCornerShape(24.dp),
+        color = AlkahfColors.Surface,
+        border = BorderStroke(1.dp, AlkahfColors.KhatamCardBorder),
+    ) {
+        Row(
+            modifier = Modifier
+                .background(
+                    androidx.compose.ui.graphics.Brush.linearGradient(
+                        listOf(AlkahfColors.KhatamCardTint, AlkahfColors.Surface),
+                    ),
+                )
+                .padding(horizontal = 18.dp, vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            MiniKhatamRing(state.khatamRingFraction, state.khatamPercent)
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.khatam_today_juz, state.khatamTodayJuz),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.4.sp,
+                    color = AlkahfColors.KhatamGoldDeep,
+                )
+                Text(
+                    text = state.khatamTodayReference,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = AlkahfColors.Ink,
+                    // The compact card (ring + chevron) is too narrow for a long
+                    // range on one line; let it wrap so the end āyah isn't clipped.
+                    maxLines = 2,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 3.dp),
+                )
+                Text(
+                    text = stringResource(R.string.khatam_resume_start),
+                    fontSize = 12.5.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = AlkahfColors.Accent,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
+            Icon(
+                imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                contentDescription = null,
+                tint = AlkahfColors.Chevron,
+            )
+        }
+    }
+}
+
+@Composable
+private fun MiniKhatamRing(fraction: Float, percent: Int) {
+    val track = AlkahfColors.KhatamRingTrack
+    val fill = AlkahfColors.KhatamProgressFill
+    Box(Modifier.size(56.dp), contentAlignment = Alignment.Center) {
+        Canvas(Modifier.size(56.dp)) {
+            val strokePx = 7.dp.toPx()
+            val inset = strokePx / 2f
+            val arcSize = androidx.compose.ui.geometry.Size(size.width - strokePx, size.height - strokePx)
+            val topLeft = Offset(inset, inset)
+            drawArc(track, 0f, 360f, false, topLeft, arcSize, style = Stroke(width = strokePx))
+            val sweep = fraction.coerceIn(0f, 1f) * 360f
+            if (sweep > 0f) {
+                drawArc(
+                    fill, -90f, sweep, false, topLeft, arcSize,
+                    style = Stroke(width = strokePx, cap = StrokeCap.Round),
+                )
+            }
+        }
+        Text(
+            text = stringResource(R.string.khatam_percent, percent),
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold,
+            color = AlkahfColors.KhatamGoldDeep,
+        )
     }
 }
 

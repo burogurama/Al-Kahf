@@ -10,12 +10,12 @@ import androidx.core.app.NotificationManagerCompat
 import app.alkahf.LocaleManager
 import app.alkahf.MainActivity
 import app.alkahf.R
-import app.alkahf.data.SabaqReference
+import app.alkahf.data.KhatamPortionRef
 
-/** Builds and posts the daily hifz reminder, including its "Listen" action. */
-object HifzNotifier {
-    private const val CHANNEL_ID = "hifz_reminders"
-    private const val NOTIFICATION_ID = 4101
+/** Builds and posts the daily khatam reminder, including its "Start reading" action. */
+object KhatamNotifier {
+    private const val CHANNEL_ID = "khatam_reminders"
+    private const val NOTIFICATION_ID = 4102
 
     fun ensureChannel(context: Context) {
         val manager = context.getSystemService(NotificationManager::class.java)
@@ -24,40 +24,39 @@ object HifzNotifier {
         manager.createNotificationChannel(
             NotificationChannel(
                 CHANNEL_ID,
-                ctx.getString(R.string.notify_channel_name),
+                ctx.getString(R.string.khatam_notify_channel_name),
                 NotificationManager.IMPORTANCE_DEFAULT,
-            ).apply { description = ctx.getString(R.string.notify_channel_desc) },
+            ).apply { description = ctx.getString(R.string.khatam_notify_channel_desc) },
         )
     }
 
-    fun showReminder(context: Context, sabaq: SabaqReference?) {
+    fun showReminder(context: Context, portion: KhatamPortionRef) {
         ensureChannel(context)
         if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) return
         val ctx = LocaleManager.apply(context)
 
-        val body = if (sabaq != null) {
-            ctx.getString(R.string.notify_reminder_body, sabaq.surahName, sabaq.from, sabaq.to)
-        } else {
-            ctx.getString(R.string.notify_reminder_body_empty)
-        }
+        val body = ctx.getString(
+            R.string.khatam_notify_body,
+            portion.juz,
+            portion.surahFromName,
+            portion.ayahFrom,
+            portion.surahToName,
+            portion.ayahTo,
+        )
 
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle(ctx.getString(R.string.notify_reminder_title))
+            .setContentTitle(ctx.getString(R.string.khatam_notify_title))
             .setContentText(body)
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
             .setAutoCancel(true)
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
-            .setContentIntent(openAppIntent(context, play = false))
-
-        // Listen only makes sense when there's a sabaq drill to play.
-        if (sabaq != null) {
-            builder.addAction(
+            .setContentIntent(openKhatamIntent(context, requestCode = 0))
+            .addAction(
                 R.drawable.ic_notification,
-                ctx.getString(R.string.notify_action_listen),
-                openAppIntent(context, play = true),
+                ctx.getString(R.string.khatam_notify_action_read),
+                openKhatamIntent(context, requestCode = 1),
             )
-        }
 
         try {
             NotificationManagerCompat.from(context).notify(NOTIFICATION_ID, builder.build())
@@ -66,14 +65,16 @@ object HifzNotifier {
         }
     }
 
-    private fun openAppIntent(context: Context, play: Boolean): PendingIntent {
+    private fun openKhatamIntent(context: Context, requestCode: Int): PendingIntent {
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
-            if (play) putExtra(MainActivity.EXTRA_PLAY_DRILL, true)
+            putExtra(MainActivity.EXTRA_OPEN_KHATAM, true)
         }
         return PendingIntent.getActivity(
             context,
-            if (play) 1 else 0, // distinct request codes so the two intents stay separate
+            // Distinct request codes so the tap and action intents stay separate;
+            // also distinct from HifzNotifier's 0/1 by virtue of the different action.
+            200 + requestCode,
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )

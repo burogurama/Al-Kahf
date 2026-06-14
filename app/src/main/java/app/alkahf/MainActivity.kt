@@ -12,6 +12,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import app.alkahf.notify.HifzNotifier
+import app.alkahf.notify.KhatamNotifier
 import app.alkahf.notify.ReminderScheduler
 import androidx.compose.runtime.CompositionLocalProvider
 import app.alkahf.ui.AlkahfApp
@@ -24,6 +25,9 @@ class MainActivity : ComponentActivity() {
     // Bumped whenever a "Listen" reminder action launches the activity, so the
     // composition navigates into the sabaq drill and starts playing.
     private var playDrillSignal = mutableIntStateOf(0)
+    // Bumped whenever a khatam reminder launches the activity, so the composition
+    // navigates into the Khatam tracker.
+    private var openKhatamSignal = mutableIntStateOf(0)
 
     override fun attachBaseContext(newBase: Context) {
         super.attachBaseContext(LocaleManager.apply(newBase))
@@ -34,8 +38,10 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         // Keep the reminder channel and alarms alive across app updates / installs.
         HifzNotifier.ensureChannel(this)
+        KhatamNotifier.ensureChannel(this)
         ReminderScheduler.reschedule(this)
         if (intent?.getBooleanExtra(EXTRA_PLAY_DRILL, false) == true) playDrillSignal.intValue++
+        if (intent?.getBooleanExtra(EXTRA_OPEN_KHATAM, false) == true) openKhatamSignal.intValue++
 
         val repository = (application as AlkahfApplication).repository
         setContent {
@@ -44,6 +50,7 @@ class MainActivity : ComponentActivity() {
                 CompositionLocalProvider(LocalQuranFont provides quranFontFor(repository.riwayah)) {
                     AlkahfApp(
                         playDrillSignal = playDrillSignal.intValue,
+                        openKhatamSignal = openKhatamSignal.intValue,
                         onThemeModeChange = { mode ->
                             themeMode = mode
                             repository.themeMode = mode.name.lowercase()
@@ -62,6 +69,7 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         if (intent.getBooleanExtra(EXTRA_PLAY_DRILL, false)) playDrillSignal.intValue++
+        if (intent.getBooleanExtra(EXTRA_OPEN_KHATAM, false)) openKhatamSignal.intValue++
     }
 
     private fun toThemeMode(value: String): ThemeMode = when (value) {
@@ -72,5 +80,6 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         const val EXTRA_PLAY_DRILL = "app.alkahf.extra.PLAY_DRILL"
+        const val EXTRA_OPEN_KHATAM = "app.alkahf.extra.OPEN_KHATAM"
     }
 }

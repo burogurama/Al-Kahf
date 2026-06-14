@@ -74,6 +74,7 @@ import app.alkahf.data.ReviewPortion
 import app.alkahf.data.WordStumble
 import app.alkahf.data.review.ReviewGrade
 import app.alkahf.data.review.ReviewScheduler
+import app.alkahf.ui.rememberSurahNamer
 import app.alkahf.ui.theme.AlkahfColors
 import app.alkahf.ui.theme.LocalQuranFont
 import kotlinx.coroutines.launch
@@ -87,6 +88,7 @@ fun ReviewScreen(onBack: () -> Unit = {}) {
         ReviewController((context.applicationContext as AlkahfApplication).repository)
     }
     val scope = rememberCoroutineScope()
+    val surahName = rememberSurahNamer()
 
     val portions by controller.portions.collectAsState()
     LaunchedEffect(Unit) { controller.load() }
@@ -130,7 +132,7 @@ fun ReviewScreen(onBack: () -> Unit = {}) {
         }
 
         val portion = queue[index]
-        QueueStrip(total = queue.size, currentIndex = index, surahLatin = portion.surahNameLatin)
+        QueueStrip(total = queue.size, currentIndex = index, surahName = surahName(portion.surah))
 
         val revealedCounts = remember(portion.id) { mutableStateMapOf<Int, Int>() }
         val stumbles = remember(portion.id) { mutableStateListOf<WordStumble>() }
@@ -144,6 +146,7 @@ fun ReviewScreen(onBack: () -> Unit = {}) {
 
         PassageCard(
             portion = portion,
+            surahName = surahName(portion.surah),
             revealedCounts = revealedCounts,
             stumbles = stumbles,
             fullyRevealed = fullyRevealed,
@@ -174,7 +177,7 @@ fun ReviewScreen(onBack: () -> Unit = {}) {
                 stumbleCount = stumbles.size,
                 growthFactor = growthFactor,
                 autoLower = autoLower,
-                nextPortionName = queue.getOrNull(index + 1)?.surahNameLatin,
+                nextPortionName = queue.getOrNull(index + 1)?.let { surahName(it.surah) },
                 remainingAfter = queue.size - index - 1,
                 onChange = { grade = null },
                 onNext = {
@@ -228,7 +231,7 @@ private fun ReviewTopBar(subtitle: String, onBack: () -> Unit) {
 }
 
 @Composable
-private fun QueueStrip(total: Int, currentIndex: Int, surahLatin: String) {
+private fun QueueStrip(total: Int, currentIndex: Int, surahName: String) {
     Column(Modifier.padding(start = 22.dp, top = 2.dp, end = 22.dp, bottom = 12.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             repeat(total) { i ->
@@ -252,7 +255,7 @@ private fun QueueStrip(total: Int, currentIndex: Int, surahLatin: String) {
                     R.string.review_portion_of,
                     currentIndex + 1,
                     total,
-                    surahLatin,
+                    surahName,
                 ),
                 fontSize = 11.5.sp,
                 fontWeight = FontWeight.SemiBold,
@@ -273,6 +276,7 @@ private fun QueueStrip(total: Int, currentIndex: Int, surahLatin: String) {
 @Composable
 private fun PassageCard(
     portion: ReviewPortion,
+    surahName: String,
     revealedCounts: MutableMap<Int, Int>,
     stumbles: MutableList<WordStumble>,
     fullyRevealed: Boolean,
@@ -293,7 +297,7 @@ private fun PassageCard(
                 Text(
                     text = stringResource(
                         R.string.review_surah_header,
-                        portion.surahNameLatin.uppercase(),
+                        surahName.uppercase(),
                         portion.ayahFrom,
                         portion.ayahTo,
                     ),

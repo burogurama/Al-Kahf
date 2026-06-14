@@ -47,6 +47,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.alkahf.AlkahfApplication
 import app.alkahf.R
+import app.alkahf.ui.rememberSurahNamer
 import app.alkahf.data.LoopPreset
 import app.alkahf.data.QuranRepository
 import app.alkahf.data.ReciterStatus
@@ -77,6 +78,8 @@ fun LibraryScreen(
     var showNewReciter by remember { mutableStateOf(false) }
     // True after a create attempt whose name was already taken.
     var reciterError by remember { mutableStateOf(false) }
+
+    val surahName = rememberSurahNamer()
 
     androidx.compose.runtime.LaunchedEffect(Unit) { controller.load() }
 
@@ -116,7 +119,11 @@ fun LibraryScreen(
             NewReciterButton { showNewReciter = true; reciterError = false }
             SectionCaption(stringResource(R.string.library_section_drill_presets))
             presets.forEach { preset ->
-                PresetRow(preset = preset, onClick = { onOpenPreset(preset.id) })
+                PresetRow(
+                    preset = preset,
+                    surahName = surahName(preset.surah),
+                    onClick = { onOpenPreset(preset.id) },
+                )
             }
             NewPresetButton(onClick = onNewPreset)
             Box(Modifier.height(12.dp))
@@ -451,7 +458,7 @@ private fun reciterSubtitle(reciter: ReciterStatus): String = when {
 }
 
 @Composable
-private fun PresetRow(preset: LoopPreset, onClick: () -> Unit) {
+private fun PresetRow(preset: LoopPreset, surahName: String, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(18.dp),
@@ -480,7 +487,13 @@ private fun PresetRow(preset: LoopPreset, onClick: () -> Unit) {
                     horizontalArrangement = Arrangement.spacedBy(7.dp),
                 ) {
                     Text(
-                        text = preset.name,
+                        // The stored name bakes in the Latin sūrah name; re-derive the
+                        // title from the sūrah number so it follows the active locale.
+                        text = if (preset.isDefault) {
+                            surahName
+                        } else {
+                            stringResource(R.string.loop_preset_name, surahName, preset.ayahFrom, preset.ayahTo)
+                        },
                         fontSize = 14.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = AlkahfColors.Ink,

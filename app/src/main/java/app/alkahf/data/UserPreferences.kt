@@ -91,6 +91,26 @@ class UserPreferences(context: Context) {
             .distinct()
             .sorted()
 
+    /**
+     * Scheduling mirror of the active khatam's reminder (the [app.alkahf.data.user.KhatamEntity]
+     * stays the display source of truth). [ReminderScheduler] reads prefs synchronously,
+     * so the khatam reminder is mirrored here; [KhatamStore] keeps the two in lock-step.
+     */
+    val khatamReminderEnabled: Boolean get() = prefs.getBoolean(KEY_KHATAM_REMINDER_ON, false)
+
+    /** Khatam reminder time as minutes after midnight (default 05:10 = 310). */
+    val khatamReminderMinute: Int
+        get() = prefs.getInt(KEY_KHATAM_REMINDER_MINUTE, DEFAULT_KHATAM_REMINDER_MINUTE)
+            .coerceIn(0, 1439)
+
+    /** Writes the khatam reminder scheduling mirror. */
+    fun setKhatamReminderMirror(enabled: Boolean, minute: Int) {
+        prefs.edit()
+            .putBoolean(KEY_KHATAM_REMINDER_ON, enabled)
+            .putInt(KEY_KHATAM_REMINDER_MINUTE, minute.coerceIn(0, 1439))
+            .apply()
+    }
+
     fun settings(): SettingsData = SettingsData(
         themeMode = themeMode,
         appLanguage = appLanguage,
@@ -144,5 +164,9 @@ class UserPreferences(context: Context) {
         private const val KEY_REMINDER_TIMES = "reminder_times"
         // A single morning nudge by default (07:30 = 450 minutes).
         private const val DEFAULT_REMINDER_TIMES = "450"
+        private const val KEY_KHATAM_REMINDER_ON = "khatam_reminder_enabled"
+        private const val KEY_KHATAM_REMINDER_MINUTE = "khatam_reminder_minute"
+        // Default khatam nudge after Fajr (05:10 = 310 minutes).
+        private const val DEFAULT_KHATAM_REMINDER_MINUTE = 310
     }
 }

@@ -33,6 +33,15 @@ interface QuranDao {
     @Query("SELECT audio_from, audio_to FROM ayahs WHERE id = :id")
     suspend fun audioRange(id: Int): AudioRange?
 
+    // The juzʼ's span: its first/last āyah (by id order) and its page range,
+    // used to resolve a khatam portion. Page numbering differs per riwāyah, so
+    // this is read from whichever DB the call targets.
+    @Query(
+        "SELECT MIN(surah * 1000 + number) AS first_id, MAX(surah * 1000 + number) AS last_id, " +
+            "MIN(page) AS page_from, MAX(page) AS page_to FROM ayahs WHERE juz = :juz",
+    )
+    suspend fun juzSpan(juz: Int): JuzSpan?
+
     // Reverse map (Hafs āyah → this DB's āyah): the lowest/highest āyah whose
     // audio range covers a given Hafs-numbered āyah, for converting ranges.
     @Query("SELECT number FROM ayahs WHERE surah = :surah AND :hafsAyah BETWEEN audio_from AND audio_to ORDER BY number ASC LIMIT 1")
@@ -49,4 +58,12 @@ data class AyahLocation(val id: Int, val page: Int, val juz: Int)
 data class AudioRange(
     @ColumnInfo(name = "audio_from") val from: Int,
     @ColumnInfo(name = "audio_to") val to: Int,
+)
+
+/** A juzʼ's bounds: first/last āyah id (surah * 1000 + number) and its page span. */
+data class JuzSpan(
+    @ColumnInfo(name = "first_id") val firstId: Int,
+    @ColumnInfo(name = "last_id") val lastId: Int,
+    @ColumnInfo(name = "page_from") val pageFrom: Int,
+    @ColumnInfo(name = "page_to") val pageTo: Int,
 )

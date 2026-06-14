@@ -19,7 +19,8 @@ class QuranTextStore(context: Context, private val riwayahProvider: () -> Riwaya
     private val warshDb by lazy { QuranDatabase.openFor(context, "warsh") }
     private fun daoFor(riwayah: Riwayah) =
         (if (riwayah == Riwayah.WARSH) warshDb else hafsDb).quranDao()
-    private val riwayah: Riwayah get() = riwayahProvider()
+    /** The currently active reading, for callers that default to it. */
+    val riwayah: Riwayah get() = riwayahProvider()
     private val quranDao get() = daoFor(riwayah)
     private var cachedHafsBasmala: String? = null
 
@@ -29,14 +30,22 @@ class QuranTextStore(context: Context, private val riwayahProvider: () -> Riwaya
 
     suspend fun surahNameLatin(surah: Int): String = quranDao.surah(surah).nameLatin
 
+    /**
+     * The sūrah's display name in the given language: the active DB's Arabic name
+     * (riwāyah-correct, fully vocalised) when [arabic], else the Latin one.
+     */
+    suspend fun surahName(surah: Int, arabic: Boolean): String =
+        quranDao.surah(surah).let { if (arabic) it.nameArabic else it.nameLatin }
+
     suspend fun pageOfAyah(surah: Int, ayah: Int): Int = quranDao.pageOfAyahId(surah * 1000 + ayah)
 
     suspend fun firstPageOfSurah(surah: Int): Int = quranDao.firstPageOfSurah(surah)
 
     suspend fun ayahLocations(): List<AyahLocation> = quranDao.ayahLocations()
 
-    suspend fun surahOptions(): List<SurahOption> =
-        quranDao.allSurahs().map { SurahOption(it.number, it.nameLatin, it.nameArabic, it.ayahCount) }
+    suspend fun surahOptions(riwayah: Riwayah = this.riwayah): List<SurahOption> =
+        daoFor(riwayah).allSurahs()
+            .map { SurahOption(it.number, it.nameLatin, it.nameArabic, it.ayahCount) }
 
     suspend fun allSurahs(): List<SurahEntity> = quranDao.allSurahs()
 
@@ -80,6 +89,26 @@ class QuranTextStore(context: Context, private val riwayahProvider: () -> Riwaya
             juz = first.juz,
             hizb = (first.hizbQuarter - 1) / 4 + 1,
             groups = groups,
+        )
+    }
+
+    /**
+     * The portion descriptor for a single juzʼ (1–30): its first and last āyah
+     * (by id order) and its page span, in the given reading. Page numbering
+     * differs between riwāyāt, so this defaults to the active reading but accepts
+     * an explicit one. Returns null only for an out-of-range juzʼ.
+     */
+    suspend fun khatamPortion(juz: Int, riwayah: Riwayah = this.riwayah): KhatamPortion? {
+        if (juz < 1 || juz > 30) return null
+        val span = daoFor(riwayah).juzSpan(juz) ?: return null
+        return KhatamPortion(
+            juz = juz,
+            surahFrom = span.firstId / 1000,
+            ayahFrom = span.firstId % 1000,
+            surahTo = span.lastId / 1000,
+            ayahTo = span.lastId % 1000,
+            pageFrom = span.pageFrom,
+            pageTo = span.pageTo,
         )
     }
 

@@ -29,6 +29,14 @@ data class HomeUiState(
     val drillPresetDetail: String = "",
     val weekSummary: String = "",
     val weekDays: List<WeekDay> = emptyList(),
+    // Khatam entry card. When [hasKhatam] is false the card invites the user to
+    // begin one; when true it's a compact resume summary that deep-links to the
+    // tracker.
+    val hasKhatam: Boolean = false,
+    val khatamPercent: Int = 0,
+    val khatamRingFraction: Float = 0f,
+    val khatamTodayReference: String = "",
+    val khatamTodayJuz: Int = 0,
 ) {
     val memorizedInSabaq: Int
         get() = sabaqAyahStates.count {

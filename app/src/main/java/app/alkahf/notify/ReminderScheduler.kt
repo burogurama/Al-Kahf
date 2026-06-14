@@ -17,9 +17,13 @@ import java.util.Calendar
  */
 object ReminderScheduler {
     const val ACTION_FIRE = "app.alkahf.action.HIFZ_REMINDER"
+    const val ACTION_FIRE_KHATAM = "app.alkahf.action.KHATAM_REMINDER"
 
     /** Upper bound on how many reminder slots we manage (and cancel). */
     const val MAX_SLOTS = 12
+
+    /** Dedicated request code for the khatam alarm, clearly outside the hifz slot range. */
+    private const val KHATAM_SLOT = 100
 
     /** Cancels every reminder alarm, then re-arms them from the saved config. */
     fun reschedule(context: Context) {
@@ -28,12 +32,24 @@ object ReminderScheduler {
         // Always clear all slots first so removed/disabled times don't linger.
         for (slot in 0 until MAX_SLOTS) am.cancel(pendingIntent(context, slot, null))
 
-        if (!app.repository.remindersEnabled) return
-        app.repository.reminderTimes.take(MAX_SLOTS).forEachIndexed { slot, minute ->
+        if (app.repository.remindersEnabled) {
+            app.repository.reminderTimes.take(MAX_SLOTS).forEachIndexed { slot, minute ->
+                am.setAndAllowWhileIdle(
+                    AlarmManager.RTC_WAKEUP,
+                    nextTriggerMillis(minute),
+                    pendingIntent(context, slot, minute),
+                )
+            }
+        }
+
+        // The khatam reminder is independent of the hifz reminders: always clear it,
+        // then re-arm one daily alarm when the active khatam's reminder is enabled.
+        am.cancel(khatamPendingIntent(context))
+        if (app.repository.khatamReminderEnabled) {
             am.setAndAllowWhileIdle(
                 AlarmManager.RTC_WAKEUP,
-                nextTriggerMillis(minute),
-                pendingIntent(context, slot, minute),
+                nextTriggerMillis(app.repository.khatamReminderMinute),
+                khatamPendingIntent(context),
             )
         }
     }
@@ -57,6 +73,16 @@ object ReminderScheduler {
         return PendingIntent.getBroadcast(
             context,
             slot,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+    }
+
+    private fun khatamPendingIntent(context: Context): PendingIntent {
+        val intent = Intent(context, ReminderReceiver::class.java).setAction(ACTION_FIRE_KHATAM)
+        return PendingIntent.getBroadcast(
+            context,
+            KHATAM_SLOT,
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )

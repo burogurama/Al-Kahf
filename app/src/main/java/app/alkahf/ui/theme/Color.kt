@@ -79,6 +79,17 @@ data class Palette(
     val AyahHighlightFill: Color,
     val PlayTile: Color,
     val PlayTileInk: Color,
+    val KhatamGoldDeep: Color,
+    val KhatamGoldBorder: Color,
+    val KhatamProgressFill: Color,
+    val KhatamToday: Color,
+    val KhatamCardTint: Color,
+    val KhatamInsetTint: Color,
+    val KhatamCardBorder: Color,
+    val KhatamBorderSoft: Color,
+    val KhatamRingTrack: Color,
+    val KhatamUpcoming: Color,
+    val ModalScrim: Color,
 )
 
 val LightPalette = Palette(
@@ -150,6 +161,17 @@ val LightPalette = Palette(
     AyahHighlightFill = Color(0xFFD6E8DF),
     PlayTile = Color(0xFF2A2620),
     PlayTileInk = Color(0xFFF5F0E6),
+    KhatamGoldDeep = Color(0xFF9A732F),
+    KhatamGoldBorder = Color(0xFFC99A45),
+    KhatamProgressFill = Color(0xFFBF9038),
+    KhatamToday = Color(0xFFE6C36C),
+    KhatamCardTint = Color(0xFFFBF3DF),
+    KhatamInsetTint = Color(0xFFF5ECD9),
+    KhatamCardBorder = Color(0xFFEAD9B4),
+    KhatamBorderSoft = Color(0xFFE0CFA3),
+    KhatamRingTrack = Color(0xFFEEE2C6),
+    KhatamUpcoming = Color(0xFFEBE3D2),
+    ModalScrim = Color(0x6B1C1810),
 )
 
 val DarkPalette = Palette(
@@ -221,6 +243,17 @@ val DarkPalette = Palette(
     AyahHighlightFill = Color(0xFF23362F),
     PlayTile = Color(0xFF2E2A20),
     PlayTileInk = Color(0xFFEDE5D2),
+    KhatamGoldDeep = Color(0xFFD9A45C),
+    KhatamGoldBorder = Color(0xFFB78A48),
+    KhatamProgressFill = Color(0xFFCB9A4A),
+    KhatamToday = Color(0xFFEACB7C),
+    KhatamCardTint = Color(0xFF2A2318),
+    KhatamInsetTint = Color(0xFF241F15),
+    KhatamCardBorder = Color(0xFF463A26),
+    KhatamBorderSoft = Color(0xFF3C3221),
+    KhatamRingTrack = Color(0xFF332E22),
+    KhatamUpcoming = Color(0xFF38331F),
+    ModalScrim = Color(0x99000000),
 )
 
 object AlkahfColors {
@@ -299,4 +332,15 @@ object AlkahfColors {
     val AyahHighlightFill get() = palette.value.AyahHighlightFill
     val PlayTile get() = palette.value.PlayTile
     val PlayTileInk get() = palette.value.PlayTileInk
+    val KhatamGoldDeep get() = palette.value.KhatamGoldDeep
+    val KhatamGoldBorder get() = palette.value.KhatamGoldBorder
+    val KhatamProgressFill get() = palette.value.KhatamProgressFill
+    val KhatamToday get() = palette.value.KhatamToday
+    val KhatamCardTint get() = palette.value.KhatamCardTint
+    val KhatamInsetTint get() = palette.value.KhatamInsetTint
+    val KhatamCardBorder get() = palette.value.KhatamCardBorder
+    val KhatamBorderSoft get() = palette.value.KhatamBorderSoft
+    val KhatamRingTrack get() = palette.value.KhatamRingTrack
+    val KhatamUpcoming get() = palette.value.KhatamUpcoming
+    val ModalScrim get() = palette.value.ModalScrim
 }

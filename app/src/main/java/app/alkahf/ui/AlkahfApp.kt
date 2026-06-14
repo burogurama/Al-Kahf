@@ -3,6 +3,7 @@ package app.alkahf.ui
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -49,9 +50,17 @@ private sealed interface Screen {
     data class ReciterDownloads(val reciter: ReciterStatus) : Screen
     data class TawqitTagging(val draft: TawqitTrack) : Screen
     object Settings : Screen
+    object KhatamProgram : Screen
+    object KhatamTracker : Screen
+    object KhatamPortion : Screen
 }
 
-private fun buildHomeUiState(res: Resources, data: HomeData): HomeUiState {
+private fun buildHomeUiState(
+    res: Resources,
+    data: HomeData,
+    surahName: (Int) -> String,
+    khatam: app.alkahf.data.KhatamState?,
+): HomeUiState {
     val names = data.review.names
     val sabaq = data.sabaq
     val drill = data.drill
@@ -59,7 +68,7 @@ private fun buildHomeUiState(res: Resources, data: HomeData): HomeUiState {
         streakDays = data.streakDays,
         hasSabaq = sabaq != null,
         sabaqReference = sabaq?.let {
-            res.getString(R.string.home_sabaq_reference, it.surahNameLatin, it.ayahFrom, it.ayahTo)
+            res.getString(R.string.home_sabaq_reference, surahName(it.surah), it.ayahFrom, it.ayahTo)
         } ?: "",
         sabaqAyahText = sabaq?.firstAyahText ?: "",
         sabaqAyahMarker = sabaq?.firstAyahMarker ?: "",
@@ -74,7 +83,7 @@ private fun buildHomeUiState(res: Resources, data: HomeData): HomeUiState {
             res.getString(
                 R.string.home_drill_title,
                 it.reciterName,
-                it.surahNameLatin,
+                surahName(it.surah),
                 it.ayahFrom,
                 it.ayahTo,
             )
@@ -98,6 +107,17 @@ private fun buildHomeUiState(res: Resources, data: HomeData): HomeUiState {
                 },
             )
         },
+        hasKhatam = khatam != null,
+        khatamPercent = khatam?.percent ?: 0,
+        khatamRingFraction = khatam?.ringFraction ?: 0f,
+        khatamTodayJuz = khatam?.todaysPortionJuz ?: 0,
+        khatamTodayReference = khatam?.todaysPortion?.let {
+            res.getString(
+                R.string.khatam_portion_range,
+                surahName(it.surahFrom), it.ayahFrom,
+                surahName(it.surahTo), it.ayahTo,
+            )
+        } ?: "",
     )
 }
 
@@ -111,6 +131,7 @@ private fun MemorizationState.toHomeState(): AyahMemorizationState = when (this)
 @Composable
 fun AlkahfApp(
     playDrillSignal: Int = 0,
+    openKhatamSignal: Int = 0,
     onThemeModeChange: (app.alkahf.ui.theme.ThemeMode) -> Unit = {},
     onLanguageChange: (String) -> Unit = {},
 ) {
@@ -118,7 +139,8 @@ fun AlkahfApp(
     // carries its own arguments so popping back restores the previous view.
     val backStack = remember { mutableStateListOf<Screen>(Screen.Home) }
     val current = backStack.last()
-    val repository = (LocalContext.current.applicationContext as AlkahfApplication).repository
+    val context = LocalContext.current
+    val repository = (context.applicationContext as AlkahfApplication).repository
     val scope = rememberCoroutineScope()
 
     fun navigate(screen: Screen) {
@@ -148,12 +170,31 @@ fun AlkahfApp(
     )
 
     val resources = LocalContext.current.resources
+    val surahName = rememberSurahNamer()
+    val khatamController = remember { app.alkahf.ui.khatam.KhatamController(repository) }
+    val khatamState by khatamController.state.collectAsState()
+    // The "log it complete" sheet shown over the tracker; not a back-stack entry.
+    var showKhatamLog by remember { mutableStateOf(false) }
     // Bumped to reload the Home dashboard after an in-place change (e.g. marking
     // the sabaq memorized) that doesn't change the visible screen.
     var homeRefresh by remember { mutableStateOf(0) }
-    val homeState by produceState(initialValue = HomeUiState(), current, homeRefresh) {
+    val homeState by produceState(initialValue = HomeUiState(), current, homeRefresh, surahName) {
         if (current is Screen.Home) {
-            value = buildHomeUiState(resources, repository.homeData())
+            value = buildHomeUiState(
+                resources,
+                repository.homeData(),
+                surahName,
+                repository.activeKhatam(),
+            )
+        }
+    }
+    // Keep the khatam controller's state fresh whenever a khatam screen is shown.
+    LaunchedEffect(current) {
+        if (current is Screen.KhatamTracker ||
+            current is Screen.KhatamPortion ||
+            current is Screen.KhatamProgram
+        ) {
+            khatamController.refresh()
         }
     }
 
@@ -162,6 +203,12 @@ fun AlkahfApp(
     // drill is already reciting); presetId null → the default sabaq drill.
     LaunchedEffect(playDrillSignal) {
         if (playDrillSignal > 0) navigate(Screen.Loop(presetId = null, newPreset = false))
+    }
+
+    // A khatam reminder drops the user into the tracker (which pops itself back to
+    // Today if the khatam was cancelled / no longer exists).
+    LaunchedEffect(openKhatamSignal) {
+        if (openKhatamSignal > 0) navigate(Screen.KhatamTracker)
     }
 
     // System back pops the stack; at the root, let the OS handle it (exit).
@@ -188,6 +235,8 @@ fun AlkahfApp(
             onOpenProgress = { navigate(Screen.Progress) },
             onOpenLibrary = { navigate(Screen.Library) },
             onOpenSettings = { navigate(Screen.Settings) },
+            onBeginKhatam = { navigate(Screen.KhatamProgram) },
+            onOpenKhatam = { navigate(Screen.KhatamTracker) },
         )
         is Screen.Mushaf -> MushafScreen(
             startSurah = screen.startSurah,
@@ -234,5 +283,80 @@ fun AlkahfApp(
             },
             onBack = { back() },
         )
+        Screen.KhatamProgram -> app.alkahf.ui.khatam.KhatamProgramScreen(
+            onClose = { back() },
+            onBegin = { pace, reminderEnabled, reminderMinute ->
+                scope.launch {
+                    khatamController.program(pace, reminderEnabled, reminderMinute)
+                    // Arm/clear the khatam reminder alarm for the new config.
+                    app.alkahf.notify.ReminderScheduler.reschedule(context)
+                    // Replace the program step with the tracker so back goes Home.
+                    back()
+                    navigate(Screen.KhatamTracker)
+                }
+            },
+        )
+        Screen.KhatamTracker -> {
+            val state = khatamState
+            if (state == null) {
+                // Khatam was cancelled (or never existed) — fall back to Today.
+                LaunchedEffect(Unit) { back() }
+            } else {
+                app.alkahf.ui.khatam.KhatamTrackerScreen(
+                    state = state,
+                    onBack = { back() },
+                    onOpenPortion = { navigate(Screen.KhatamPortion) },
+                    onStartReading = { page -> navigate(Screen.Mushaf(null, page, null)) },
+                    onReminderChange = { enabled, minute ->
+                        scope.launch {
+                            khatamController.setReminder(enabled, minute)
+                            app.alkahf.notify.ReminderScheduler.reschedule(context)
+                        }
+                    },
+                    onCancel = {
+                        scope.launch {
+                            khatamController.cancel()
+                            // Drop the khatam reminder alarm now that it's gone.
+                            app.alkahf.notify.ReminderScheduler.reschedule(context)
+                            back()
+                        }
+                    },
+                )
+                if (showKhatamLog) {
+                    app.alkahf.ui.khatam.KhatamLogSheet(
+                        state = state,
+                        onDone = {
+                            scope.launch {
+                                khatamController.logTodayPortion()
+                                homeRefresh++
+                                showKhatamLog = false
+                            }
+                        },
+                        onReadAhead = {
+                            showKhatamLog = false
+                            state.todaysPortion?.let { navigate(Screen.Mushaf(null, it.pageTo + 1, null)) }
+                        },
+                        onDismiss = { showKhatamLog = false },
+                    )
+                }
+            }
+        }
+        Screen.KhatamPortion -> {
+            val state = khatamState
+            if (state == null) {
+                LaunchedEffect(Unit) { back() }
+            } else {
+                app.alkahf.ui.khatam.KhatamPortionScreen(
+                    state = state,
+                    onBack = { back() },
+                    onStartReading = { page -> navigate(Screen.Mushaf(null, page, null)) },
+                    onMarkComplete = {
+                        // The log sheet lives on the tracker; pop to it and show it.
+                        back()
+                        showKhatamLog = true
+                    },
+                )
+            }
+        }
     }
 }
