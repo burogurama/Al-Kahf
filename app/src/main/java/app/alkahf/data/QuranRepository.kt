@@ -4,9 +4,6 @@ import android.content.Context
 import app.alkahf.data.review.ReviewGrade
 import app.alkahf.data.audio.AudioStore
 import app.alkahf.data.audio.Reciter
-import app.alkahf.data.audio.recitersFor
-import app.alkahf.data.user.CustomReciterEntity
-import app.alkahf.data.user.ImportedSurahEntity
 import app.alkahf.data.user.LoopPresetEntity
 import app.alkahf.data.user.UserDatabase
 import java.time.LocalDate
@@ -251,8 +248,7 @@ class QuranRepository(context: Context) {
     private val memorization = MemorizationStore(userDao)
     private val review = ReviewStore(userDao, quranText, memorization, settings)
     private val tawqit = TawqitStore(userDao, quranText)
-    private val audioStore = AudioStore(context)
-    private val filesDir = context.filesDir
+    private val reciters = ReciterLibrary(AudioStore(context), userDao, quranText, settings, context.filesDir)
 
     /** Last page open in the Mushaf, so reading resumes where the user left off. */
     var lastMushafPage: Int?
@@ -408,22 +404,15 @@ class QuranRepository(context: Context) {
         set(value) { settings.riwayah = value }
 
     /** Built-in reciters available for the active riwāyah. */
-    val riwayahReciters: List<Reciter> get() = recitersFor(riwayah)
+    val riwayahReciters: List<Reciter> get() = reciters.riwayahReciters
 
     // --- Active reciter (the voice used by Review and Mushaf listening) ---
 
-    val activeReciterPath: String
-        get() {
-            val pool = riwayahReciters
-            val stored = settings.activeReciterRaw
-            // Keep the stored voice only if it belongs to the active riwāyah.
-            return pool.firstOrNull { it.path == stored }?.path ?: pool.first().path
-        }
+    val activeReciterPath: String get() = reciters.activeReciterPath
 
-    val activeReciter: Reciter
-        get() = riwayahReciters.firstOrNull { it.path == activeReciterPath } ?: riwayahReciters.first()
+    val activeReciter: Reciter get() = reciters.activeReciter
 
-    fun setActiveReciter(path: String) = settings.setActiveReciter(path)
+    fun setActiveReciter(path: String) = reciters.setActiveReciter(path)
 
     /** "light" | "dark" | "system" (default). */
     var themeMode: String
@@ -463,7 +452,7 @@ class QuranRepository(context: Context) {
     suspend fun defaultPreset(): LoopPreset =
         sabaqDrill()
             ?: userDao.allPresets().firstOrNull()?.toLoopPreset()
-            ?: activeReciter.let { r ->
+            ?: reciters.activeReciter.let { r ->
                 LoopPreset(
                     surah = 18,
                     surahNameLatin = "Al-Kahf",
@@ -496,7 +485,7 @@ class QuranRepository(context: Context) {
         defaults.drop(1).forEach { userDao.deletePreset(it.id) }
         val surahName = quranText.surahNameLatin(range.surah)
         if (existing == null) {
-            val reciter = activeReciter
+            val reciter = reciters.activeReciter
             userDao.insertPreset(
                 LoopPresetEntity(
                     name = surahName,
@@ -519,8 +508,8 @@ class QuranRepository(context: Context) {
         // The sabaq drill follows the system riwāyah: convert its reading and (if
         // needed) reciter when the system reading toggled, and track the sabaq range.
         val reciterValid = isCustomReciter(existing.reciterPath) ||
-            recitersFor(riwayah).any { it.path == existing.reciterPath }
-        val reciter = if (existing.riwayah != riwayah.key || !reciterValid) activeReciter else null
+            reciters.riwayahReciters.any { it.path == existing.reciterPath }
+        val reciter = if (existing.riwayah != riwayah.key || !reciterValid) reciters.activeReciter else null
         userDao.updatePreset(
             existing.copy(
                 name = surahName,
@@ -571,118 +560,34 @@ class QuranRepository(context: Context) {
 
     // --- Reciters (built-in + custom imported) ---
 
-    suspend fun reciterStatuses(riwayah: Riwayah = this.riwayah): List<ReciterStatus> {
-        val active = activeReciterPath
-        val builtins = recitersFor(riwayah).map { reciter ->
-            ReciterStatus(
-                key = reciter.path,
-                displayName = reciter.displayName,
-                arabicInitial = reciterInitial(reciter.path),
-                isActive = reciter.path == active,
-                isImported = false,
-                itemCount = audioStore.downloadedSurahs(reciter.path).size,
-                bytes = audioStore.reciterBytes(reciter.path),
-            )
-        }
-        val customs = userDao.customRecitersForRiwayah(riwayah.key).map { reciter ->
-            ReciterStatus(
-                key = customReciterKey(reciter.id),
-                displayName = reciter.name,
-                arabicInitial = reciter.initial,
-                isActive = false,
-                isImported = true,
-                itemCount = userDao.importedSurahs(reciter.id).size,
-                bytes = 0L,
-            )
-        }
-        return builtins + customs
-    }
+    suspend fun reciterStatuses(riwayah: Riwayah = this.riwayah): List<ReciterStatus> =
+        reciters.statuses(riwayah)
 
-    suspend fun createCustomReciter(name: String, riwayah: Riwayah = this.riwayah): String {
-        val initial = name.trim().firstOrNull { !it.isWhitespace() }?.toString() ?: "ق"
-        val id = userDao.insertCustomReciter(
-            CustomReciterEntity(
-                name = name.trim(),
-                initial = initial,
-                createdAt = System.currentTimeMillis(),
-                riwayah = riwayah.key,
-            ),
-        )
-        return customReciterKey(id)
-    }
+    suspend fun createCustomReciter(name: String, riwayah: Riwayah = this.riwayah): String =
+        reciters.createCustom(name, riwayah)
 
     /** Re-tags an imported reciter with a riwāyah. */
-    suspend fun setReciterRiwayah(reciterKey: String, riwayah: Riwayah) {
-        val id = customReciterId(reciterKey) ?: return
-        userDao.setReciterRiwayah(id, riwayah.key)
-    }
+    suspend fun setReciterRiwayah(reciterKey: String, riwayah: Riwayah) =
+        reciters.setRiwayah(reciterKey, riwayah)
 
-    suspend fun deleteCustomReciter(key: String) {
-        val id = customReciterId(key) ?: return
-        userDao.deleteImportsForReciter(id)
-        userDao.deleteCustomReciter(id)
-    }
+    suspend fun deleteCustomReciter(key: String) = reciters.deleteCustom(key)
 
-    suspend fun importSurah(reciterKey: String, surah: Int, uri: String) {
-        val id = customReciterId(reciterKey) ?: return
-        userDao.deleteImportedSurah(id, surah)
-        userDao.insertImportedSurah(ImportedSurahEntity(reciterId = id, surah = surah, uri = uri))
-    }
+    suspend fun importSurah(reciterKey: String, surah: Int, uri: String) =
+        reciters.importSurah(reciterKey, surah, uri)
 
-    suspend fun removeImportedSurah(reciterKey: String, surah: Int) {
-        val id = customReciterId(reciterKey) ?: return
-        userDao.deleteImportedSurah(id, surah)
-    }
+    suspend fun removeImportedSurah(reciterKey: String, surah: Int) =
+        reciters.removeImportedSurah(reciterKey, surah)
 
     /** Per-surah rows for a reciter's surah list (download or import state). */
-    suspend fun reciterSurahItems(reciterKey: String): List<ReciterSurahItem> {
-        val surahs = quranText.allSurahs()
-        val customId = customReciterId(reciterKey)
-        if (customId == null) {
-            return surahs.map { surah ->
-                val downloaded = audioStore.downloadedAyahCount(reciterKey, surah.number)
-                ReciterSurahItem(
-                    surah = surah.number,
-                    nameLatin = surah.nameLatin,
-                    ayahCount = surah.ayahCount,
-                    isImported = false,
-                    hasAudio = downloaded >= surah.ayahCount,
-                    downloadedAyahs = downloaded,
-                    bytes = audioStore.surahBytes(reciterKey, surah.number),
-                    timed = false,
-                    importedUri = null,
-                )
-            }
-        }
-        val imports = userDao.importedSurahs(customId).associateBy { it.surah }
-        val tracks = userDao.allTimingTracks()
-        return surahs.map { surah ->
-            val import = imports[surah.number]
-            val timed = import != null && tracks.any {
-                it.sourceRef == import.uri && it.surah == surah.number && it.complete
-            }
-            ReciterSurahItem(
-                surah = surah.number,
-                nameLatin = surah.nameLatin,
-                ayahCount = surah.ayahCount,
-                isImported = true,
-                hasAudio = import != null,
-                downloadedAyahs = if (import != null) surah.ayahCount else 0,
-                bytes = 0L,
-                timed = timed,
-                importedUri = import?.uri,
-            )
-        }
-    }
+    suspend fun reciterSurahItems(reciterKey: String): List<ReciterSurahItem> =
+        reciters.surahItems(reciterKey)
 
     /** A Tawqīt draft (new or resumed) for an imported surah of a custom reciter. */
     suspend fun tawqitDraftForImport(reciterKey: String, surah: Int): TawqitTrack? =
         tawqit.draftForImport(reciterKey, surah)
 
-    suspend fun downloadSurah(reciterPath: String, surah: Int, onProgress: (Float) -> Unit) {
-        val ayahCount = quranText.surahAyahCount(surah)
-        audioStore.downloadSurah(reciterPath, surah, ayahCount, onProgress)
-    }
+    suspend fun downloadSurah(reciterPath: String, surah: Int, onProgress: (Float) -> Unit) =
+        reciters.downloadSurah(reciterPath, surah, onProgress)
 
     /**
      * Downloads just the āyāt [from]..[to] of a built-in reciter's sūrah,
@@ -696,10 +601,7 @@ class QuranRepository(context: Context) {
         to: Int,
         riwayah: Riwayah = this.riwayah,
         onProgress: (Float) -> Unit,
-    ) {
-        val audio = audioHafsRange(surah, from, to, riwayah)
-        audioStore.downloadRange(reciterPath, surah, audio.first, audio.last, onProgress)
-    }
+    ) = reciters.downloadRange(reciterPath, surah, from, to, riwayah, onProgress)
 
     /** True when every āyah of [from]..[to] is already cached for the reciter. */
     suspend fun rangeAudioAvailable(
@@ -708,10 +610,7 @@ class QuranRepository(context: Context) {
         from: Int,
         to: Int,
         riwayah: Riwayah = this.riwayah,
-    ): Boolean {
-        val audio = audioHafsRange(surah, from, to, riwayah)
-        return audioStore.rangeDownloaded(reciterPath, surah, audio.first, audio.last)
-    }
+    ): Boolean = reciters.rangeAvailable(reciterPath, surah, from, to, riwayah)
 
     /**
      * The standard (Hafs-numbered) audio āyāt for an app āyah. Identity in Hafs;
@@ -742,15 +641,9 @@ class QuranRepository(context: Context) {
     ): IntRange = quranText.audioHafsRange(surah, from, to, riwayah)
 
     suspend fun deleteSurahAudio(reciterPath: String, surah: Int) =
-        audioStore.deleteSurah(reciterPath, surah)
+        reciters.deleteSurahAudio(reciterPath, surah)
 
-    fun storageInfo(): StorageInfo {
-        val stat = android.os.StatFs(filesDir.absolutePath)
-        return StorageInfo(
-            usedBytes = audioStore.totalDownloadedBytes(),
-            totalBytes = stat.blockCountLong * stat.blockSizeLong,
-        )
-    }
+    fun storageInfo(): StorageInfo = reciters.storageInfo()
 
     // --- Tawqīt timing tracks ---
 
@@ -764,9 +657,7 @@ class QuranRepository(context: Context) {
 
     /** Resolves the per-ayah audio files for a reciter source (downloads as needed). */
     suspend fun reciterAyahUris(reciterPath: String, surah: Int, from: Int, to: Int): List<String> =
-        (from..to).map { ayah ->
-            android.net.Uri.fromFile(audioStore.ayahFile(surah, ayah, reciterPath)).toString()
-        }
+        reciters.ayahUris(reciterPath, surah, from, to)
 
     /**
      * Resolves playback for an imported reciter over [from]..[to] of a sūrah from
@@ -792,8 +683,7 @@ class QuranRepository(context: Context) {
 
     /** A riwāyah's reciters (built-in + imported), for drill/Mushaf pickers. */
     suspend fun allReciters(riwayah: Riwayah = this.riwayah): List<Reciter> =
-        recitersFor(riwayah) +
-            userDao.customRecitersForRiwayah(riwayah.key).map { Reciter(customReciterKey(it.id), it.name) }
+        reciters.allReciters(riwayah)
 
     suspend fun surahOptions(): List<SurahOption> = quranText.surahOptions()
 
@@ -854,14 +744,6 @@ class QuranRepository(context: Context) {
         isDefault = isDefault,
         riwayah = Riwayah.fromKey(riwayah),
     )
-
-    private fun reciterInitial(reciterPath: String): String = when {
-        reciterPath.startsWith("Husary") -> "ح"
-        reciterPath.startsWith("Alafasy") -> "ع"
-        reciterPath.startsWith("Abdul_Basit") -> "ع"
-        reciterPath.startsWith("Minshawy") -> "م"
-        else -> "ق"
-    }
 
     companion object {
         const val PAGE_COUNT = 604
