@@ -66,6 +66,11 @@
     <string name="settings_section_language">اللغة</string>
     <string name="settings_language">لغة التطبيق</string>
     <string name="settings_language_auto">تلقائي</string>
+    <string name="settings_section_riwayah">الرواية</string>
+    <string name="settings_riwayah">الرواية</string>
+    <string name="settings_riwayah_hafs">حفص</string>
+    <string name="settings_riwayah_warsh">ورش</string>
+    <string name="settings_riwayah_hint">يغيّر رسم المصحف والخط والقرّاء. سيُعاد تشغيل التطبيق لتطبيق التغيير.</string>
     <string name="settings_section_appearance">المظهر</string>
     <string name="settings_theme">السمة</string>
     <string name="settings_theme_light">فاتح</string>

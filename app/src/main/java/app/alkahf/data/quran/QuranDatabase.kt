@@ -14,10 +14,20 @@ abstract class QuranDatabase : RoomDatabase() {
     abstract fun quranDao(): QuranDao
 
     companion object {
-        fun open(context: Context): QuranDatabase =
-            Room.databaseBuilder(context, QuranDatabase::class.java, "quran.db")
-                .createFromAsset("quran.db")
+        /**
+         * Opens the Qur'an DB for the active riwāyah. Hafs and Warsh are bundled
+         * as separate assets and cached under distinct filenames, so switching
+         * just reopens the other (the process restarts on a riwāyah change).
+         */
+        fun open(context: Context): QuranDatabase {
+            val warsh = context
+                .getSharedPreferences("alkahf_prefs", Context.MODE_PRIVATE)
+                .getString("riwayah", "hafs") == "warsh"
+            val asset = if (warsh) "quran_warsh.db" else "quran.db"
+            return Room.databaseBuilder(context, QuranDatabase::class.java, asset)
+                .createFromAsset(asset)
                 .fallbackToDestructiveMigration()
                 .build()
+        }
     }
 }

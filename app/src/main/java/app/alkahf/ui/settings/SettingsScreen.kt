@@ -3,6 +3,7 @@ package app.alkahf.ui.settings
 import android.Manifest
 import android.app.TimePickerDialog
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.text.format.DateFormat
@@ -71,6 +72,19 @@ fun SettingsScreen(
     val repository = remember { (context.applicationContext as AlkahfApplication).repository }
     var settings by remember { mutableStateOf(repository.settings()) }
     var notificationsAllowed by remember { mutableStateOf(notificationsAllowed(context)) }
+    var riwayah by remember { mutableStateOf(repository.riwayah) }
+
+    // Switching riwāyah swaps the Qur'an DB, font, and reciter list, all resolved
+    // at process start — so persist the choice and relaunch cleanly.
+    fun changeRiwayah(value: String) {
+        if (value == riwayah) return
+        repository.riwayah = value
+        riwayah = value
+        val launch = context.packageManager.getLaunchIntentForPackage(context.packageName)
+        launch?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+        context.startActivity(launch)
+        Runtime.getRuntime().exit(0)
+    }
 
     fun apply(updated: SettingsData) {
         settings = updated
@@ -162,6 +176,27 @@ fun SettingsScreen(
                                 onLanguageChange(language)
                             }
                         },
+                    )
+                }
+            }
+
+            SectionCaption(stringResource(R.string.settings_section_riwayah))
+            SettingsCard {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    RowLabel(stringResource(R.string.settings_riwayah))
+                    Segmented(
+                        options = listOf(
+                            "hafs" to stringResource(R.string.settings_riwayah_hafs),
+                            "warsh" to stringResource(R.string.settings_riwayah_warsh),
+                        ),
+                        selected = riwayah,
+                        onSelect = { changeRiwayah(it) },
+                    )
+                    Text(
+                        text = stringResource(R.string.settings_riwayah_hint),
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = AlkahfColors.InkFaint,
                     )
                 }
             }

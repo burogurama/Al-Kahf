@@ -5,8 +5,8 @@ import app.alkahf.data.quran.QuranDatabase
 import app.alkahf.data.review.ReviewGrade
 import app.alkahf.data.review.ReviewScheduler
 import app.alkahf.data.audio.AudioStore
-import app.alkahf.data.audio.RECITERS
 import app.alkahf.data.audio.Reciter
+import app.alkahf.data.audio.recitersFor
 import app.alkahf.data.user.AyahStateEntity
 import app.alkahf.data.user.CustomReciterEntity
 import app.alkahf.data.user.ImportedSurahEntity
@@ -496,17 +496,33 @@ class QuranRepository(context: Context) {
         )
     }
 
+    // --- Riwāyah (Hafs / Warsh) ---
+
+    /** "hafs" (default) | "warsh". Drives the Qur'an DB, font, and reciter list. */
+    var riwayah: String
+        get() = prefs.getString(KEY_RIWAYAH, "hafs") ?: "hafs"
+        // commit() (not apply()) so the value is on disk before the caller
+        // restarts the process to reload the DB/font.
+        @android.annotation.SuppressLint("ApplySharedPref")
+        set(value) {
+            prefs.edit().putString(KEY_RIWAYAH, value).commit()
+        }
+
+    /** Built-in reciters available for the active riwāyah. */
+    val riwayahReciters: List<Reciter> get() = recitersFor(riwayah)
+
     // --- Active reciter (the voice used by Review and Mushaf listening) ---
 
     val activeReciterPath: String
         get() {
+            val pool = riwayahReciters
             val stored = prefs.getString(KEY_ACTIVE_RECITER, null)
-            // Fall back to a valid reciter if the stored one was removed.
-            return RECITERS.firstOrNull { it.path == stored }?.path ?: RECITERS.first().path
+            // Keep the stored voice only if it belongs to the active riwāyah.
+            return pool.firstOrNull { it.path == stored }?.path ?: pool.first().path
         }
 
     val activeReciter: Reciter
-        get() = RECITERS.firstOrNull { it.path == activeReciterPath } ?: RECITERS.first()
+        get() = riwayahReciters.firstOrNull { it.path == activeReciterPath } ?: riwayahReciters.first()
 
     fun setActiveReciter(path: String) {
         prefs.edit().putString(KEY_ACTIVE_RECITER, path).apply()
@@ -687,7 +703,7 @@ class QuranRepository(context: Context) {
 
     suspend fun reciterStatuses(): List<ReciterStatus> {
         val active = activeReciterPath
-        val builtins = RECITERS.map { reciter ->
+        val builtins = riwayahReciters.map { reciter ->
             ReciterStatus(
                 key = reciter.path,
                 displayName = reciter.displayName,
@@ -937,9 +953,9 @@ class QuranRepository(context: Context) {
         return ImportedSurahAudio(import.uri, segments)
     }
 
-    /** Built-in reciters plus every imported one (keyed "custom:<id>"). */
+    /** Active-riwāyah reciters plus every imported one (keyed "custom:<id>"). */
     suspend fun allReciters(): List<Reciter> =
-        RECITERS + userDao.customReciters().map { Reciter("custom:${it.id}", it.name) }
+        riwayahReciters + userDao.customReciters().map { Reciter("custom:${it.id}", it.name) }
 
     private fun TimingTrackEntity.toTawqitTrack() = TawqitTrack(
         id = id,
@@ -1191,6 +1207,7 @@ class QuranRepository(context: Context) {
         private const val KEY_SABAQ_SURAH = "sabaq_surah"
         private const val KEY_SABAQ_FROM = "sabaq_from"
         private const val KEY_SABAQ_TO = "sabaq_to"
+        private const val KEY_RIWAYAH = "riwayah"
         private const val KEY_REMINDERS_ON = "reminders_enabled"
         private const val KEY_REMINDER_TIMES = "reminder_times"
         // A single morning nudge by default (07:30 = 450 minutes).

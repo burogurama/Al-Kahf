@@ -56,7 +56,7 @@ import app.alkahf.data.PageAyah
 import app.alkahf.data.TawqitSourceType
 import app.alkahf.data.TawqitTrack
 import app.alkahf.ui.theme.AlkahfColors
-import app.alkahf.ui.theme.KfgqpcHafs
+import app.alkahf.ui.theme.quranFont
 import kotlinx.coroutines.launch
 
 @Composable
@@ -246,7 +246,7 @@ private fun AyahLine(ayah: PageAyah, fontSize: Int, color: Color) {
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
         Text(
             text = "${ayah.words.joinToString(" ")} ${ayah.marker}",
-            fontFamily = KfgqpcHafs,
+            fontFamily = quranFont,
             fontSize = fontSize.sp,
             lineHeight = (fontSize * 1.9f).sp,
             color = color,

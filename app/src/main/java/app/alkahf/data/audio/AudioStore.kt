@@ -117,11 +117,20 @@ class AudioStore(private val context: Context) {
     }
 }
 
-/** An everyayah.com reciter: directory name + display name. */
-data class Reciter(val path: String, val displayName: String)
+/** An everyayah.com reciter: directory name + display name + riwāyah. */
+data class Reciter(
+    val path: String,
+    val displayName: String,
+    val riwayah: String = "hafs",
+)
 
 val RECITERS = listOf(
     Reciter("Husary_128kbps", "Ḥuṣarī"),
     Reciter("Abdul_Basit_Murattal_192kbps", "Abdul Basit"),
     Reciter("Minshawy_Murattal_128kbps", "Minshawy"),
+    Reciter("warsh/warsh_yassin_al_jazaery_64kbps", "Yāsīn al-Jazāʼirī", "warsh"),
+    Reciter("warsh/warsh_ibrahim_aldosary_128kbps", "Ibrāhīm al-Dawsarī", "warsh"),
 )
+
+/** Built-in reciters for a riwāyah ("hafs" | "warsh"). */
+fun recitersFor(riwayah: String): List<Reciter> = RECITERS.filter { it.riwayah == riwayah }

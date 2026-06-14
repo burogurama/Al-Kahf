@@ -62,6 +62,11 @@
     <string name="settings_section_language">LANGUAGE</string>
     <string name="settings_language">App language</string>
     <string name="settings_language_auto">Auto</string>
+    <string name="settings_section_riwayah">READING (RIWĀYAH)</string>
+    <string name="settings_riwayah">Riwāyah</string>
+    <string name="settings_riwayah_hafs">Ḥafṣ</string>
+    <string name="settings_riwayah_warsh">Warsh</string>
+    <string name="settings_riwayah_hint">Switches the Qur\'an script, font, and reciters. The app restarts to apply it.</string>
     <string name="settings_section_appearance">APPEARANCE</string>
     <string name="settings_theme">Theme</string>
     <string name="settings_theme_light">Light</string>

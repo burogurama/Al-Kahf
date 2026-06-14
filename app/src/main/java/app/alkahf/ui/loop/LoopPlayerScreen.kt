@@ -80,7 +80,7 @@ import app.alkahf.data.SurahOption
 import app.alkahf.data.audio.AudioStore
 import app.alkahf.data.toArabicIndic
 import app.alkahf.ui.theme.AlkahfColors
-import app.alkahf.ui.theme.KfgqpcHafs
+import app.alkahf.ui.theme.quranFont
 import kotlinx.coroutines.launch
 
 @Composable
@@ -459,7 +459,7 @@ private fun AyahNode(number: Int, built: Boolean, sounding: Boolean) {
         ) {
             Text(
                 text = number.toArabicIndic(),
-                fontFamily = KfgqpcHafs,
+                fontFamily = quranFont,
                 fontSize = if (sounding) 18.sp else 16.sp,
                 color = if (built) AlkahfColors.OnAccent else AlkahfColors.QueuedNumeral,
             )
@@ -624,7 +624,7 @@ private fun AyahText(state: LoopUiState) {
         Box(Modifier.fillMaxWidth().verticalScroll(scrollState)) {
             Text(
                 text = annotated,
-                fontFamily = KfgqpcHafs,
+                fontFamily = quranFont,
                 fontSize = 28.sp,
                 lineHeight = 55.sp,
                 textAlign = TextAlign.Center,

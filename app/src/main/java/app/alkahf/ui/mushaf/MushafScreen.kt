@@ -115,7 +115,7 @@ import app.alkahf.data.ReciterStatus
 import app.alkahf.data.SurahOption
 import app.alkahf.data.audio.AudioStore
 import app.alkahf.ui.theme.AlkahfColors
-import app.alkahf.ui.theme.KfgqpcHafs
+import app.alkahf.ui.theme.quranFont
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 
@@ -989,7 +989,7 @@ private fun PageGroupView(
     if (group.basmala != null) {
         Text(
             text = group.basmala,
-            fontFamily = KfgqpcHafs,
+            fontFamily = quranFont,
             fontSize = 20.sp,
             color = AlkahfColors.InkChrome,
             textAlign = TextAlign.Center,
@@ -1021,7 +1021,7 @@ private fun SurahHeaderBand(group: PageGroup, onClick: () -> Unit) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
                 text = group.surahNameArabic,
-                fontFamily = KfgqpcHafs,
+                fontFamily = quranFont,
                 fontSize = 25.sp,
                 lineHeight = 34.sp,
                 color = AlkahfColors.Ink,
@@ -1087,7 +1087,7 @@ private fun AyatBody(
         Text(
             text = groupText.annotated,
             style = TextStyle(
-                fontFamily = KfgqpcHafs,
+                fontFamily = quranFont,
                 fontSize = bodySize,
                 lineHeight = bodySize * 1.9f,
                 color = AlkahfColors.Ink,
@@ -1701,7 +1701,7 @@ private fun ReciterChip(
             ) {
                 Text(
                     text = reciter.arabicInitial,
-                    fontFamily = KfgqpcHafs,
+                    fontFamily = quranFont,
                     fontSize = 14.sp,
                     color = if (selected) AlkahfColors.OnAccent else AlkahfColors.InkChrome,
                 )
@@ -2129,7 +2129,7 @@ private fun SurahRow(s: SurahOption, onClick: () -> Unit) {
         )
         Text(
             text = s.nameArabic,
-            fontFamily = KfgqpcHafs,
+            fontFamily = quranFont,
             fontSize = 19.sp,
             color = AlkahfColors.InkChrome,
         )

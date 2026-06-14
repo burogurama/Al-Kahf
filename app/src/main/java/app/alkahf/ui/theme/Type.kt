@@ -28,10 +28,22 @@ val AmiriQuran = FontFamily(
     Font(R.font.amiri_quran, weight = FontWeight.Normal),
 )
 
-/** KFGQPC Uthmanic Script HAFS — the product's mushaf font (handoff target). */
+/** KFGQPC Uthmanic Script HAFS — the Hafs mushaf font. */
 val KfgqpcHafs = FontFamily(
     Font(R.font.kfgqpc_hafs, weight = FontWeight.Normal),
 )
+
+/** KFGQPC Uthmanic Script WARSH — the Warsh mushaf font. */
+val KfgqpcWarsh = FontFamily(
+    Font(R.font.kfgqpc_warsh, weight = FontWeight.Normal),
+)
+
+/**
+ * The Qur'an font for the active riwāyah. Set once at process start
+ * (AlkahfApplication) so it works in both composable and text-builder code;
+ * a riwāyah change restarts the process, so this never changes mid-run.
+ */
+var quranFont: FontFamily = KfgqpcHafs
 
 val AlkahfTypography = Typography().run {
     copy(
@@ -55,7 +67,7 @@ val AlkahfTypography = Typography().run {
 
 /** Ayah text style per handoff: 25sp, line-height 1.88. */
 val AyahTextStyle = TextStyle(
-    fontFamily = KfgqpcHafs,
+    fontFamily = quranFont,
     fontWeight = FontWeight.Normal,
     fontSize = 25.sp,
     lineHeight = 47.sp,
