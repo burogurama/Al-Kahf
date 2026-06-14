@@ -5,7 +5,3 @@ local.properties
 *.iml
 .kotlin/
 captures/
-
-# Design handoffs and the product brief are kept out of the repo
-APP_DEFINITION.md
-design_handoff_*/
