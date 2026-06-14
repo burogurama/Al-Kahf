@@ -31,4 +31,8 @@ data class AyahEntity(
     val page: Int,
     val juz: Int,
     @ColumnInfo(name = "hizb_quarter") val hizbQuarter: Int,
+    // The standard (Hafs-numbered) āyah range whose everyayah audio covers this
+    // āyah. Identity in Hafs; in Warsh it maps the differing verse boundaries.
+    @ColumnInfo(name = "audio_from") val audioFrom: Int,
+    @ColumnInfo(name = "audio_to") val audioTo: Int,
 )

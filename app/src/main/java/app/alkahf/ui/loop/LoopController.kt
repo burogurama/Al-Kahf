@@ -280,8 +280,16 @@ class LoopController(
             }
             return playImportedSegment(importedAudio!!.fileUri, segment)
         }
-        val file = downloadStep(step) ?: return null
-        return playFile(file)
+        // One drill āyah maps to one (Hafs) or several (Warsh merges) everyayah
+        // files; play them back to back as a single step.
+        val hafsAyahs = repository.audioAyahs(_state.value.surah, step.ayah)
+        var finished = true
+        for (hafsAyah in hafsAyahs) {
+            val file = downloadAyah(hafsAyah) ?: return null
+            finished = playFile(file)
+            if (!finished) break
+        }
+        return finished
     }
 
     /** Plays a single āyah's [segment] of an imported file. False if a jump cut it. */
@@ -317,10 +325,10 @@ class LoopController(
         return true
     }
 
-    private suspend fun downloadStep(step: LoopStep): File? {
+    private suspend fun downloadAyah(ayah: Int): File? {
         _state.update { it.copy(phase = LoopPhase.PREPARING) }
         return try {
-            audioStore.ayahFile(_state.value.surah, step.ayah, _state.value.reciterPath)
+            audioStore.ayahFile(_state.value.surah, ayah, _state.value.reciterPath)
         } catch (e: IOException) {
             _state.update {
                 it.copy(

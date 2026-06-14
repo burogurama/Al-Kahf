@@ -7,7 +7,7 @@ import androidx.room.RoomDatabase
 
 @Database(
     entities = [SurahEntity::class, AyahEntity::class],
-    version = 1,
+    version = 2, // v2: added audio_from/audio_to (Warsh→Hafs audio mapping)
     exportSchema = false,
 )
 abstract class QuranDatabase : RoomDatabase() {

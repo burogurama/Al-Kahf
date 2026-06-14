@@ -1,5 +1,6 @@
 package app.alkahf.data.quran
 
+import androidx.room.ColumnInfo
 import androidx.room.Dao
 import androidx.room.Query
 
@@ -28,7 +29,16 @@ interface QuranDao {
 
     @Query("SELECT * FROM surahs ORDER BY number")
     suspend fun allSurahs(): List<SurahEntity>
+
+    @Query("SELECT audio_from, audio_to FROM ayahs WHERE id = :id")
+    suspend fun audioRange(id: Int): AudioRange?
 }
 
 /** Minimal projection for whole-mushaf aggregations (Progress screen). */
 data class AyahLocation(val id: Int, val page: Int, val juz: Int)
+
+/** The standard (Hafs-numbered) audio āyāt covering an app āyah. */
+data class AudioRange(
+    @ColumnInfo(name = "audio_from") val from: Int,
+    @ColumnInfo(name = "audio_to") val to: Int,
+)

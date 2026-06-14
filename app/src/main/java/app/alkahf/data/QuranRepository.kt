@@ -463,7 +463,11 @@ class QuranRepository(context: Context) {
 
     suspend fun page(number: Int): MushafPage {
         val ayahs = quranDao.ayahsOnPage(number)
-        val basmala = cachedBasmala ?: quranDao.basmala().also { cachedBasmala = it }
+        // In Warsh, id 1001 is "al-ḥamdu" (basmala isn't a counted āyah), so the
+        // basmala header comes from a fixed Warsh-orthography string instead.
+        val basmala = cachedBasmala ?: (
+            if (riwayah == "warsh") WARSH_BASMALA else quranDao.basmala()
+            ).also { cachedBasmala = it }
         val groups = ayahs
             .groupBy { it.surah }
             .map { (surahNumber, surahAyahs) ->
@@ -835,11 +839,33 @@ class QuranRepository(context: Context) {
         from: Int,
         to: Int,
         onProgress: (Float) -> Unit,
-    ) = audioStore.downloadRange(reciterPath, surah, from, to, onProgress)
+    ) {
+        val audio = audioHafsRange(surah, from, to)
+        audioStore.downloadRange(reciterPath, surah, audio.first, audio.last, onProgress)
+    }
 
     /** True when every āyah of [from]..[to] is already cached for the reciter. */
-    suspend fun rangeAudioAvailable(reciterPath: String, surah: Int, from: Int, to: Int): Boolean =
-        audioStore.rangeDownloaded(reciterPath, surah, from, to)
+    suspend fun rangeAudioAvailable(reciterPath: String, surah: Int, from: Int, to: Int): Boolean {
+        val audio = audioHafsRange(surah, from, to)
+        return audioStore.rangeDownloaded(reciterPath, surah, audio.first, audio.last)
+    }
+
+    /**
+     * The standard (Hafs-numbered) audio āyāt for an app āyah. Identity in Hafs;
+     * in Warsh it maps each verse to the everyayah file(s) that cover it (the
+     * everyayah library numbers all audio by the Hafs counting).
+     */
+    suspend fun audioAyahs(surah: Int, ayah: Int): List<Int> {
+        val r = quranDao.audioRange(surah * 1000 + ayah) ?: return listOf(ayah)
+        return (r.from..r.to).toList()
+    }
+
+    /** The Hafs audio āyāh range spanning an app range [from]..[to]. */
+    suspend fun audioHafsRange(surah: Int, from: Int, to: Int): IntRange {
+        val lo = quranDao.audioRange(surah * 1000 + from)?.from ?: from
+        val hi = quranDao.audioRange(surah * 1000 + to)?.to ?: to
+        return lo..hi
+    }
 
     suspend fun deleteSurahAudio(reciterPath: String, surah: Int) =
         audioStore.deleteSurah(reciterPath, surah)
@@ -1192,6 +1218,8 @@ class QuranRepository(context: Context) {
     companion object {
         const val PAGE_COUNT = 604
         const val TOTAL_AYAH_COUNT = 6236
+        // Warsh-orthography basmala (basmala is not a counted āyah in Warsh).
+        private const val WARSH_BASMALA = "بِسْمِ اِ۬للَّهِ اِ۬لرَّحْمَٰنِ اِ۬لرَّحِيمِ"
         private const val KEY_LAST_MUSHAF_PAGE = "last_mushaf_page"
         private const val KEY_LAST_HIDE_MODE = "last_mushaf_hide_mode"
         private const val KEY_ACTIVE_RECITER = "active_reciter"

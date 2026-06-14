@@ -146,20 +146,26 @@ class MushafAudioController(
             pass++
             for (ayahId in ayahIds) {
                 _state.update { it.copy(currentAyahId = ayahId, phase = MushafAudioPhase.PREPARING) }
-                val file = try {
-                    audioStore.ayahFile(ayahId / 1000, ayahId % 1000, _state.value.reciterPath)
-                } catch (e: IOException) {
-                    _state.update {
-                        it.copy(
-                            phase = MushafAudioPhase.IDLE,
-                            currentAyahId = null,
-                            errorMessage = context.getString(R.string.mushaf_audio_download_failed),
-                        )
+                // One app āyah maps to one (Hafs) or, where Warsh counting merges
+                // verses, several everyayah files; play them back to back.
+                val surah = ayahId / 1000
+                val hafsAyahs = repository.audioAyahs(surah, ayahId % 1000)
+                for (hafsAyah in hafsAyahs) {
+                    val file = try {
+                        audioStore.ayahFile(surah, hafsAyah, _state.value.reciterPath)
+                    } catch (e: IOException) {
+                        _state.update {
+                            it.copy(
+                                phase = MushafAudioPhase.IDLE,
+                                currentAyahId = null,
+                                errorMessage = context.getString(R.string.mushaf_audio_download_failed),
+                            )
+                        }
+                        return
                     }
-                    return
+                    val finished = playFile(file)
+                    if (!finished) return
                 }
-                val finished = playFile(file)
-                if (!finished) return
                 repository.logPractice(type = "listen", ayahCount = 1, durationMs = lastDurationMs)
                 if (_state.value.mode == MushafAudioMode.RECITE_BACK) {
                     reciteBackGap()
