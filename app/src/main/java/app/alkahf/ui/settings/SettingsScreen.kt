@@ -34,7 +34,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowLeft
-import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
@@ -594,6 +593,7 @@ private fun Toggle(checked: Boolean, onChange: (Boolean) -> Unit) {
     }
 }
 
+/** A read-only label/value row (no chevron — it isn't tappable). */
 @Composable
 private fun NavRow(label: String, value: String) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -604,12 +604,6 @@ private fun NavRow(label: String, value: String) {
             fontSize = 13.sp,
             fontWeight = FontWeight.Medium,
             color = AlkahfColors.InkFaint,
-        )
-        Icon(
-            imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
-            contentDescription = null,
-            tint = AlkahfColors.Chevron,
-            modifier = Modifier.padding(start = 4.dp),
         )
     }
 }
