@@ -115,6 +115,8 @@ import app.alkahf.data.ReciterStatus
 import app.alkahf.data.SurahOption
 import app.alkahf.data.audio.AudioStore
 import app.alkahf.ui.theme.AlkahfColors
+import app.alkahf.ui.theme.KfgqpcHafs
+import app.alkahf.ui.theme.KfgqpcWarsh
 import app.alkahf.ui.theme.quranFont
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
@@ -255,6 +257,12 @@ fun MushafScreen(
     val sessions = remember { mutableStateMapOf<Int, SelfTestSession>() }
     val currentPageNumber = pagerState.currentPage + windowStart
     val currentSession = sessions[currentPageNumber]
+    // A temporary peek at the other reading — local to this Mushaf; it never
+    // changes the saved riwāyah. Text, font, reciters and audio follow it here.
+    var displayRiwayah by remember { mutableStateOf(repository.riwayah) }
+    DisposableEffect(Unit) {
+        onDispose { quranFont = if (repository.riwayah == "warsh") KfgqpcWarsh else KfgqpcHafs }
+    }
 
     LaunchedEffect(pagerState) {
         snapshotFlow { pagerState.currentPage }.collect { page ->
@@ -320,13 +328,22 @@ fun MushafScreen(
     // currently chosen for the range. Refreshed whenever the panel opens.
     var reciters by remember { mutableStateOf<List<ReciterStatus>>(emptyList()) }
     var rangeReciterKey by remember { mutableStateOf(repository.activeReciterPath) }
-    LaunchedEffect(rangeAudioOpen) {
+    LaunchedEffect(rangeAudioOpen, displayRiwayah) {
         if (rangeAudioOpen) {
-            reciters = repository.reciterStatuses()
+            reciters = repository.reciterStatuses(displayRiwayah)
             if (reciters.none { it.key == rangeReciterKey }) {
                 rangeReciterKey = reciters.firstOrNull()?.key ?: rangeReciterKey
             }
         }
+    }
+    // Toggling the reading reloads the page text/font, the reciter list, and the
+    // audio mapping — all just for this Mushaf.
+    LaunchedEffect(displayRiwayah) {
+        quranFont = if (displayRiwayah == "warsh") KfgqpcWarsh else KfgqpcHafs
+        audioController.setRiwayah(displayRiwayah)
+        reciters = repository.reciterStatuses(displayRiwayah)
+        rangeReciterKey = reciters.firstOrNull { it.key == rangeReciterKey }?.key
+            ?: reciters.firstOrNull()?.key ?: rangeReciterKey
     }
     // Pending download confirmation: (reciter, surah, from, to) once the user
     // hits Listen on an undownloaded built-in range; null while idle.
@@ -441,7 +458,7 @@ fun MushafScreen(
         val from = nums.min()
         val to = nums.max()
         scope.launch {
-            val ready = repository.rangeAudioAvailable(chosen.key, surah, from, to)
+            val ready = repository.rangeAudioAvailable(chosen.key, surah, from, to, displayRiwayah)
             if (ready) {
                 rangeAudioOpen = false
                 playRange(rangeMode)
@@ -462,7 +479,9 @@ fun MushafScreen(
         downloadProgress = 0f
         downloadJob = scope.launch {
             try {
-                repository.downloadRange(request.reciterKey, request.surah, request.from, request.to) {
+                repository.downloadRange(
+                    request.reciterKey, request.surah, request.from, request.to, displayRiwayah,
+                ) {
                     downloadProgress = it
                 }
                 downloadProgress = null
@@ -552,6 +571,23 @@ fun MushafScreen(
                     }
                 }
             },
+            // Temporary reading toggle — hidden in the locked sabaq view.
+            riwayahLabel = if (sabaqMode) {
+                null
+            } else {
+                stringResource(
+                    if (displayRiwayah == "warsh") R.string.settings_riwayah_warsh else R.string.settings_riwayah_hafs,
+                )
+            },
+            onToggleRiwayah = {
+                // Clear sessions in the same frame as the riwāyah change so the
+                // page reloads with the new text (the load guard checks session),
+                // and set the font now so the reloaded text renders correctly.
+                sessions.clear()
+                val next = if (displayRiwayah == "warsh") "hafs" else "warsh"
+                quranFont = if (next == "warsh") KfgqpcWarsh else KfgqpcHafs
+                displayRiwayah = next
+            }.takeIf { !sabaqMode },
         )
         // RTL pager: swiping toward the right turns to the next page, as in a
         // physical mushaf. Page content restores LTR for its own chrome.
@@ -567,6 +603,7 @@ fun MushafScreen(
                     val pageNumber = pageIndex + windowStart
                     MushafPageView(
                         pageNumber = pageNumber,
+                        riwayah = displayRiwayah,
                         repository = repository,
                         hideMode = hideMode,
                         session = sessions[pageNumber],
@@ -744,6 +781,8 @@ private fun MushafTopBar(
     onAudioLongPress: () -> Unit,
     onBack: () -> Unit,
     onToggleHideMode: () -> Unit,
+    riwayahLabel: String? = null,
+    onToggleRiwayah: (() -> Unit)? = null,
 ) {
     // The headset gesture detector lives in a pointerInput(Unit) that never
     // restarts, so capture the latest handlers to avoid acting on stale state.
@@ -805,6 +844,22 @@ private fun MushafTopBar(
                             modifier = Modifier.size(14.dp),
                         )
                     }
+                }
+            }
+            if (riwayahLabel != null && onToggleRiwayah != null) {
+                Surface(
+                    onClick = onToggleRiwayah,
+                    shape = RoundedCornerShape(8.dp),
+                    color = AlkahfColors.AccentTint,
+                    modifier = Modifier.padding(end = 2.dp),
+                ) {
+                    Text(
+                        text = riwayahLabel,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = AlkahfColors.AccentDeep,
+                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
+                    )
                 }
             }
             Box(
@@ -891,6 +946,7 @@ private fun MushafTopBar(
 @Composable
 private fun MushafPageView(
     pageNumber: Int,
+    riwayah: String,
     repository: QuranRepository,
     hideMode: Boolean,
     session: SelfTestSession?,
@@ -906,9 +962,9 @@ private fun MushafPageView(
     selectedIds: Set<Int>,
     scrollToAyahId: Int?,
 ) {
-    LaunchedEffect(pageNumber) {
+    LaunchedEffect(pageNumber, riwayah) {
         if (session == null) {
-            val page = repository.page(pageNumber)
+            val page = repository.page(pageNumber, riwayah)
             val newSession = SelfTestSession(page, persistReveal)
             val ayahIds = page.ayahs.map { it.id }
             newSession.revealedCounts.putAll(repository.revealStates(ayahIds))

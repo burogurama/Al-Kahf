@@ -20,10 +20,15 @@ abstract class QuranDatabase : RoomDatabase() {
          * just reopens the other (the process restarts on a riwāyah change).
          */
         fun open(context: Context): QuranDatabase {
-            val warsh = context
+            val riwayah = context
                 .getSharedPreferences("alkahf_prefs", Context.MODE_PRIVATE)
-                .getString("riwayah", "hafs") == "warsh"
-            val asset = if (warsh) "quran_warsh.db" else "quran.db"
+                .getString("riwayah", "hafs") ?: "hafs"
+            return openFor(context, riwayah)
+        }
+
+        /** Opens a specific riwāyah's DB (cached under its own filename). */
+        fun openFor(context: Context, riwayah: String): QuranDatabase {
+            val asset = if (riwayah == "warsh") "quran_warsh.db" else "quran.db"
             return Room.databaseBuilder(context, QuranDatabase::class.java, asset)
                 .createFromAsset(asset)
                 .fallbackToDestructiveMigration()

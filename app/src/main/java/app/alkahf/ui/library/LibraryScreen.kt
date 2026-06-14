@@ -119,10 +119,11 @@ fun LibraryScreen(
 
     if (showNewReciter) {
         NewReciterDialog(
+            defaultRiwayah = repository.riwayah,
             onDismiss = { showNewReciter = false },
-            onCreate = { name ->
+            onCreate = { name, riwayah ->
                 scope.launch {
-                    repository.createCustomReciter(name)
+                    repository.createCustomReciter(name, riwayah)
                     showNewReciter = false
                     refreshKey++
                 }
@@ -158,8 +159,13 @@ private fun NewReciterButton(onClick: () -> Unit) {
 }
 
 @Composable
-private fun NewReciterDialog(onDismiss: () -> Unit, onCreate: (String) -> Unit) {
+private fun NewReciterDialog(
+    defaultRiwayah: String,
+    onDismiss: () -> Unit,
+    onCreate: (String, String) -> Unit,
+) {
     var name by remember { mutableStateOf("") }
+    var riwayah by remember { mutableStateOf(defaultRiwayah) }
     androidx.compose.material3.AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = AlkahfColors.Surface,
@@ -179,11 +185,40 @@ private fun NewReciterDialog(onDismiss: () -> Unit, onCreate: (String) -> Unit) 
                     placeholder = { Text(stringResource(R.string.library_import_reciter_name_hint)) },
                     modifier = Modifier.fillMaxWidth(),
                 )
+                Text(
+                    stringResource(R.string.library_reciter_riwayah_label),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = AlkahfColors.InkFaint,
+                    modifier = Modifier.padding(top = 14.dp, bottom = 6.dp),
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(
+                        "hafs" to stringResource(R.string.settings_riwayah_hafs),
+                        "warsh" to stringResource(R.string.settings_riwayah_warsh),
+                    ).forEach { (value, label) ->
+                        val selected = value == riwayah
+                        Surface(
+                            onClick = { riwayah = value },
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (selected) AlkahfColors.AccentTint else AlkahfColors.ChipBg,
+                            border = BorderStroke(1.dp, if (selected) AlkahfColors.Accent else AlkahfColors.CardBorder),
+                        ) {
+                            Text(
+                                text = label,
+                                fontSize = 13.sp,
+                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                                color = if (selected) AlkahfColors.AccentDeep else AlkahfColors.InkSecondaryDark,
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 7.dp),
+                            )
+                        }
+                    }
+                }
             }
         },
         confirmButton = {
             androidx.compose.material3.TextButton(
-                onClick = { if (name.isNotBlank()) onCreate(name) },
+                onClick = { if (name.isNotBlank()) onCreate(name, riwayah) },
                 enabled = name.isNotBlank(),
             ) { Text(stringResource(R.string.common_create), color = AlkahfColors.AccentDeep, fontWeight = FontWeight.Bold) }
         },
@@ -392,12 +427,32 @@ private fun PresetRow(preset: LoopPreset, onClick: () -> Unit) {
                 )
             }
             Column(Modifier.weight(1f).padding(start = 13.dp)) {
-                Text(
-                    text = preset.name,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = AlkahfColors.Ink,
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(7.dp),
+                ) {
+                    Text(
+                        text = preset.name,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = AlkahfColors.Ink,
+                    )
+                    Surface(shape = RoundedCornerShape(6.dp), color = AlkahfColors.ChipBg) {
+                        Text(
+                            text = stringResource(
+                                if (preset.riwayah == "warsh") {
+                                    R.string.settings_riwayah_warsh
+                                } else {
+                                    R.string.settings_riwayah_hafs
+                                },
+                            ),
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = AlkahfColors.InkSecondaryDark,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                        )
+                    }
+                }
                 Text(
                     text = stringResource(
                         R.string.library_preset_subtitle,

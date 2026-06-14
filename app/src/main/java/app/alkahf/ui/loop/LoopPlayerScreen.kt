@@ -80,6 +80,8 @@ import app.alkahf.data.SurahOption
 import app.alkahf.data.audio.AudioStore
 import app.alkahf.data.toArabicIndic
 import app.alkahf.ui.theme.AlkahfColors
+import app.alkahf.ui.theme.KfgqpcHafs
+import app.alkahf.ui.theme.KfgqpcWarsh
 import app.alkahf.ui.theme.quranFont
 import kotlinx.coroutines.launch
 
@@ -107,15 +109,21 @@ fun LoopPlayerScreen(presetId: Long? = null, newPreset: Boolean = false, onBack:
         onDispose { controller.release() }
     }
     val state by controller.state.collectAsState()
+    // The drill renders in its own riwāyah's script; restore the app font on exit.
+    LaunchedEffect(state.riwayah) {
+        quranFont = if (state.riwayah == "warsh") KfgqpcWarsh else KfgqpcHafs
+    }
+    DisposableEffect(Unit) {
+        onDispose {
+            quranFont = if (repository.riwayah == "warsh") KfgqpcWarsh else KfgqpcHafs
+        }
+    }
     // "New preset" opens straight into the editor in create mode (id 0 → save
     // inserts a new preset rather than editing/playing the default one).
     var creatingNew by remember { mutableStateOf(newPreset) }
     var showEditor by remember { mutableStateOf(newPreset) }
     val surahs by produceState(initialValue = emptyList<SurahOption>()) {
         value = repository.surahOptions()
-    }
-    val reciters by produceState(initialValue = emptyList<app.alkahf.data.audio.Reciter>()) {
-        value = repository.allReciters()
     }
 
     if (showEditor) {
@@ -133,9 +141,10 @@ fun LoopPlayerScreen(presetId: Long? = null, newPreset: Boolean = false, onBack:
                 id = if (creatingNew) 0L else (base?.id ?: 0L),
                 name = base?.name ?: defaultDrillName,
                 isDefault = if (creatingNew) false else (base?.isDefault ?: false),
+                riwayah = if (creatingNew) repository.riwayah else (base?.riwayah ?: state.riwayah),
             ),
             surahs = surahs,
-            reciters = reciters,
+            loadReciters = { repository.allReciters(it) },
             onSave = { preset ->
                 scope.launch {
                     val id = repository.savePreset(preset)

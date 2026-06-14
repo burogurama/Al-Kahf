@@ -313,6 +313,7 @@
     <string name="library_import_reciter_title">Import a reciter</string>
     <string name="library_import_reciter_message">Name this reciter profile, then import an audio file per sūrah.</string>
     <string name="library_import_reciter_name_hint">e.g. Mishary (my recording)</string>
+    <string name="library_reciter_riwayah_label">Reading (riwāyah)</string>
     <string name="library_badge_active">ACTIVE</string>
     <string name="library_badge_default">SABAQ</string>
     <string name="library_action_open">Open</string>

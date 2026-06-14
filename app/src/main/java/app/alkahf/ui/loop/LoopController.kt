@@ -50,6 +50,7 @@ data class LoopUiState(
     val surahAyahCount: Int = 110,
     val reciterPath: String = AudioStore.DEFAULT_RECITER,
     val reciterName: String = "Ḥuṣarī",
+    val riwayah: String = "hafs",
     val ayahs: Map<Int, PageAyah> = emptyMap(),
     val errorMessage: String? = null,
 ) {
@@ -64,6 +65,7 @@ data class LoopUiState(
         perChain = perChain,
         gapMultiplier = gapMultiplier,
         speed = speed,
+        riwayah = riwayah,
     )
 }
 
@@ -108,6 +110,7 @@ class LoopController(
         rangeEnd = preset.ayahTo,
         reciterPath = preset.reciterPath,
         reciterName = preset.reciterName,
+        riwayah = preset.riwayah,
         perAyah = preset.perAyah,
         perChain = preset.perChain,
         gapMultiplier = preset.gapMultiplier,
@@ -194,7 +197,9 @@ class LoopController(
     private suspend fun runSession() {
         if (loadedSurah != _state.value.surah) {
             val surah = _state.value.surah
-            val ayahs = repository.ayahsForRange(surah, 1, 300).associateBy { it.number }
+            // Load the drill's own riwāyah text (independent of the app setting).
+            val ayahs = repository.ayahsForRange(surah, 1, 300, _state.value.riwayah)
+                .associateBy { it.number }
             val latin = repository.surahNameLatin(surah)
             _state.update {
                 it.copy(
@@ -282,7 +287,7 @@ class LoopController(
         }
         // One drill āyah maps to one (Hafs) or several (Warsh merges) everyayah
         // files; play them back to back as a single step.
-        val hafsAyahs = repository.audioAyahs(_state.value.surah, step.ayah)
+        val hafsAyahs = repository.audioAyahs(_state.value.surah, step.ayah, _state.value.riwayah)
         var finished = true
         for (hafsAyah in hafsAyahs) {
             val file = downloadAyah(hafsAyah) ?: return null

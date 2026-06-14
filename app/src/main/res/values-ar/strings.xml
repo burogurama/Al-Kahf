@@ -357,6 +357,7 @@
     <string name="library_import_reciter_title">استيراد قارئ</string>
     <string name="library_import_reciter_message">سمِّ ملف القارئ هذا، ثم استورد ملفًا صوتيًا لكل سورة.</string>
     <string name="library_import_reciter_name_hint">مثال: مشاري (تسجيلي)</string>
+    <string name="library_reciter_riwayah_label">الرواية</string>
     <string name="library_badge_active">نشط</string>
     <string name="library_badge_default">السبق</string>
     <string name="library_action_open">فتح</string>

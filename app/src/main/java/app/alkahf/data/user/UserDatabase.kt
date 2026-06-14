@@ -61,6 +61,7 @@ data class CustomReciterEntity(
     val name: String,
     val initial: String,
     @ColumnInfo(name = "created_at") val createdAt: Long,
+    val riwayah: String = "hafs",
 )
 
 /** One imported audio file (one surah) belonging to a custom reciter. */
@@ -108,6 +109,7 @@ data class LoopPresetEntity(
     @ColumnInfo(name = "gap_multiplier") val gapMultiplier: Float,
     val speed: Float,
     @ColumnInfo(name = "is_default") val isDefault: Boolean,
+    val riwayah: String = "hafs",
 )
 
 /** A memorized portion tracked by the spaced-repetition scheduler. */
@@ -180,8 +182,14 @@ interface UserDao {
     @Query("SELECT * FROM loop_presets ORDER BY is_default DESC, id")
     suspend fun allPresets(): List<LoopPresetEntity>
 
+    @Query("SELECT * FROM loop_presets WHERE riwayah = :riwayah ORDER BY is_default DESC, id")
+    suspend fun presetsForRiwayah(riwayah: String): List<LoopPresetEntity>
+
     @Query("SELECT * FROM loop_presets WHERE is_default = 1 LIMIT 1")
     suspend fun defaultPreset(): LoopPresetEntity?
+
+    @Query("SELECT * FROM loop_presets WHERE is_default = 1 AND riwayah = :riwayah LIMIT 1")
+    suspend fun defaultPresetForRiwayah(riwayah: String): LoopPresetEntity?
 
     @Query("SELECT COUNT(*) FROM loop_presets")
     suspend fun presetCount(): Int
@@ -219,6 +227,12 @@ interface UserDao {
     @Query("SELECT * FROM custom_reciters ORDER BY created_at")
     suspend fun customReciters(): List<CustomReciterEntity>
 
+    @Query("SELECT * FROM custom_reciters WHERE riwayah = :riwayah ORDER BY created_at")
+    suspend fun customRecitersForRiwayah(riwayah: String): List<CustomReciterEntity>
+
+    @Query("UPDATE custom_reciters SET riwayah = :riwayah WHERE id = :id")
+    suspend fun setReciterRiwayah(id: Long, riwayah: String)
+
     @Insert
     suspend fun insertCustomReciter(reciter: CustomReciterEntity): Long
 
@@ -253,15 +267,24 @@ interface UserDao {
         CustomReciterEntity::class,
         ImportedSurahEntity::class,
     ],
-    version = 7,
+    version = 8,
     exportSchema = false,
 )
 abstract class UserDatabase : RoomDatabase() {
     abstract fun userDao(): UserDao
 
     companion object {
+        // v8: tag custom reciters and drills with a riwāyah (preserve user data).
+        private val MIGRATION_7_8 = object : androidx.room.migration.Migration(7, 8) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE custom_reciters ADD COLUMN riwayah TEXT NOT NULL DEFAULT 'hafs'")
+                db.execSQL("ALTER TABLE loop_presets ADD COLUMN riwayah TEXT NOT NULL DEFAULT 'hafs'")
+            }
+        }
+
         fun open(context: Context): UserDatabase =
             Room.databaseBuilder(context, UserDatabase::class.java, "user.db")
+                .addMigrations(MIGRATION_7_8)
                 .fallbackToDestructiveMigration()
                 .build()
     }

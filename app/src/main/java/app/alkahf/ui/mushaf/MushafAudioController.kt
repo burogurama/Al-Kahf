@@ -59,6 +59,14 @@ class MushafAudioController(
     private var job: Job? = null
     private var lastDurationMs = 0L
     private var playbackSpeed = 1f
+    // The riwāyah whose audio mapping is used (the Mushaf's temporary view).
+    private var riwayah = "hafs"
+
+    fun setRiwayah(value: String) {
+        if (value == riwayah) return
+        stop()
+        riwayah = value
+    }
 
     fun setMode(mode: MushafAudioMode) {
         stop()
@@ -149,7 +157,7 @@ class MushafAudioController(
                 // One app āyah maps to one (Hafs) or, where Warsh counting merges
                 // verses, several everyayah files; play them back to back.
                 val surah = ayahId / 1000
-                val hafsAyahs = repository.audioAyahs(surah, ayahId % 1000)
+                val hafsAyahs = repository.audioAyahs(surah, ayahId % 1000, riwayah)
                 for (hafsAyah in hafsAyahs) {
                     val file = try {
                         audioStore.ayahFile(surah, hafsAyah, _state.value.reciterPath)

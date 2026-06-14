@@ -29,8 +29,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -57,7 +59,7 @@ import app.alkahf.ui.theme.AlkahfColors
 fun PresetEditor(
     initial: LoopPreset,
     surahs: List<SurahOption>,
-    reciters: List<Reciter>,
+    loadReciters: suspend (String) -> List<Reciter>,
     onSave: (LoopPreset) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -66,12 +68,21 @@ fun PresetEditor(
     }
     var ayahFrom by remember { mutableStateOf(initial.ayahFrom) }
     var ayahTo by remember { mutableStateOf(initial.ayahTo) }
-    val reciterOptions = reciters.ifEmpty { RECITERS }
-    var reciter by remember(reciterOptions) {
-        mutableStateOf(
-            reciterOptions.firstOrNull { it.path == initial.reciterPath } ?: reciterOptions.first(),
-        )
+    // The drill's own riwāyah; the reciter list follows it.
+    var riwayah by remember { mutableStateOf(initial.riwayah) }
+    val loadedReciters by produceState(initialValue = emptyList<Reciter>(), riwayah) {
+        value = loadReciters(riwayah)
     }
+    val reciterOptions = loadedReciters.ifEmpty { RECITERS }
+    var reciter by remember { mutableStateOf<Reciter?>(null) }
+    // Keep the selection valid as the riwāyah (and thus the list) changes.
+    LaunchedEffect(reciterOptions) {
+        if (reciterOptions.isNotEmpty() && reciterOptions.none { it.path == reciter?.path }) {
+            reciter = reciterOptions.firstOrNull { it.path == initial.reciterPath }
+                ?: reciterOptions.first()
+        }
+    }
+    val selectedReciter = reciter ?: reciterOptions.firstOrNull() ?: RECITERS.first()
     var perAyah by remember { mutableStateOf(initial.perAyah) }
     var perChain by remember { mutableStateOf(initial.perChain) }
     var gap by remember { mutableStateOf(initial.gapMultiplier) }
@@ -157,13 +168,37 @@ fun PresetEditor(
                     onIncrement = { ayahTo = (ayahTo + 1).coerceAtMost(maxTo) },
                 )
             }
+            EditorCard(stringResource(R.string.settings_riwayah)) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                    listOf(
+                        "hafs" to stringResource(R.string.settings_riwayah_hafs),
+                        "warsh" to stringResource(R.string.settings_riwayah_warsh),
+                    ).forEach { (value, label) ->
+                        val selected = value == riwayah
+                        Surface(
+                            onClick = { riwayah = value },
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (selected) AlkahfColors.AccentTint else AlkahfColors.ChipBg,
+                            border = BorderStroke(1.dp, if (selected) AlkahfColors.Accent else AlkahfColors.CardBorder),
+                        ) {
+                            Text(
+                                text = label,
+                                fontSize = 13.sp,
+                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                                color = if (selected) AlkahfColors.AccentDeep else AlkahfColors.InkSecondaryDark,
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 7.dp),
+                            )
+                        }
+                    }
+                }
+            }
             EditorCard(stringResource(R.string.loop_card_reciter)) {
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(7.dp),
                     verticalArrangement = Arrangement.spacedBy(7.dp),
                 ) {
                     reciterOptions.forEach { option ->
-                        val selected = option.path == reciter.path
+                        val selected = option.path == selectedReciter.path
                         Surface(
                             onClick = { reciter = option },
                             shape = RoundedCornerShape(10.dp),
@@ -221,13 +256,14 @@ fun PresetEditor(
                         surahNameLatin = surah.nameLatin,
                         ayahFrom = ayahFrom,
                         ayahTo = ayahTo,
-                        reciterPath = reciter.path,
-                        reciterName = reciter.displayName,
+                        reciterPath = selectedReciter.path,
+                        reciterName = selectedReciter.displayName,
                         perAyah = perAyah,
                         perChain = perChain,
                         gapMultiplier = gap,
                         speed = speed,
                         isDefault = initial.isDefault,
+                        riwayah = riwayah,
                     ),
                 )
             },
