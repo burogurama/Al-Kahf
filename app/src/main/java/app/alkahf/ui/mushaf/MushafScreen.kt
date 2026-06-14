@@ -81,6 +81,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.pluralStringResource
@@ -448,7 +449,7 @@ fun MushafScreen(
     CompositionLocalProvider(LocalQuranFont provides quranFontFor(displayRiwayah)) {
         Column(Modifier.fillMaxSize().background(AlkahfColors.Paper)) {
             MushafTopBar(
-                title = currentSession?.page?.primarySurahLatin ?: "",
+                title = currentSession?.page?.let { localizedSurahName(it) } ?: "",
                 location = currentSession?.page?.let {
                     stringResource(R.string.mushaf_location, it.juz, it.number)
                 } ?: "",
@@ -990,7 +991,7 @@ private fun SurahHeaderBand(group: PageGroup, surahState: MemorizationState, onC
         )
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-                text = group.surahNameArabic,
+                text = "سُورَةُ ${group.surahNameArabic}",
                 fontFamily = LocalQuranFont.current,
                 fontSize = 25.sp,
                 lineHeight = 34.sp,
@@ -1045,6 +1046,16 @@ private fun surahStateLabel(state: MemorizationState): Int = when (state) {
     MemorizationState.LEARNING -> R.string.state_learning
     MemorizationState.NOT_STARTED -> R.string.state_not_started
 }
+
+/** The page's primary sūrah name in the UI language: Arabic when the app is in
+ *  Arabic, the Latin transliteration otherwise. */
+@Composable
+private fun localizedSurahName(page: MushafPage): String =
+    if (LocalConfiguration.current.locales[0].language == "ar") {
+        page.primarySurahArabic
+    } else {
+        page.primarySurahLatin
+    }
 
 @Composable
 private fun AyatBody(
@@ -1293,7 +1304,7 @@ private fun PageFooter(page: MushafPage) {
                 color = AlkahfColors.InkMuted,
             )
             Text(
-                text = page.primarySurahLatin,
+                text = localizedSurahName(page),
                 fontSize = 11.sp,
                 fontWeight = FontWeight.SemiBold,
                 letterSpacing = 0.4.sp,

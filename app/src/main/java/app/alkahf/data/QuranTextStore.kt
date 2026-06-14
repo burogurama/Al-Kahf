@@ -58,7 +58,7 @@ class QuranTextStore(context: Context, private val riwayahProvider: () -> Riwaya
                 val beginsHere = surahAyahs.first().number == 1
                 PageGroup(
                     surahNumber = surahNumber,
-                    surahNameArabic = "سُورَةُ ${surah.nameArabic}",
+                    surahNameArabic = surah.nameArabic,
                     surahNameLatin = surah.nameLatin,
                     surahMeta = surahMeta(surah.revelationType, surah.ayahCount),
                     showSurahHeader = beginsHere,

@@ -22,6 +22,7 @@ data class PageAyah(
  */
 data class PageGroup(
     val surahNumber: Int,
+    /** The sūrah's plain Arabic name, e.g. "الفاتحة" (no "سُورَةُ" prefix). */
     val surahNameArabic: String,
     val surahNameLatin: String,
     val surahMeta: String,
@@ -38,6 +39,7 @@ data class MushafPage(
 ) {
     val ayahs: List<PageAyah> get() = groups.flatMap { it.ayahs }
     val primarySurahLatin: String get() = groups.first().surahNameLatin
+    val primarySurahArabic: String get() = groups.first().surahNameArabic
 }
 
 data class WordStumble(val ayahId: Int, val wordIndex: Int)
