@@ -22,8 +22,9 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -58,10 +59,11 @@ fun ProgressScreen(
     onSelectTab: (AlkahfTab) -> Unit = {},
 ) {
     val context = LocalContext.current
-    val repository = remember { (context.applicationContext as AlkahfApplication).repository }
-    val snapshot by produceState<ProgressSnapshot?>(initialValue = null) {
-        value = repository.progressSnapshot()
+    val controller = remember {
+        ProgressController((context.applicationContext as AlkahfApplication).repository)
     }
+    val snapshot by controller.snapshot.collectAsState()
+    LaunchedEffect(Unit) { controller.load() }
 
     Scaffold(
         containerColor = AlkahfColors.Paper,

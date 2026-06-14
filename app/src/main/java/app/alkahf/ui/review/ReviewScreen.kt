@@ -38,7 +38,8 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -82,14 +83,15 @@ private const val MINUTES_PER_PORTION = 1.6f
 @Composable
 fun ReviewScreen(onBack: () -> Unit = {}) {
     val context = LocalContext.current
-    val repository = remember { (context.applicationContext as AlkahfApplication).repository }
+    val controller = remember {
+        ReviewController((context.applicationContext as AlkahfApplication).repository)
+    }
     val scope = rememberCoroutineScope()
 
-    val portions by produceState<List<ReviewPortion>?>(initialValue = null) {
-        value = repository.dueReviewPortions()
-    }
-    val growthFactor = remember { repository.reviewPacing.growthFactor }
-    val autoLower = remember { repository.autoLowerOnStumble }
+    val portions by controller.portions.collectAsState()
+    LaunchedEffect(Unit) { controller.load() }
+    val growthFactor = controller.growthFactor
+    val autoLower = controller.autoLower
     var index by remember { mutableIntStateOf(0) }
     var completed by remember { mutableStateOf(false) }
 
@@ -178,10 +180,8 @@ fun ReviewScreen(onBack: () -> Unit = {}) {
                 onNext = {
                     val chosen = grade ?: return@GradedDock
                     val effective = ReviewScheduler.effectiveGrade(chosen, stumbles.size, autoLower)
-                    scope.launch {
-                        repository.commitReviewGrade(portion, effective)
-                        stumbles.forEach { repository.addStumble(it) }
-                    }
+                    val recorded = stumbles.toList()
+                    scope.launch { controller.commit(portion, effective, recorded) }
                     if (index + 1 < queue.size) index++ else completed = true
                 },
             )

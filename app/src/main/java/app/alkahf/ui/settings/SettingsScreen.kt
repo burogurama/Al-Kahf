@@ -41,6 +41,7 @@ import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -69,25 +70,23 @@ fun SettingsScreen(
     onLanguageChange: (String) -> Unit = {},
 ) {
     val context = LocalContext.current
-    val repository = remember { (context.applicationContext as AlkahfApplication).repository }
-    var settings by remember { mutableStateOf(repository.settings()) }
+    val controller = remember {
+        SettingsController((context.applicationContext as AlkahfApplication).repository)
+    }
+    val settings by controller.settings.collectAsState()
+    val riwayah by controller.riwayah.collectAsState()
     var notificationsAllowed by remember { mutableStateOf(notificationsAllowed(context)) }
-    var riwayah by remember { mutableStateOf(repository.riwayah) }
 
     // Switching riwāyah swaps the Qur'an DB, font, and reciter list, all resolved
-    // resolved when the screen tree is rebuilt — recreating the activity reloads
-    // the DB, font, and reciter list for the new reading.
+    // when the screen tree is rebuilt — recreating the activity reloads the DB,
+    // font, and reciter list for the new reading.
     fun changeRiwayah(value: app.alkahf.data.Riwayah) {
         if (value == riwayah) return
-        repository.riwayah = value
-        riwayah = value
+        controller.setRiwayah(value)
         (context as? Activity)?.recreate()
     }
 
-    fun apply(updated: SettingsData) {
-        settings = updated
-        repository.updateSettings(updated)
-    }
+    fun apply(updated: SettingsData) = controller.update(updated)
 
     // Saving reminder config also (re-)arms the alarm set.
     fun applyReminders(updated: SettingsData) {
@@ -170,7 +169,7 @@ fun SettingsScreen(
                         selected = settings.appLanguage,
                         onSelect = { language ->
                             if (language != settings.appLanguage) {
-                                settings = settings.copy(appLanguage = language)
+                                controller.preview(settings.copy(appLanguage = language))
                                 onLanguageChange(language)
                             }
                         },

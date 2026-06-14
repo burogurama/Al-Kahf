@@ -27,6 +27,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -63,21 +64,18 @@ fun LibraryScreen(
     onSelectTab: (AlkahfTab) -> Unit = {},
 ) {
     val context = LocalContext.current
-    val repository = remember { (context.applicationContext as AlkahfApplication).repository }
+    val controller = remember {
+        LibraryController((context.applicationContext as AlkahfApplication).repository)
+    }
     val scope = rememberCoroutineScope()
 
-    var storage by remember { mutableStateOf<StorageInfo?>(null) }
-    var reciters by remember { mutableStateOf<List<ReciterStatus>>(emptyList()) }
-    var activeReciterPath by remember { mutableStateOf(repository.activeReciterPath) }
-    var presets by remember { mutableStateOf<List<LoopPreset>>(emptyList()) }
+    val state by controller.state.collectAsState()
+    val storage = state.storage
+    val reciters = state.reciters
+    val presets = state.presets
     var showNewReciter by remember { mutableStateOf(false) }
-    var refreshKey by remember { mutableStateOf(0) }
 
-    androidx.compose.runtime.LaunchedEffect(refreshKey, activeReciterPath) {
-        storage = repository.storageInfo()
-        reciters = repository.reciterStatuses()
-        presets = repository.presets()
-    }
+    androidx.compose.runtime.LaunchedEffect(Unit) { controller.load() }
 
     Scaffold(
         containerColor = AlkahfColors.Paper,
@@ -100,8 +98,7 @@ fun LibraryScreen(
                         if (reciter.isImported) {
                             onManageReciter(reciter)
                         } else {
-                            repository.setActiveReciter(reciter.key)
-                            activeReciterPath = reciter.key
+                            scope.launch { controller.activateReciter(reciter.key) }
                         }
                     },
                     onManage = { onManageReciter(reciter) },
@@ -119,13 +116,12 @@ fun LibraryScreen(
 
     if (showNewReciter) {
         NewReciterDialog(
-            defaultRiwayah = repository.riwayah,
+            defaultRiwayah = controller.defaultRiwayah,
             onDismiss = { showNewReciter = false },
             onCreate = { name, riwayah ->
                 scope.launch {
-                    repository.createCustomReciter(name, riwayah)
+                    controller.createReciter(name, riwayah)
                     showNewReciter = false
-                    refreshKey++
                 }
             },
         )
