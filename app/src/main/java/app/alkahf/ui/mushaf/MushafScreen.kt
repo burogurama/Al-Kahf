@@ -1287,7 +1287,7 @@ private fun PageFooter(page: MushafPage) {
                 color = AlkahfColors.InkFooter,
             )
             Text(
-                text = page.pageNumberArabic,
+                text = page.number.toString(),
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
                 color = AlkahfColors.InkMuted,

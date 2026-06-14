@@ -78,7 +78,6 @@ import app.alkahf.R
 import app.alkahf.audio.LoopMode
 import app.alkahf.data.SurahOption
 import app.alkahf.data.audio.AudioStore
-import app.alkahf.data.toArabicIndic
 import app.alkahf.ui.theme.AlkahfColors
 import app.alkahf.ui.theme.LocalQuranFont
 import app.alkahf.ui.theme.quranFontFor
@@ -463,7 +462,7 @@ private fun AyahNode(number: Int, built: Boolean, sounding: Boolean) {
             contentAlignment = Alignment.Center,
         ) {
             Text(
-                text = number.toArabicIndic(),
+                text = number.toString(),
                 fontFamily = LocalQuranFont.current,
                 fontSize = if (sounding) 18.sp else 16.sp,
                 color = if (built) AlkahfColors.OnAccent else AlkahfColors.QueuedNumeral,

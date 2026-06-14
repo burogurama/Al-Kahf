@@ -38,7 +38,6 @@ data class MushafPage(
 ) {
     val ayahs: List<PageAyah> get() = groups.flatMap { it.ayahs }
     val primarySurahLatin: String get() = groups.first().surahNameLatin
-    val pageNumberArabic: String get() = number.toArabicIndic()
 }
 
 data class WordStumble(val ayahId: Int, val wordIndex: Int)
