@@ -316,41 +316,27 @@ fun MushafScreen(
     // Floating action menu for the selection: anchored at the long-press point
     // in window coordinates (null = closed).
     var menuAnchor by remember { mutableStateOf<IntOffset?>(null) }
-    // The range-listening config sheet (long-press the headset with a selection).
-    var rangeAudioOpen by remember { mutableStateOf(false) }
-    var rangeMode by remember { mutableStateOf(MushafAudioMode.LISTEN) }
-    var rangeSpeed by remember { mutableStateOf(1f) }
-    var rangeTimes by remember { mutableStateOf(1) }
-    // Reciters available in the config panel (built-in + imported) and the one
-    // currently chosen for the range. Refreshed whenever the panel opens.
-    var reciters by remember { mutableStateOf<List<ReciterStatus>>(emptyList()) }
-    var rangeReciterKey by remember { mutableStateOf(repository.activeReciterPath) }
-    LaunchedEffect(rangeAudioOpen, displayRiwayah) {
-        if (rangeAudioOpen) {
-            reciters = repository.reciterStatuses(displayRiwayah)
-            if (reciters.none { it.key == rangeReciterKey }) {
-                rangeReciterKey = reciters.firstOrNull()?.key ?: rangeReciterKey
-            }
-        }
+    // The range-listening flow (config panel, reciter choice, download confirm)
+    // lives in its own controller; the panel opens on long-pressing the headset
+    // with a selection.
+    val rangeController = remember {
+        MushafRangeController(repository, audioController, scope, onImportReciter, repository.activeReciterPath)
+    }
+    val rangeState by rangeController.state.collectAsState()
+    LaunchedEffect(rangeState.open, displayRiwayah) {
+        if (rangeState.open) rangeController.loadReciters(displayRiwayah)
     }
     // Toggling the reading updates the reciter list and the audio mapping for
     // this Mushaf; the page text reloads via the toggle handler and the font
     // follows LocalQuranFont below.
     LaunchedEffect(displayRiwayah) {
         audioController.setRiwayah(displayRiwayah)
-        reciters = repository.reciterStatuses(displayRiwayah)
-        rangeReciterKey = reciters.firstOrNull { it.key == rangeReciterKey }?.key
-            ?: reciters.firstOrNull()?.key ?: rangeReciterKey
+        rangeController.loadReciters(displayRiwayah)
     }
-    // Pending download confirmation: (reciter, surah, from, to) once the user
-    // hits Listen on an undownloaded built-in range; null while idle.
-    var downloadPrompt by remember { mutableStateOf<RangeDownloadRequest?>(null) }
-    var downloadProgress by remember { mutableStateOf<Float?>(null) }
-    var downloadJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
     LaunchedEffect(currentPageNumber) {
         selection = null
         menuAnchor = null
-        rangeAudioOpen = false
+        rangeController.setOpen(false)
     }
     val orderedSelectedIds: List<Int> = currentSession?.page?.ayahs?.let { ayahs ->
         // Bounds-guard: during a page swap the old range may not fit the new page.
@@ -401,107 +387,14 @@ fun MushafScreen(
     // selected in sabaq mode (so the headset always listens to the sabaq there).
     fun audioRangeIds(): List<Int> = orderedSelectedIds.ifEmpty { sabaqOrderedIds }
 
-    fun playRange(mode: MushafAudioMode) {
-        val ids = audioRangeIds()
-        if (ids.isEmpty()) return
-        audioController.setMode(mode)
-        audioController.setSpeed(rangeSpeed)
-        audioController.playAyahIds(ids, repeat = rangeTimes)
-        rangeMode = mode
-    }
+    fun playRange(mode: MushafAudioMode) = rangeController.play(mode, audioRangeIds())
 
-    // Listen pressed in the config panel. Applies the chosen reciter, then:
-    //  - imported reciter whose sūrah isn't imported+timed → route to import/time
-    //  - built-in reciter with audio not yet cached → confirm + download, play after
-    //  - otherwise → play immediately.
-    fun onRangeListen() {
-        val ids = audioRangeIds()
-        if (ids.isEmpty()) return
-        val chosen = reciters.firstOrNull { it.key == rangeReciterKey }
-        if (chosen == null) {
-            rangeAudioOpen = false
-            playRange(rangeMode)
-            return
-        }
-        if (chosen.isImported) {
-            // Imported reciter: play from the Tawqīt timings if the range is
-            // timed (partial timings are fine for their covered āyāt); otherwise
-            // route the user to import + time the sūrah.
-            val surah = ids.first() / 1000
-            val nums = ids.filter { it / 1000 == surah }.map { it % 1000 }
-            scope.launch {
-                val playback = repository.importedRangePlayback(chosen.key, surah, nums.min(), nums.max())
-                rangeAudioOpen = false
-                if (playback != null) {
-                    audioController.setMode(rangeMode)
-                    audioController.setSpeed(rangeSpeed)
-                    audioController.playImported(
-                        playback.fileUri,
-                        playback.ayahIds,
-                        playback.segments,
-                        repeat = rangeTimes,
-                    )
-                } else {
-                    onImportReciter(chosen)
-                }
-            }
-            return
-        }
-        // Built-in reciter.
-        repository.setActiveReciter(chosen.key)
-        audioController.setReciter(chosen.key, chosen.displayName)
-        val surah = ids.first() / 1000
-        val nums = ids.filter { it / 1000 == surah }.map { it % 1000 }
-        val from = nums.min()
-        val to = nums.max()
-        scope.launch {
-            val ready = repository.rangeAudioAvailable(chosen.key, surah, from, to, displayRiwayah)
-            if (ready) {
-                rangeAudioOpen = false
-                playRange(rangeMode)
-            } else {
-                downloadPrompt = RangeDownloadRequest(
-                    reciterKey = chosen.key,
-                    reciterName = chosen.displayName,
-                    surah = surah,
-                    from = from,
-                    to = to,
-                    count = ids.size,
-                )
-            }
-        }
-    }
+    fun onRangeListen() = rangeController.listen(audioRangeIds(), displayRiwayah)
 
-    fun startRangeDownload(request: RangeDownloadRequest) {
-        downloadProgress = 0f
-        downloadJob = scope.launch {
-            try {
-                repository.downloadRange(
-                    request.reciterKey, request.surah, request.from, request.to, displayRiwayah,
-                ) {
-                    downloadProgress = it
-                }
-                downloadProgress = null
-                downloadPrompt = null
-                downloadJob = null
-                rangeAudioOpen = false
-                playRange(rangeMode)
-            } catch (e: kotlinx.coroutines.CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                downloadProgress = null
-                downloadPrompt = null
-                downloadJob = null
-            }
-        }
-    }
+    fun startRangeDownload(request: RangeDownloadRequest) =
+        rangeController.startDownload(request, displayRiwayah, audioRangeIds())
 
-    fun cancelRangeDownload() {
-        downloadJob?.cancel()
-        downloadJob = null
-        downloadProgress = null
-        downloadPrompt = null
-    }
+    fun cancelRangeDownload() = rangeController.cancelDownload()
 
     // Long-pressing an ayah in reading mode opens the floating action menu,
     // re-selecting that ayah alone when it lies outside the current selection.
@@ -533,7 +426,7 @@ fun MushafScreen(
             // Long-press toggles the config open/closed (closing it doesn't play;
             // only the Listen button starts playback).
             audioDockOpen = false
-            rangeAudioOpen = !rangeAudioOpen
+            rangeController.toggleOpen()
         } else {
             toggleAudioDock()
         }
@@ -549,7 +442,7 @@ fun MushafScreen(
                 // Tapping the title opens "go to"; the locked sabaq view can't jump.
                 onTitleClick = { showJump = true }.takeIf { !sabaqMode },
                 hideMode = hideMode,
-                audioActive = audioDockOpen || rangeAudioOpen,
+                audioActive = audioDockOpen || rangeState.open,
                 onAudioTap = onHeadsetTap,
                 onAudioDoubleTap = onHeadsetDoubleTap,
                 onAudioLongPress = onHeadsetLongPress,
@@ -624,16 +517,16 @@ fun MushafScreen(
                 }
             }
             when {
-                rangeAudioOpen -> RangeAudioDock(
-                    mode = rangeMode,
-                    speed = rangeSpeed,
-                    times = rangeTimes,
-                    reciters = reciters,
-                    selectedReciterKey = rangeReciterKey,
-                    onMode = { rangeMode = it },
-                    onSpeed = { rangeSpeed = it },
-                    onTimes = { rangeTimes = it },
-                    onReciter = { rangeReciterKey = it },
+                rangeState.open -> RangeAudioDock(
+                    mode = rangeState.mode,
+                    speed = rangeState.speed,
+                    times = rangeState.times,
+                    reciters = rangeState.reciters,
+                    selectedReciterKey = rangeState.reciterKey,
+                    onMode = rangeController::setMode,
+                    onSpeed = rangeController::setSpeed,
+                    onTimes = rangeController::setTimes,
+                    onReciter = rangeController::setReciter,
                     onListen = { onRangeListen() },
                 )
                 audioDockOpen -> MushafAudioDock(
@@ -742,12 +635,12 @@ fun MushafScreen(
             )
         }
 
-        val request = downloadPrompt
+        val request = rangeState.downloadPrompt
         if (request != null) {
             RangeDownloadDialog(
                 reciterName = request.reciterName,
                 count = request.count,
-                progress = downloadProgress,
+                progress = rangeState.downloadProgress,
                 onConfirm = { startRangeDownload(request) },
                 onCancel = { cancelRangeDownload() },
             )
@@ -755,15 +648,6 @@ fun MushafScreen(
     }
 }
 
-/** A pending built-in-reciter range download awaiting the user's confirmation. */
-private data class RangeDownloadRequest(
-    val reciterKey: String,
-    val reciterName: String,
-    val surah: Int,
-    val from: Int,
-    val to: Int,
-    val count: Int,
-)
 
 @Composable
 private fun MushafTopBar(
