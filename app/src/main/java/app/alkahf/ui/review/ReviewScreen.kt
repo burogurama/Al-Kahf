@@ -390,12 +390,9 @@ private fun PassageText(
                             val span = spanAt(layoutResult.value, passage, position) ?: return@detectTapGestures
                             val ayah = portion.ayahs.first { it.id == span.ayahId }
                             val revealed = revealedCounts[ayah.id] ?: 0
-                            if (span.wordIndex < revealed) {
-                                // Manual marking: tapping a revealed word
-                                // toggles its stumble mark.
-                                val mark = WordStumble(span.ayahId, span.wordIndex)
-                                if (!stumbles.remove(mark)) stumbles.add(mark)
-                            } else if (revealed < ayah.words.size) {
+                            // Tapping only reveals the next word; revealed words
+                            // are not markable (no underline on tap).
+                            if (revealed < ayah.words.size) {
                                 revealedCounts[ayah.id] = revealed + 1
                             }
                         },
