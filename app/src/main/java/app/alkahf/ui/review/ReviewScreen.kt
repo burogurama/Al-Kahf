@@ -133,7 +133,10 @@ fun ReviewScreen(onBack: () -> Unit = {}) {
         val revealedCounts = remember(portion.id) { mutableStateMapOf<Int, Int>() }
         val stumbles = remember(portion.id) { mutableStateListOf<WordStumble>() }
         var grade by remember(portion.id) { mutableStateOf<ReviewGrade?>(null) }
-        val fullyRevealed = portion.ayahs.all {
+        // Only the portion's own āyāt are concealed; the surrounding context
+        // āyāt are always shown, so completion ignores them.
+        val reviewAyahs = portion.ayahs.filter { it.id % 1000 in portion.ayahFrom..portion.ayahTo }
+        val fullyRevealed = reviewAyahs.all {
             (revealedCounts[it.id] ?: 0) >= it.words.size
         }
 
@@ -153,7 +156,7 @@ fun ReviewScreen(onBack: () -> Unit = {}) {
                     }
                 },
                 onRevealAll = {
-                    portion.ayahs.forEach { revealedCounts[it.id] = it.words.size }
+                    reviewAyahs.forEach { revealedCounts[it.id] = it.words.size }
                 },
             )
             grade == null -> GradingDock(
@@ -315,14 +318,20 @@ private fun PassageCard(
                     }
                 }
             }
-            Spacer(Modifier.weight(1f))
-            PassageText(
-                portion = portion,
-                revealedCounts = revealedCounts,
-                stumbles = stumbles,
-                modifier = Modifier.verticalScroll(rememberScrollState(), enabled = false),
-            )
-            Spacer(Modifier.weight(1f))
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                contentAlignment = Alignment.Center,
+            ) {
+                PassageText(
+                    portion = portion,
+                    revealedCounts = revealedCounts,
+                    stumbles = stumbles,
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                )
+            }
             HorizontalDivider(thickness = 1.dp, color = AlkahfColors.Hairline)
             Row(
                 modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
@@ -364,9 +373,14 @@ private fun PassageText(
     stumbles: MutableList<WordStumble>,
     modifier: Modifier = Modifier,
 ) {
+    // Context āyāt (outside the portion's range) are always shown, in a muted
+    // colour, so they're never part of what's recited from memory.
+    val contextIds = remember(portion.id) {
+        portion.ayahs.filter { it.id % 1000 !in portion.ayahFrom..portion.ayahTo }.map { it.id }.toSet()
+    }
     val revealedSnapshot = portion.ayahs.associate { it.id to (revealedCounts[it.id] ?: 0) }
     val passage = remember(portion.id, revealedSnapshot, stumbles.size) {
-        buildPassageText(portion.ayahs, revealedSnapshot)
+        buildPassageText(portion.ayahs, revealedSnapshot, contextIds)
     }
     val layoutResult = remember { mutableStateOf<TextLayoutResult?>(null) }
     val stumbleAmber = AlkahfColors.StumbleAmber
@@ -388,18 +402,19 @@ private fun PassageText(
                     detectTapGestures(
                         onTap = { position ->
                             val span = spanAt(layoutResult.value, passage, position) ?: return@detectTapGestures
-                            val ayah = portion.ayahs.first { it.id == span.ayahId }
-                            val revealed = revealedCounts[ayah.id] ?: 0
-                            // Tapping only reveals the next word; revealed words
-                            // are not markable (no underline on tap).
-                            if (revealed < ayah.words.size) {
-                                revealedCounts[ayah.id] = revealed + 1
+                            // Tapping a portion āyah reveals it whole; context
+                            // āyāt are already shown.
+                            if (span.ayahId !in contextIds) {
+                                val ayah = portion.ayahs.first { it.id == span.ayahId }
+                                revealedCounts[ayah.id] = ayah.words.size
                             }
                         },
                         onLongPress = { position ->
                             val span = spanAt(layoutResult.value, passage, position) ?: return@detectTapGestures
-                            val ayah = portion.ayahs.first { it.id == span.ayahId }
-                            revealedCounts[ayah.id] = ayah.words.size
+                            if (span.ayahId !in contextIds) {
+                                val ayah = portion.ayahs.first { it.id == span.ayahId }
+                                revealedCounts[ayah.id] = ayah.words.size
+                            }
                         },
                     )
                 }
@@ -448,23 +463,25 @@ private data class PassageAnnotated(val annotated: AnnotatedString, val spans: L
 private fun buildPassageText(
     ayahs: List<PageAyah>,
     revealedByAyah: Map<Int, Int>,
+    contextIds: Set<Int>,
 ): PassageAnnotated {
     val spans = mutableListOf<PassageSpan>()
     val annotated = buildAnnotatedString {
         ayahs.forEachIndexed { ayahIndex, ayah ->
+            val isContext = ayah.id in contextIds
             val revealed = revealedByAyah[ayah.id] ?: 0
             ayah.words.forEachIndexed { wordIndex, word ->
                 val start = length
                 append(word)
                 spans += PassageSpan(ayah.id, wordIndex, start, length, isMarker = false)
                 addStyle(
-                    style = if (wordIndex >= revealed) {
-                        SpanStyle(
+                    style = when {
+                        isContext -> SpanStyle(color = AlkahfColors.InkFaint)
+                        wordIndex >= revealed -> SpanStyle(
                             color = Color.Transparent,
                             shadow = Shadow(AlkahfColors.ConcealedInk, Offset.Zero, 14f),
                         )
-                    } else {
-                        SpanStyle(color = AlkahfColors.Ink)
+                        else -> SpanStyle(color = AlkahfColors.Ink)
                     },
                     start = start,
                     end = length,
@@ -476,7 +493,11 @@ private fun buildPassageText(
             spans += PassageSpan(ayah.id, wordIndex = -1, start = markerStart, end = length, isMarker = true)
             addStyle(
                 style = SpanStyle(
-                    color = if (revealed >= ayah.words.size) AlkahfColors.Accent else AlkahfColors.ConcealedMedallion,
+                    color = when {
+                        isContext -> AlkahfColors.InkFaint
+                        revealed >= ayah.words.size -> AlkahfColors.Accent
+                        else -> AlkahfColors.ConcealedMedallion
+                    },
                 ),
                 start = markerStart,
                 end = length,

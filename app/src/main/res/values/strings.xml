@@ -25,7 +25,7 @@
     <!-- Bottom navigation -->
     <string name="nav_today">Today</string>
     <string name="nav_mushaf">Mushaf</string>
-    <string name="nav_review">Review</string>
+    <string name="nav_review">Istiḥḍār</string>
     <string name="nav_progress">Progress</string>
     <string name="nav_library">Library</string>
 
@@ -42,10 +42,10 @@
     <string name="home_continue_learning">Continue learning</string>
     <string name="home_hide_self_test">Hide &amp; self-test</string>
     <string name="home_mark_sabaq_memorized">Mark section memorized</string>
-    <string name="home_review_murajaah">REVIEW · MURĀJAʿAH</string>
+    <string name="home_review_murajaah">ISTIḤḌĀR</string>
     <string name="home_due_today">DUE TODAY</string>
     <string name="home_approx_min">≈ %1$d min</string>
-    <string name="home_start_review">Start review</string>
+    <string name="home_start_review">Start istiḥḍār</string>
     <string name="home_resume_drill">Resume drill</string>
     <string name="home_resume_drill_caption">RESUME DRILL</string>
     <string name="home_drill_title">%1$s · %2$s %3$d–%4$d</string>
@@ -70,11 +70,11 @@
     <string name="settings_arabic_text_size">Arabic text size</string>
     <string name="settings_pt_value">%1$d pt</string>
     <string name="settings_script">Script</string>
-    <string name="settings_section_review">REVIEW &amp; SCHEDULE</string>
-    <string name="settings_daily_budget">Daily review budget</string>
+    <string name="settings_section_review">ISTIḤḌĀR &amp; SCHEDULE</string>
+    <string name="settings_daily_budget">Daily istiḥḍār budget</string>
     <string name="settings_min_value">%1$d min</string>
     <string name="settings_new_per_day">New āyāt per day</string>
-    <string name="settings_review_pacing">Review pacing</string>
+    <string name="settings_review_pacing">Istiḥḍār pacing</string>
     <string name="settings_pacing_gentle">Gentle</string>
     <string name="settings_pacing_standard">Standard</string>
     <string name="settings_pacing_aggressive">Aggressive</string>
@@ -203,15 +203,15 @@
     <string name="loop_audio_download_failed">Audio download failed — check your connection</string>
 
     <!-- Review -->
-    <string name="review_title">Daily Review</string>
-    <string name="review_subtitle_done">Murājaʿah · done for today</string>
-    <string name="review_subtitle_remaining">Murājaʿah · ≈ %1$s left</string>
+    <string name="review_title">Daily Istiḥḍār</string>
+    <string name="review_subtitle_done">Istiḥḍār · done for today</string>
+    <string name="review_subtitle_remaining">Istiḥḍār · ≈ %1$s left</string>
     <string name="review_portion_of">Portion %1$d of %2$d · %3$s</string>
     <string name="review_graded_count">%1$d graded</string>
     <string name="review_surah_header">SŪRAT %1$s · %2$d–%3$d</string>
     <string name="review_revealed_after_recall">Revealed after recall · %1$s</string>
     <string name="review_recite_then_reveal">Recite from memory, then reveal to check</string>
-    <string name="review_reveal_hint">Tap a word to reveal · long-press for the full ayah</string>
+    <string name="review_reveal_hint">Tap an āyah to reveal it · long-press too</string>
     <string name="review_stumble">Stumble</string>
     <string name="review_reveal_all">Reveal all</string>
     <string name="review_recall_prompt">How was your recall?</string>
@@ -224,10 +224,10 @@
     <string name="review_graded_capped">Graded %1$s (stumble cap) · next review %2$s</string>
     <string name="review_change">Change</string>
     <string name="review_next_portion">Next portion · %1$s →</string>
-    <string name="review_finish">Finish review</string>
+    <string name="review_finish">Finish istiḥḍār</string>
     <string name="review_portions_left">%1$s left · ≈ %2$s</string>
     <string name="review_last_portion">Last portion of today\'s queue</string>
-    <string name="review_complete_title">Review complete</string>
+    <string name="review_complete_title">Istiḥḍār complete</string>
     <string name="review_nothing_due">Nothing due today</string>
     <string name="review_back_to_today">Back to Today</string>
     <plurals name="review_minutes">

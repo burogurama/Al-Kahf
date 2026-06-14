@@ -902,6 +902,9 @@ class QuranRepository(context: Context) {
         // Cap the queue to the daily time budget (≈1.6 min per portion).
         val budgetLimit = (dailyBudgetMin / 1.6f).toInt().coerceAtLeast(1)
         return userDao.duePortions(LocalDate.now().toEpochDay()).take(budgetLimit).map { entity ->
+            val surahLen = quranDao.surah(entity.surah).ayahCount
+            // Load two āyāt of context on each side (shown, not concealed) so the
+            // hafiz can place the portion they're reciting from memory.
             ReviewPortion(
                 id = entity.id,
                 surah = entity.surah,
@@ -909,7 +912,11 @@ class QuranRepository(context: Context) {
                 ayahFrom = entity.ayahFrom,
                 ayahTo = entity.ayahTo,
                 intervalDays = entity.intervalDays,
-                ayahs = ayahsForRange(entity.surah, entity.ayahFrom, entity.ayahTo),
+                ayahs = ayahsForRange(
+                    entity.surah,
+                    (entity.ayahFrom - 2).coerceAtLeast(1),
+                    (entity.ayahTo + 2).coerceAtMost(surahLen),
+                ),
             )
         }
     }

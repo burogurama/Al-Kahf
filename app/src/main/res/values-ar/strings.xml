@@ -25,7 +25,7 @@
     <!-- Bottom navigation -->
     <string name="nav_today">اليوم</string>
     <string name="nav_mushaf">المصحف</string>
-    <string name="nav_review">المراجعة</string>
+    <string name="nav_review">الاستحضار</string>
     <string name="nav_progress">التقدّم</string>
     <string name="nav_library">المكتبة</string>
 
@@ -42,10 +42,10 @@
     <string name="home_continue_learning">متابعة الحفظ</string>
     <string name="home_hide_self_test">الإخفاء والاختبار الذاتي</string>
     <string name="home_mark_sabaq_memorized">تعليم المقطع محفوظًا</string>
-    <string name="home_review_murajaah">المراجعة · مُراجعة</string>
+    <string name="home_review_murajaah">الاستحضار</string>
     <string name="home_due_today">مستحق اليوم</string>
     <string name="home_approx_min">≈ %1$d د</string>
-    <string name="home_start_review">بدء المراجعة</string>
+    <string name="home_start_review">بدء الاستحضار</string>
     <string name="home_resume_drill">استئناف التمرين</string>
     <string name="home_resume_drill_caption">استئناف التمرين</string>
     <string name="home_drill_title">%1$s · %2$s %3$d–%4$d</string>
@@ -74,11 +74,11 @@
     <string name="settings_arabic_text_size">حجم النص العربي</string>
     <string name="settings_pt_value">%1$d نقطة</string>
     <string name="settings_script">الرسم</string>
-    <string name="settings_section_review">المراجعة والجدولة</string>
-    <string name="settings_daily_budget">حصة المراجعة اليومية</string>
+    <string name="settings_section_review">الاستحضار والجدولة</string>
+    <string name="settings_daily_budget">حصة الاستحضار اليومية</string>
     <string name="settings_min_value">%1$d د</string>
     <string name="settings_new_per_day">آيات جديدة في اليوم</string>
-    <string name="settings_review_pacing">وتيرة المراجعة</string>
+    <string name="settings_review_pacing">وتيرة الاستحضار</string>
     <string name="settings_pacing_gentle">هادئة</string>
     <string name="settings_pacing_standard">قياسية</string>
     <string name="settings_pacing_aggressive">مكثّفة</string>
@@ -215,15 +215,15 @@
     <string name="loop_audio_download_failed">فشل تنزيل الصوت — تحقّق من اتصالك</string>
 
     <!-- Review -->
-    <string name="review_title">المراجعة اليومية</string>
-    <string name="review_subtitle_done">المراجعة · انتهت لليوم</string>
-    <string name="review_subtitle_remaining">المراجعة · يتبقّى ≈ %1$s</string>
+    <string name="review_title">الاستحضار اليومي</string>
+    <string name="review_subtitle_done">الاستحضار · انتهت لليوم</string>
+    <string name="review_subtitle_remaining">الاستحضار · يتبقّى ≈ %1$s</string>
     <string name="review_portion_of">المقطع %1$d من %2$d · %3$s</string>
     <string name="review_graded_count">%1$d مُقيَّم</string>
     <string name="review_surah_header">سورة %1$s · %2$d–%3$d</string>
     <string name="review_revealed_after_recall">كُشف بعد الاستذكار · %1$s</string>
     <string name="review_recite_then_reveal">استظهر من الذاكرة، ثمّ اكشف للتحقّق</string>
-    <string name="review_reveal_hint">انقر كلمة لكشفها · اضغط مطوّلًا لكشف الآية كاملة</string>
+    <string name="review_reveal_hint">انقر على آية لكشفها</string>
     <string name="review_stumble">تعثّر</string>
     <string name="review_reveal_all">اكشف الكل</string>
     <string name="review_recall_prompt">كيف كان استذكارك؟</string>
@@ -236,10 +236,10 @@
     <string name="review_graded_capped">قُيِّم %1$s (حدّ التعثّر) · المراجعة التالية %2$s</string>
     <string name="review_change">تغيير</string>
     <string name="review_next_portion">المقطع التالي · %1$s ←</string>
-    <string name="review_finish">إنهاء المراجعة</string>
+    <string name="review_finish">إنهاء الاستحضار</string>
     <string name="review_portions_left">يتبقّى %1$s · ≈ %2$s</string>
     <string name="review_last_portion">آخر مقطع في طابور اليوم</string>
-    <string name="review_complete_title">اكتملت المراجعة</string>
+    <string name="review_complete_title">اكتمل الاستحضار</string>
     <string name="review_nothing_due">لا شيء مستحق اليوم</string>
     <string name="review_back_to_today">العودة إلى اليوم</string>
     <plurals name="review_minutes">
