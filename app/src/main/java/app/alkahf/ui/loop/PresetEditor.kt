@@ -40,6 +40,7 @@ import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -96,6 +97,9 @@ fun PresetEditor(
     val surah = surahs.getOrNull(surahIndex) ?: return
     val maxTo = minOf(ayahFrom + LoopController.MAX_SPAN - 1, surah.ayahCount)
     val presetName = stringResource(R.string.loop_preset_name, surah.nameLatin, ayahFrom, ayahTo)
+    // Show the sūrah name in the UI language; the preset still stores the Latin name.
+    val surahDisplayName =
+        if (LocalConfiguration.current.locales[0].language == "ar") surah.nameArabic else surah.nameLatin
 
     fun clampRange() {
         ayahFrom = ayahFrom.coerceIn(1, surah.ayahCount)
@@ -144,7 +148,7 @@ fun PresetEditor(
             EditorCard(stringResource(R.string.loop_card_passage)) {
                 StepperRow(
                     label = stringResource(R.string.loop_field_surah),
-                    value = stringResource(R.string.loop_surah_value, surah.number, surah.nameLatin),
+                    value = stringResource(R.string.loop_surah_value, surah.number, surahDisplayName),
                     onDecrement = {
                         if (surahIndex > 0) {
                             surahIndex--
