@@ -412,7 +412,6 @@ class QuranRepository(context: Context) {
     }
 
     suspend fun homeData(): HomeData {
-        ensureSeeded()
         maybeAdvanceSabaq()
         syncSabaqDrill()
         val today = LocalDate.now()
@@ -1132,7 +1131,6 @@ class QuranRepository(context: Context) {
     }
 
     suspend fun dueReviewPortions(): List<ReviewPortion> {
-        ensureSeeded()
         // Cap the queue to the daily time budget (≈1.6 min per portion).
         val budgetLimit = (dailyBudgetMin / 1.6f).toInt().coerceAtLeast(1)
         return userDao.duePortions(LocalDate.now().toEpochDay()).take(budgetLimit).map { entity ->
@@ -1187,7 +1185,6 @@ class QuranRepository(context: Context) {
     }
 
     suspend fun progressSnapshot(): ProgressSnapshot {
-        ensureSeeded()
         val states = userDao.allAyahStates().associate { it.ayahId to it.state }
         val locations = quranDao.ayahLocations()
 
@@ -1260,12 +1257,6 @@ class QuranRepository(context: Context) {
             expected--
         }
         return streak
-    }
-
-    private suspend fun ensureSeeded() {
-        // No-op: the review queue is built from real hifz — a sabaq section
-        // becomes a review portion once fully memorized (see maybeAdvanceSabaq →
-        // enrollReviewPortion).
     }
 
     private fun surahMeta(revelationType: String, ayahCount: Int): String {

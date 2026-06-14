@@ -250,7 +250,10 @@ fun SettingsScreen(
                         ),
                     )
                     Divider()
-                    NavRow(label = stringResource(R.string.settings_script), value = "KFGQPC Uthmanic · HAFS")
+                    NavRow(
+                        label = stringResource(R.string.settings_script),
+                        value = "KFGQPC Uthmanic · ${if (riwayah == "warsh") "WARSH" else "HAFS"}",
+                    )
                 }
             }
 
