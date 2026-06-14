@@ -624,6 +624,20 @@ class QuranRepository(context: Context) {
     suspend fun setAyahState(ayahId: Int, state: MemorizationState) =
         memorization.setState(ayahId, state)
 
+    /** Sets every āyah of [surah] to [state] in one write. */
+    suspend fun setSurahState(surah: Int, state: MemorizationState) {
+        val count = quranText.surahAyahCount(surah)
+        memorization.markStates((1..count).map { surah * 1000 + it }, state)
+    }
+
+    /** The sūrah's overall memorization state, aggregated from its āyāt. */
+    suspend fun surahState(surah: Int): MemorizationState {
+        val count = quranText.surahAyahCount(surah)
+        val ids = (1..count).map { surah * 1000 + it }
+        val states = memorization.statesFor(ids)
+        return surahAggregateState(ids.map { states[it] ?: MemorizationState.NOT_STARTED })
+    }
+
     suspend fun saveRevealState(ayahId: Int, revealedCount: Int) =
         memorization.saveRevealState(ayahId, revealedCount)
 

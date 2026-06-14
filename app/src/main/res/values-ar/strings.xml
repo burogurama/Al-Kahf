@@ -162,8 +162,8 @@
     <string name="mushaf_scope_from_ayah">من آية</string>
     <string name="mushaf_hint_tap_to_hear">انقر أي آية في الصفحة لسماعها</string>
     <string name="mushaf_hint_tap_to_start">انقر آية في الصفحة لتبدأ منها</string>
-    <string name="mushaf_start_learning">بدء حفظ سورة %1$s</string>
-    <string name="mushaf_start_learning_body">كل آية لم تُحفظ بعد ستُعلَّم بأنها قيد الحفظ، وستُقسَّم السورة إلى مقاطع، ويصبح المقطع الأول سبقك.</string>
+    <string name="mushaf_surah_actions_title">سورة %1$s</string>
+    <string name="mushaf_surah_mark_state">تعليم السورة كاملةً كـ</string>
     <string name="mushaf_reciter_label">القارئ</string>
     <string name="mushaf_reciter_imported">مستورد</string>
     <string name="mushaf_download_title">تنزيل التلاوة</string>

@@ -6,6 +6,20 @@ import app.alkahf.data.user.StumbleEntity
 import app.alkahf.data.user.UserDao
 
 /**
+ * A sūrah's overall state from its āyāt's states: strong when every āyah is
+ * strong; memorized when every āyah is strong or memorized (but not all strong);
+ * learning when any āyah is still learning; otherwise not started.
+ */
+fun surahAggregateState(states: List<MemorizationState>): MemorizationState = when {
+    states.isEmpty() -> MemorizationState.NOT_STARTED
+    states.all { it == MemorizationState.STRONG } -> MemorizationState.STRONG
+    states.all { it == MemorizationState.STRONG || it == MemorizationState.MEMORIZED } ->
+        MemorizationState.MEMORIZED
+    states.any { it == MemorizationState.LEARNING } -> MemorizationState.LEARNING
+    else -> MemorizationState.NOT_STARTED
+}
+
+/**
  * Per-āyah memorization progress and the Mushaf's self-test bookkeeping: each
  * āyah's [MemorizationState], the words the reader stumbled on, and how far each
  * āyah has been revealed in hide mode.

@@ -149,6 +149,8 @@ class SelfTestSession(
 ) {
     val revealedCounts = mutableStateMapOf<Int, Int>()
     val memStates = mutableStateMapOf<Int, MemorizationState>()
+    // Overall state of each sūrah whose header begins on this page.
+    val surahStates = mutableStateMapOf<Int, MemorizationState>()
 
     fun revealedOf(ayah: PageAyah): Int = revealedCounts.getOrDefault(ayah.id, 0)
 
@@ -345,8 +347,15 @@ fun MushafScreen(
             ?.let { range -> ayahs.slice(range).map { it.id } }
     } ?: emptyList()
     val selectedIds = orderedSelectedIds.toSet()
-    // The surah whose "start learning" confirmation is open (header tapped).
+    // The surah whose actions sheet is open (its header was tapped).
     var learnSurah by remember { mutableStateOf<Pair<Int, String>?>(null) }
+    // A whole-sūrah listen target for the range dock; null = listen to the
+    // selection/sabaq instead. Cleared when the dock closes.
+    var listenTarget by remember { mutableStateOf<List<Int>?>(null) }
+    // A whole-sūrah listen lasts only while its config dock is open.
+    LaunchedEffect(rangeState.open) {
+        if (!rangeState.open) listenTarget = null
+    }
     // The "go to" sheet (jump to a surah or page) for the regular mushaf.
     var showJump by remember { mutableStateOf(false) }
     val surahOptions by produceState(initialValue = emptyList<SurahOption>()) {
@@ -364,6 +373,9 @@ fun MushafScreen(
             val st = mushaf.ayahStates(s.page.ayahs.map { it.id })
             s.memStates.clear()
             s.memStates.putAll(st)
+            s.page.groups.filter { it.showSurahHeader }.forEach { g ->
+                s.surahStates[g.surahNumber] = mushaf.surahState(g.surahNumber)
+            }
         }
     }
 
@@ -384,9 +396,9 @@ fun MushafScreen(
         }
     }
 
-    // Audio targets the current selection, or the whole sabaq when nothing is
-    // selected in sabaq mode (so the headset always listens to the sabaq there).
-    fun audioRangeIds(): List<Int> = orderedSelectedIds.ifEmpty { sabaqOrderedIds }
+    // Audio targets an explicit whole-sūrah listen, else the current selection,
+    // else the whole sabaq (so the headset always listens to the sabaq there).
+    fun audioRangeIds(): List<Int> = listenTarget ?: orderedSelectedIds.ifEmpty { sabaqOrderedIds }
 
     fun playRange(mode: MushafAudioMode) = rangeController.play(mode, audioRangeIds())
 
@@ -612,12 +624,29 @@ fun MushafScreen(
 
         val prompt = learnSurah
         if (prompt != null) {
-            LearnSurahSheet(
+            SurahActionsSheet(
                 surahName = prompt.second,
-                onConfirm = {
+                currentState = currentSession?.surahStates?.get(prompt.first) ?: MemorizationState.NOT_STARTED,
+                onSetSabaq = {
                     scope.launch {
                         mushaf.startLearningSurah(prompt.first)
                         reloadMemStates()
+                    }
+                    learnSurah = null
+                },
+                onSetState = { state ->
+                    scope.launch {
+                        mushaf.setSurahState(prompt.first, state)
+                        // Memorizing the sabaq's sūrah may complete its section.
+                        mushaf.maybeAdvanceSabaq()
+                        reloadMemStates()
+                    }
+                    learnSurah = null
+                },
+                onListen = {
+                    scope.launch {
+                        listenTarget = mushaf.ayahsForRange(prompt.first, 1, 300).map { it.id }
+                        rangeController.setOpen(true)
                     }
                     learnSurah = null
                 },
@@ -850,6 +879,10 @@ private fun MushafPageView(
             val ayahIds = page.ayahs.map { it.id }
             newSession.revealedCounts.putAll(controller.revealStates(ayahIds))
             newSession.memStates.putAll(controller.ayahStates(ayahIds))
+            // Overall state for each sūrah whose header band shows on this page.
+            page.groups.filter { it.showSurahHeader }.forEach { g ->
+                newSession.surahStates[g.surahNumber] = controller.surahState(g.surahNumber)
+            }
             onSessionReady(newSession)
         }
     }
@@ -921,7 +954,11 @@ private fun PageGroupView(
     selectedIds: Set<Int>,
 ) {
     if (group.showSurahHeader) {
-        SurahHeaderBand(group, onClick = { onLearnSurah(group.surahNumber, group.surahNameLatin) })
+        SurahHeaderBand(
+            group = group,
+            surahState = session.surahStates[group.surahNumber] ?: MemorizationState.NOT_STARTED,
+            onClick = { onLearnSurah(group.surahNumber, group.surahNameLatin) },
+        )
     }
     if (group.basmala != null) {
         Text(
@@ -939,7 +976,7 @@ private fun PageGroupView(
 }
 
 @Composable
-private fun SurahHeaderBand(group: PageGroup, onClick: () -> Unit) {
+private fun SurahHeaderBand(group: PageGroup, surahState: MemorizationState, onClick: () -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(top = 2.dp),
         horizontalArrangement = Arrangement.spacedBy(14.dp),
@@ -972,6 +1009,10 @@ private fun SurahHeaderBand(group: PageGroup, onClick: () -> Unit) {
                 color = AlkahfColors.InkFooter,
                 modifier = Modifier.padding(top = 5.dp),
             )
+            // The sūrah's overall memorization state; hidden when untouched.
+            if (surahState != MemorizationState.NOT_STARTED) {
+                SurahStateChip(surahState, modifier = Modifier.padding(top = 4.dp))
+            }
         }
         Box(
             Modifier
@@ -984,6 +1025,29 @@ private fun SurahHeaderBand(group: PageGroup, onClick: () -> Unit) {
                 ),
         )
     }
+}
+
+/** A small dot + label badge for a sūrah's overall memorization state. */
+@Composable
+private fun SurahStateChip(state: MemorizationState, modifier: Modifier = Modifier) {
+    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(7.dp).background(memMedallionColor(state), CircleShape))
+        Text(
+            text = stringResource(surahStateLabel(state)).uppercase(),
+            fontSize = 9.5.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 1.5.sp,
+            color = AlkahfColors.InkFooter,
+            modifier = Modifier.padding(start = 6.dp),
+        )
+    }
+}
+
+private fun surahStateLabel(state: MemorizationState): Int = when (state) {
+    MemorizationState.STRONG -> R.string.state_strong
+    MemorizationState.MEMORIZED -> R.string.state_memorized
+    MemorizationState.LEARNING -> R.string.state_learning
+    MemorizationState.NOT_STARTED -> R.string.state_not_started
 }
 
 @Composable
@@ -1838,10 +1902,18 @@ private fun StepButton(label: String, onClick: () -> Unit) {
     }
 }
 
+/**
+ * Bottom sheet shown when a sūrah header is tapped: set it as the sabaq, listen
+ * to it (opens the range config dock), or mark the whole sūrah's memorization
+ * state.
+ */
 @Composable
-private fun LearnSurahSheet(
+private fun SurahActionsSheet(
     surahName: String,
-    onConfirm: () -> Unit,
+    currentState: MemorizationState,
+    onSetSabaq: () -> Unit,
+    onSetState: (MemorizationState) -> Unit,
+    onListen: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     Box(
@@ -1864,54 +1936,80 @@ private fun LearnSurahSheet(
                 ) {
                     Box(Modifier.width(38.dp).height(4.dp).background(AlkahfColors.DashedNode, RoundedCornerShape(2.dp)))
                 }
-                Text(
-                    text = stringResource(R.string.mushaf_start_learning, surahName),
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = AlkahfColors.Ink,
-                    modifier = Modifier.padding(bottom = 6.dp),
-                )
-                Text(
-                    text = stringResource(R.string.mushaf_start_learning_body),
-                    fontSize = 13.5.sp,
-                    color = AlkahfColors.InkMuted,
-                    lineHeight = 19.sp,
-                    modifier = Modifier.padding(bottom = 16.dp),
-                )
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Surface(
-                        onClick = onDismiss,
-                        shape = RoundedCornerShape(14.dp),
-                        color = AlkahfColors.Surface,
-                        border = BorderStroke(1.dp, AlkahfColors.CardBorder),
-                        modifier = Modifier.weight(1f).height(48.dp),
-                    ) {
-                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Text(
-                                text = stringResource(R.string.common_cancel),
-                                fontSize = 14.5.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = AlkahfColors.Ink,
-                            )
-                        }
-                    }
-                    Surface(
-                        onClick = onConfirm,
-                        shape = RoundedCornerShape(14.dp),
-                        color = AlkahfColors.Accent,
-                        modifier = Modifier.weight(1f).height(48.dp).padding(start = 10.dp),
-                    ) {
-                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Text(
-                                text = stringResource(R.string.mushaf_menu_set_sabaq),
-                                fontSize = 14.5.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = AlkahfColors.OnAccent,
-                            )
-                        }
+                    Text(
+                        text = stringResource(R.string.mushaf_surah_actions_title, surahName),
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = AlkahfColors.Ink,
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (currentState != MemorizationState.NOT_STARTED) {
+                        SurahStateChip(currentState)
                     }
                 }
+                Spacer(Modifier.height(16.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    SurahActionButton(
+                        label = stringResource(R.string.mushaf_menu_set_sabaq),
+                        filled = true,
+                        onClick = onSetSabaq,
+                        modifier = Modifier.weight(1f),
+                    )
+                    SurahActionButton(
+                        label = stringResource(R.string.mushaf_menu_listen),
+                        filled = false,
+                        onClick = onListen,
+                        modifier = Modifier.weight(1f).padding(start = 10.dp),
+                    )
+                }
+                Text(
+                    text = stringResource(R.string.mushaf_surah_mark_state),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.4.sp,
+                    color = AlkahfColors.InkFooter,
+                    modifier = Modifier.padding(top = 20.dp, bottom = 4.dp),
+                )
+                listOf(
+                    MemorizationState.NOT_STARTED to stringResource(R.string.state_not_started),
+                    MemorizationState.LEARNING to stringResource(R.string.state_learning),
+                    MemorizationState.MEMORIZED to stringResource(R.string.state_memorized),
+                    MemorizationState.STRONG to stringResource(R.string.state_strong),
+                ).forEach { (state, label) ->
+                    StateMenuItem(
+                        label = label,
+                        color = memMedallionColor(state),
+                        selected = state == currentState,
+                        onClick = { onSetState(state) },
+                    )
+                }
             }
+        }
+    }
+}
+
+@Composable
+private fun SurahActionButton(
+    label: String,
+    filled: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(14.dp),
+        color = if (filled) AlkahfColors.Accent else AlkahfColors.Surface,
+        border = if (filled) null else BorderStroke(1.dp, AlkahfColors.CardBorder),
+        modifier = modifier.height(48.dp),
+    ) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text(
+                text = label,
+                fontSize = 14.5.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = if (filled) AlkahfColors.OnAccent else AlkahfColors.Ink,
+            )
         }
     }
 }

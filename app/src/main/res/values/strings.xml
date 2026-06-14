@@ -154,8 +154,8 @@
     <string name="mushaf_scope_from_ayah">From āyah</string>
     <string name="mushaf_hint_tap_to_hear">Tap any āyah on the page to hear it</string>
     <string name="mushaf_hint_tap_to_start">Tap an āyah on the page to start from it</string>
-    <string name="mushaf_start_learning">Start learning Sūrat %1$s</string>
-    <string name="mushaf_start_learning_body">Every āyah not yet memorized will be marked as learning, the sūrah will be split into sections, and the first section becomes your sabaq.</string>
+    <string name="mushaf_surah_actions_title">Sūrat %1$s</string>
+    <string name="mushaf_surah_mark_state">MARK WHOLE SŪRAH AS</string>
     <string name="mushaf_reciter_label">Reciter</string>
     <string name="mushaf_reciter_imported">imported</string>
     <string name="mushaf_download_title">Download recitation</string>
