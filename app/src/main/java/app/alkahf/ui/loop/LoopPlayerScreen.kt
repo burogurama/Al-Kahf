@@ -88,10 +88,9 @@ import kotlinx.coroutines.launch
 fun LoopPlayerScreen(presetId: Long? = null, newPreset: Boolean = false, onBack: () -> Unit = {}) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val repository = remember { (context.applicationContext as AlkahfApplication).repository }
     val controller = remember {
         LoopController(
-            repository = repository,
+            repository = (context.applicationContext as AlkahfApplication).repository,
             audioStore = AudioStore(context.applicationContext),
             player = ExoPlayer.Builder(context).build(),
             scope = scope,
@@ -104,7 +103,7 @@ fun LoopPlayerScreen(presetId: Long? = null, newPreset: Boolean = false, onBack:
         // drill behind it. Applying a preset starts playback, so skip it here.
         if (!newPreset) {
             scope.launch {
-                val preset = presetId?.let { repository.presetById(it) } ?: repository.defaultPreset()
+                val preset = controller.resolvePreset(presetId)
                 loadedPreset = preset
                 controller.applyPreset(preset)
             }
@@ -117,7 +116,7 @@ fun LoopPlayerScreen(presetId: Long? = null, newPreset: Boolean = false, onBack:
     var creatingNew by remember { mutableStateOf(newPreset) }
     var showEditor by remember { mutableStateOf(newPreset) }
     val surahs by produceState(initialValue = emptyList<SurahOption>()) {
-        value = repository.surahOptions()
+        value = controller.surahOptions()
     }
 
     if (showEditor) {
@@ -135,14 +134,14 @@ fun LoopPlayerScreen(presetId: Long? = null, newPreset: Boolean = false, onBack:
                 id = if (creatingNew) 0L else (base?.id ?: 0L),
                 name = base?.name ?: defaultDrillName,
                 isDefault = if (creatingNew) false else (base?.isDefault ?: false),
-                riwayah = if (creatingNew) repository.riwayah else (base?.riwayah ?: state.riwayah),
+                riwayah = if (creatingNew) controller.systemRiwayah else (base?.riwayah ?: state.riwayah),
             ),
             surahs = surahs,
-            loadReciters = { repository.allReciters(it) },
-            convertRange = { s, f, t, fr, tr -> repository.convertAyahRange(s, f, t, fr, tr) },
+            loadReciters = { controller.allReciters(it) },
+            convertRange = { s, f, t, fr, tr -> controller.convertRange(s, f, t, fr, tr) },
             onSave = { preset ->
                 scope.launch {
-                    val id = repository.savePreset(preset)
+                    val id = controller.savePreset(preset)
                     loadedPreset = preset.copy(id = id)
                     controller.applyPreset(preset)
                 }

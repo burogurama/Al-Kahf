@@ -31,8 +31,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -49,8 +49,6 @@ import app.alkahf.AlkahfApplication
 import app.alkahf.R
 import app.alkahf.data.ReciterSurahItem
 import app.alkahf.ui.theme.AlkahfColors
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.launch
 
 @Composable
 fun ReciterDownloadsScreen(
@@ -61,16 +59,20 @@ fun ReciterDownloadsScreen(
     onBack: () -> Unit = {},
 ) {
     val context = LocalContext.current
-    val repository = remember { (context.applicationContext as AlkahfApplication).repository }
     val scope = rememberCoroutineScope()
-
-    var surahs by remember { mutableStateOf<List<ReciterSurahItem>>(emptyList()) }
-    val progress = remember { mutableStateMapOf<Int, Float>() }
-    var bulkJob by remember { mutableStateOf<Job?>(null) }
-    var refreshKey by remember { mutableStateOf(0) }
+    val controller = remember {
+        ReciterDownloadsController(
+            (context.applicationContext as AlkahfApplication).repository,
+            reciterKey,
+            scope,
+        )
+    }
+    val state by controller.state.collectAsState()
+    val surahs = state.surahs
+    val progress = state.progress
     var importTargetSurah by remember { mutableStateOf(0) }
 
-    LaunchedEffect(refreshKey) { surahs = repository.reciterSurahItems(reciterKey) }
+    LaunchedEffect(Unit) { controller.load() }
 
     val picker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument(),
@@ -80,33 +82,7 @@ fun ReciterDownloadsScreen(
                 uri,
                 android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION,
             )
-            val surah = importTargetSurah
-            scope.launch {
-                repository.importSurah(reciterKey, surah, uri.toString())
-                refreshKey++
-            }
-        }
-    }
-
-    fun downloadOne(surah: Int) {
-        scope.launch {
-            progress[surah] = 0f
-            repository.downloadSurah(reciterKey, surah) { p -> progress[surah] = p }
-            progress.remove(surah)
-            refreshKey++
-        }
-    }
-
-    fun downloadAll() {
-        bulkJob = scope.launch {
-            for (item in surahs) {
-                if (item.hasAudio) continue
-                progress[item.surah] = 0f
-                repository.downloadSurah(reciterKey, item.surah) { p -> progress[item.surah] = p }
-                progress.remove(item.surah)
-                refreshKey++
-            }
-            bulkJob = null
+            controller.importSurah(importTargetSurah, uri.toString())
         }
     }
 
@@ -154,8 +130,7 @@ fun ReciterDownloadsScreen(
         if (!isImported) {
             Surface(
                 onClick = {
-                    val running = bulkJob
-                    if (running != null) { running.cancel(); bulkJob = null } else if (!allDone) downloadAll()
+                    if (state.bulkRunning) controller.cancelBulk() else if (!allDone) controller.downloadAll()
                 },
                 shape = RoundedCornerShape(14.dp),
                 color = if (allDone) AlkahfColors.Surface else AlkahfColors.Accent,
@@ -165,7 +140,7 @@ fun ReciterDownloadsScreen(
                 Box(contentAlignment = Alignment.Center) {
                     Text(
                         text = when {
-                            bulkJob != null -> stringResource(R.string.library_cancel_download)
+                            state.bulkRunning -> stringResource(R.string.library_cancel_download)
                             allDone -> stringResource(R.string.library_all_surahs_downloaded)
                             else -> pluralStringResource(
                                 R.plurals.library_download_all_surahs,
@@ -198,19 +173,10 @@ fun ReciterDownloadsScreen(
                 SurahRow(
                     surah = surah,
                     progress = progress[surah.surah],
-                    onDownload = { downloadOne(surah.surah) },
+                    onDownload = { controller.downloadOne(surah.surah) },
                     onImport = { importTargetSurah = surah.surah; picker.launch(arrayOf("audio/*")) },
                     onTime = { onTimeSurah(surah.surah) },
-                    onDelete = {
-                        scope.launch {
-                            if (isImported) {
-                                repository.removeImportedSurah(reciterKey, surah.surah)
-                            } else {
-                                repository.deleteSurahAudio(reciterKey, surah.surah)
-                            }
-                            refreshKey++
-                        }
-                    },
+                    onDelete = { controller.delete(surah.surah, isImported) },
                 )
             }
         }

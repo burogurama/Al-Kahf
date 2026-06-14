@@ -3,6 +3,9 @@ package app.alkahf.ui.tawqit
 import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
 import app.alkahf.data.PageAyah
+import app.alkahf.data.QuranRepository
+import app.alkahf.data.TawqitSourceType
+import app.alkahf.data.TawqitTrack
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -34,6 +37,7 @@ data class TawqitUiState(
 class TawqitController(
     private val player: ExoPlayer,
     private val scope: CoroutineScope,
+    private val repository: QuranRepository,
 ) {
     private val _state = MutableStateFlow(TawqitUiState())
     val state: StateFlow<TawqitUiState> = _state.asStateFlow()
@@ -41,6 +45,35 @@ class TawqitController(
     // Durations of playlist items as they become known, for cumulative position.
     private val itemDurations = HashMap<Int, Long>()
     private var ticker: Job? = null
+
+    /** Resolves a [draft]'s āyāt and audio sources, then begins a tagging session. */
+    suspend fun loadDraft(draft: TawqitTrack) {
+        val ayahs = repository.ayahsForRange(draft.surah, draft.ayahFrom, draft.ayahTo)
+        val uris = when (draft.sourceType) {
+            TawqitSourceType.IMPORT -> List(ayahs.size) { draft.sourceRef }.take(1)
+            TawqitSourceType.RECITER ->
+                repository.reciterAyahUris(draft.sourceRef, draft.surah, draft.ayahFrom, draft.ayahTo)
+        }
+        load(
+            ayahs = ayahs,
+            uris = uris,
+            existingEndTimes = draft.endTimesMs,
+            offsetMs = draft.globalOffsetMs,
+            speed = 0.75f,
+        )
+    }
+
+    /** Persists the current marks back onto [draft]. */
+    suspend fun save(draft: TawqitTrack) {
+        val s = _state.value
+        repository.saveTawqitTrack(
+            draft.copy(
+                endTimesMs = s.endTimesMs,
+                globalOffsetMs = s.globalOffsetMs,
+                complete = s.isComplete,
+            ),
+        )
+    }
 
     fun load(
         ayahs: List<PageAyah>,

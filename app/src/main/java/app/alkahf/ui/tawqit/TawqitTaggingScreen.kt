@@ -53,7 +53,6 @@ import androidx.media3.exoplayer.ExoPlayer
 import app.alkahf.AlkahfApplication
 import app.alkahf.R
 import app.alkahf.data.PageAyah
-import app.alkahf.data.TawqitSourceType
 import app.alkahf.data.TawqitTrack
 import app.alkahf.ui.theme.AlkahfColors
 import app.alkahf.ui.theme.LocalQuranFont
@@ -66,37 +65,22 @@ fun TawqitTaggingScreen(
     onClose: () -> Unit,
 ) {
     val context = LocalContext.current
-    val repository = remember { (context.applicationContext as AlkahfApplication).repository }
     val scope = rememberCoroutineScope()
-    val controller = remember { TawqitController(ExoPlayer.Builder(context).build(), scope) }
-
-    LaunchedEffect(draft.id) {
-        val ayahs = repository.ayahsForRange(draft.surah, draft.ayahFrom, draft.ayahTo)
-        val uris = when (draft.sourceType) {
-            TawqitSourceType.IMPORT -> List(ayahs.size) { draft.sourceRef }.take(1)
-            TawqitSourceType.RECITER ->
-                repository.reciterAyahUris(draft.sourceRef, draft.surah, draft.ayahFrom, draft.ayahTo)
-        }
-        controller.load(
-            ayahs = ayahs,
-            uris = uris,
-            existingEndTimes = draft.endTimesMs,
-            offsetMs = draft.globalOffsetMs,
-            speed = 0.75f,
+    val controller = remember {
+        TawqitController(
+            ExoPlayer.Builder(context).build(),
+            scope,
+            (context.applicationContext as AlkahfApplication).repository,
         )
     }
+
+    LaunchedEffect(draft.id) { controller.loadDraft(draft) }
     DisposableEffect(Unit) { onDispose { controller.release() } }
     val state by controller.state.collectAsState()
 
     fun save() {
         scope.launch {
-            repository.saveTawqitTrack(
-                draft.copy(
-                    endTimesMs = state.endTimesMs,
-                    globalOffsetMs = state.globalOffsetMs,
-                    complete = state.isComplete,
-                ),
-            )
+            controller.save(draft)
             onSaved()
         }
     }

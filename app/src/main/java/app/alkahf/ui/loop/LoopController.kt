@@ -133,6 +133,30 @@ class LoopController(
         player.release()
     }
 
+    // --- Screen/editor data access (kept here so the composable touches no repo) ---
+
+    /** The preset for [presetId], or the default drill when null. */
+    suspend fun resolvePreset(presetId: Long?): LoopPreset =
+        presetId?.let { repository.presetById(it) } ?: repository.defaultPreset()
+
+    suspend fun surahOptions(): List<app.alkahf.data.SurahOption> = repository.surahOptions()
+
+    /** The system riwāyah, used as the default when creating a new drill. */
+    val systemRiwayah: Riwayah get() = repository.riwayah
+
+    suspend fun allReciters(riwayah: Riwayah): List<app.alkahf.data.audio.Reciter> =
+        repository.allReciters(riwayah)
+
+    suspend fun convertRange(
+        surah: Int,
+        from: Int,
+        to: Int,
+        fromRiwayah: Riwayah,
+        toRiwayah: Riwayah,
+    ): IntRange = repository.convertAyahRange(surah, from, to, fromRiwayah, toRiwayah)
+
+    suspend fun savePreset(preset: LoopPreset): Long = repository.savePreset(preset)
+
     fun togglePlayPause() {
         when (_state.value.phase) {
             LoopPhase.COMPLETE, LoopPhase.ERROR -> {
