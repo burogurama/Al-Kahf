@@ -178,6 +178,71 @@ class MushafAudioController(
         player.setMediaItem(MediaItem.fromUri(Uri.parse(fileUri)))
         player.prepare()
         player.setPlaybackSpeed(playbackSpeed)
+        // Recite-back wants a pause after every āyah; plain listening should flow
+        // through the whole range without the seek-induced gap between āyāt.
+        if (_state.value.mode == MushafAudioMode.RECITE_BACK) {
+            runImportedReciteBack(ayahIds, segments, repeat)
+        } else {
+            runImportedContinuous(ayahIds, segments, repeat)
+        }
+        player.pause()
+        _state.update { it.copy(phase = MushafAudioPhase.IDLE, currentAyahId = null) }
+    }
+
+    /**
+     * Plays the whole range as one continuous stretch (seek once to the start,
+     * stop at the range end), mapping the play head to the current segment so the
+     * highlight still tracks each āyah.
+     */
+    private suspend fun runImportedContinuous(
+        ayahIds: List<Int>,
+        segments: List<LongRange>,
+        repeat: Int,
+    ) {
+        val rangeStart = segments.first().first
+        val rangeEnd = segments.last().last
+        var pass = 0
+        while (repeat <= 0 || pass < repeat) {
+            pass++
+            _state.update {
+                it.copy(currentAyahId = ayahIds.firstOrNull(), phase = MushafAudioPhase.PREPARING)
+            }
+            player.seekTo(rangeStart)
+            player.playWhenReady = !_state.value.isPaused
+            _state.update { it.copy(phase = MushafAudioPhase.PLAYING) }
+            var currentIndex = -1
+            while (true) {
+                when (player.playbackState) {
+                    Player.STATE_IDLE -> return // stopped
+                    Player.STATE_ENDED -> break
+                    else -> {
+                        val pos = player.currentPosition
+                        if (pos >= rangeEnd) break
+                        val idx = segments.indexOfFirst { pos < it.last }
+                            .let { if (it < 0) segments.lastIndex else it }
+                        if (idx != currentIndex) {
+                            currentIndex = idx
+                            _state.update { it.copy(currentAyahId = ayahIds.getOrNull(idx)) }
+                        }
+                    }
+                }
+                delay(40)
+            }
+            lastDurationMs = (rangeEnd - rangeStart).coerceAtLeast(0)
+            repository.logPractice(
+                type = "listen",
+                ayahCount = segments.size,
+                durationMs = lastDurationMs,
+            )
+        }
+    }
+
+    /** Plays each āyah in turn, pausing for a recite-back gap after every one. */
+    private suspend fun runImportedReciteBack(
+        ayahIds: List<Int>,
+        segments: List<LongRange>,
+        repeat: Int,
+    ) {
         var pass = 0
         while (repeat <= 0 || pass < repeat) {
             pass++
@@ -200,13 +265,9 @@ class MushafAudioController(
                 player.pause()
                 lastDurationMs = (seg.last - seg.first).coerceAtLeast(0)
                 repository.logPractice(type = "listen", ayahCount = 1, durationMs = lastDurationMs)
-                if (_state.value.mode == MushafAudioMode.RECITE_BACK) {
-                    reciteBackGap()
-                }
+                reciteBackGap()
             }
         }
-        player.pause()
-        _state.update { it.copy(phase = MushafAudioPhase.IDLE, currentAyahId = null) }
     }
 
     /** Plays the file to its end. Returns false if playback was stopped. */
