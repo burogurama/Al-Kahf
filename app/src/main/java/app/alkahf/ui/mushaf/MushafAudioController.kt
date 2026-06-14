@@ -6,6 +6,8 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import app.alkahf.R
+import app.alkahf.audio.AyahPlayer
+import app.alkahf.audio.PlayResult
 import app.alkahf.data.QuranRepository
 import app.alkahf.data.Riwayah
 import app.alkahf.data.audio.AudioStore
@@ -266,17 +268,12 @@ class MushafAudioController(
                 _state.update {
                     it.copy(currentAyahId = ayahIds.getOrNull(i), phase = MushafAudioPhase.PREPARING)
                 }
-                player.seekTo(seg.first)
-                player.playWhenReady = !_state.value.isPaused
                 _state.update { it.copy(phase = MushafAudioPhase.PLAYING) }
-                while (true) {
-                    when (player.playbackState) {
-                        Player.STATE_IDLE -> return // stopped
-                        Player.STATE_ENDED -> break
-                        else -> if (player.currentPosition >= seg.last) break
-                    }
-                    delay(40)
-                }
+                val result = AyahPlayer.playSegment(
+                    player, fileUri = "", segment = seg, speed = playbackSpeed,
+                    isPaused = { _state.value.isPaused }, prepare = false, pollMs = 40,
+                )
+                if (result == PlayResult.STOPPED) return
                 player.pause()
                 lastDurationMs = (seg.last - seg.first).coerceAtLeast(0)
                 repository.logPractice(type = "listen", ayahCount = 1, durationMs = lastDurationMs)
@@ -287,22 +284,13 @@ class MushafAudioController(
 
     /** Plays the file to its end. Returns false if playback was stopped. */
     private suspend fun playFile(file: File): Boolean {
-        player.setMediaItem(MediaItem.fromUri(Uri.fromFile(file)))
-        player.prepare()
-        player.setPlaybackSpeed(playbackSpeed)
-        player.playWhenReady = !_state.value.isPaused
         _state.update { it.copy(phase = MushafAudioPhase.PLAYING) }
-        while (true) {
-            when (player.playbackState) {
-                Player.STATE_ENDED -> {
-                    lastDurationMs = player.duration.coerceAtLeast(0)
-                    return true
-                }
-                Player.STATE_IDLE -> return false
-                else -> {}
-            }
-            delay(150)
-        }
+        val result = AyahPlayer.playFile(
+            player, file, playbackSpeed, { _state.value.isPaused }, pollMs = 150,
+        )
+        if (result == PlayResult.STOPPED) return false
+        lastDurationMs = player.duration.coerceAtLeast(0)
+        return true
     }
 
     private suspend fun reciteBackGap() {

@@ -1,13 +1,12 @@
 package app.alkahf.ui.loop
 
 import android.content.Context
-import android.net.Uri
-import androidx.media3.common.MediaItem
-import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
+import app.alkahf.audio.AyahPlayer
 import app.alkahf.audio.LoopMode
 import app.alkahf.audio.LoopSequencer
 import app.alkahf.audio.LoopStep
+import app.alkahf.audio.PlayResult
 import app.alkahf.data.LoopPreset
 import app.alkahf.data.Riwayah
 import app.alkahf.data.PageAyah
@@ -304,33 +303,16 @@ class LoopController(
 
     /** Plays a single āyah's [segment] of an imported file. False if a jump cut it. */
     private suspend fun playImportedSegment(fileUri: String, segment: LongRange): Boolean {
-        player.setMediaItem(MediaItem.fromUri(Uri.parse(fileUri)))
-        player.prepare()
-        player.setPlaybackSpeed(_state.value.speed)
-        player.seekTo(segment.first)
-        player.playWhenReady = !_state.value.isPaused
         val total = (segment.last - segment.first).coerceAtLeast(0)
         _state.update { it.copy(phase = LoopPhase.PLAYING, durationMs = total) }
-        while (true) {
-            when (player.playbackState) {
-                Player.STATE_IDLE -> return false
-                Player.STATE_ENDED -> break
-                else -> {
-                    val position = (player.currentPosition - segment.first).coerceIn(0, total)
-                    if (player.currentPosition >= segment.last) break
-                    val words = _state.value.ayahs[_state.value.currentAyah]?.words.orEmpty()
-                    val highlight = if (total > 0 && words.isNotEmpty()) {
-                        ((position * words.size) / total).toInt().coerceIn(0, words.size - 1)
-                    } else {
-                        -1
-                    }
-                    _state.update {
-                        it.copy(positionMs = position, durationMs = total, highlightIndex = highlight)
-                    }
-                }
+        val result = AyahPlayer.playSegment(
+            player, fileUri, segment, _state.value.speed, { _state.value.isPaused },
+        ) { position, durationMs ->
+            _state.update {
+                it.copy(positionMs = position, durationMs = durationMs, highlightIndex = highlight(position, durationMs))
             }
-            delay(120)
         }
+        if (result == PlayResult.STOPPED) return false
         player.pause()
         return true
     }
@@ -352,31 +334,22 @@ class LoopController(
 
     /** Plays the file to its end. Returns false if interrupted by a jump. */
     private suspend fun playFile(file: File): Boolean {
-        player.setMediaItem(MediaItem.fromUri(Uri.fromFile(file)))
-        player.prepare()
-        player.setPlaybackSpeed(_state.value.speed)
-        player.playWhenReady = !_state.value.isPaused
         _state.update { it.copy(phase = LoopPhase.PLAYING) }
-        while (true) {
-            when (player.playbackState) {
-                Player.STATE_ENDED -> return true
-                Player.STATE_IDLE -> return false
-                else -> {}
-            }
-            val duration = player.duration.takeIf { it > 0 } ?: 0
-            val position = player.currentPosition
-            val words = _state.value.ayahs[_state.value.currentAyah]?.words.orEmpty()
-            // Word highlight is an even split across the āyah's words.
-            val highlight = if (duration > 0 && words.isNotEmpty()) {
-                ((position * words.size) / duration).toInt().coerceIn(0, words.size - 1)
-            } else {
-                -1
-            }
+        val result = AyahPlayer.playFile(
+            player, file, _state.value.speed, { _state.value.isPaused },
+        ) { position, durationMs ->
             _state.update {
-                it.copy(positionMs = position, durationMs = duration, highlightIndex = highlight)
+                it.copy(positionMs = position, durationMs = durationMs, highlightIndex = highlight(position, durationMs))
             }
-            delay(120)
         }
+        return result == PlayResult.ENDED
+    }
+
+    /** Even split of the current āyah's words across [durationMs]; -1 when unknown. */
+    private fun highlight(positionMs: Long, durationMs: Long): Int {
+        val words = _state.value.ayahs[_state.value.currentAyah]?.words.orEmpty()
+        if (durationMs <= 0 || words.isEmpty()) return -1
+        return ((positionMs * words.size) / durationMs).toInt().coerceIn(0, words.size - 1)
     }
 
     /** Silent pause after each play, sized for the user to recite back. */
