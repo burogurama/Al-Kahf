@@ -104,7 +104,7 @@
     <string name="settings_reminders_empty">لا توجد أوقات بعد — أضف وقتًا لتصلك التذكيرات</string>
     <string name="settings_reminders_permission">اسمح بالإشعارات لتصلك التذكيرات</string>
     <string name="settings_reminders_remove">إزالة %1$s</string>
-    <string name="settings_app_version">الكهف · إصدار 1.1.0</string>
+    <string name="settings_app_version">الكهف · إصدار 1.2.0</string>
     <string name="settings_footer_privacy">جميع البيانات محفوظة على هذا الجهاز · بدون حساب</string>
 
     <!-- إشعار التذكير -->
