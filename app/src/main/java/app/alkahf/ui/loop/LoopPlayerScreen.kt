@@ -84,7 +84,7 @@ import app.alkahf.ui.theme.KfgqpcHafs
 import kotlinx.coroutines.launch
 
 @Composable
-fun LoopPlayerScreen(presetId: Long? = null, onBack: () -> Unit = {}) {
+fun LoopPlayerScreen(presetId: Long? = null, newPreset: Boolean = false, onBack: () -> Unit = {}) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val repository = remember { (context.applicationContext as AlkahfApplication).repository }
@@ -107,20 +107,29 @@ fun LoopPlayerScreen(presetId: Long? = null, onBack: () -> Unit = {}) {
         onDispose { controller.release() }
     }
     val state by controller.state.collectAsState()
-    var showEditor by remember { mutableStateOf(false) }
+    // "New preset" opens straight into the editor in create mode (id 0 → save
+    // inserts a new preset rather than editing/playing the default one).
+    var creatingNew by remember { mutableStateOf(newPreset) }
+    var showEditor by remember { mutableStateOf(newPreset) }
     val surahs by produceState(initialValue = emptyList<SurahOption>()) {
         value = repository.surahOptions()
     }
 
-    if (showEditor && surahs.isNotEmpty()) {
+    if (showEditor) {
+        // Don't flash the drill UI behind the editor while the surah list loads.
+        if (surahs.isEmpty()) {
+            Box(Modifier.fillMaxSize().background(AlkahfColors.SessionBg))
+            return
+        }
         val base = loadedPreset
         val defaultDrillName = stringResource(R.string.loop_default_drill_name)
-        BackHandler { showEditor = false }
+        val dismiss = { if (creatingNew) onBack() else showEditor = false }
+        BackHandler { dismiss() }
         PresetEditor(
             initial = state.toPreset().copy(
-                id = base?.id ?: 0L,
+                id = if (creatingNew) 0L else (base?.id ?: 0L),
                 name = base?.name ?: defaultDrillName,
-                isDefault = base?.isDefault ?: false,
+                isDefault = if (creatingNew) false else (base?.isDefault ?: false),
             ),
             surahs = surahs,
             onSave = { preset ->
@@ -129,9 +138,10 @@ fun LoopPlayerScreen(presetId: Long? = null, onBack: () -> Unit = {}) {
                     loadedPreset = preset.copy(id = id)
                     controller.applyPreset(preset)
                 }
+                creatingNew = false
                 showEditor = false
             },
-            onDismiss = { showEditor = false },
+            onDismiss = { dismiss() },
         )
         return
     }

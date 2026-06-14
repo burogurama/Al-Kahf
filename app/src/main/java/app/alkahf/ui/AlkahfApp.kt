@@ -100,6 +100,8 @@ fun AlkahfApp(
     var mushafTargetPage by remember { mutableStateOf<Int?>(null) }
     // The preset to open in the Loop player; null means the default preset.
     var loopPresetId by remember { mutableStateOf<Long?>(null) }
+    // True when the Loop player should open straight into the new-preset editor.
+    var loopNewPreset by remember { mutableStateOf(false) }
     // The reciter whose surahs are being managed.
     var manageReciter by remember { mutableStateOf<app.alkahf.data.ReciterStatus?>(null) }
     // The Tawqīt track being tagged (a fresh draft or an existing track).
@@ -150,6 +152,7 @@ fun AlkahfApp(
             },
             onOpenLoop = {
                 loopPresetId = null
+                loopNewPreset = false
                 destination = AlkahfDestination.Loop
             },
             onOpenReview = { destination = AlkahfDestination.Review },
@@ -174,6 +177,7 @@ fun AlkahfApp(
             BackHandler { destination = AlkahfDestination.Home }
             LoopPlayerScreen(
                 presetId = loopPresetId,
+                newPreset = loopNewPreset,
                 onBack = { destination = AlkahfDestination.Home },
             )
         }
@@ -193,10 +197,12 @@ fun AlkahfApp(
             LibraryScreen(
                 onOpenPreset = { id ->
                     loopPresetId = id
+                    loopNewPreset = false
                     destination = AlkahfDestination.Loop
                 },
                 onNewPreset = {
                     loopPresetId = null
+                    loopNewPreset = true
                     destination = AlkahfDestination.Loop
                 },
                 onManageReciter = { reciter ->
