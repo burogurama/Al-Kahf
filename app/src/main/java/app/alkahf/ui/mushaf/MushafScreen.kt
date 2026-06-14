@@ -35,6 +35,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -50,6 +51,7 @@ import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -109,6 +111,7 @@ import app.alkahf.data.PageAyah
 import app.alkahf.data.PageGroup
 import app.alkahf.data.MemorizationState
 import app.alkahf.data.QuranRepository
+import app.alkahf.data.ReciterStatus
 import app.alkahf.data.SurahOption
 import app.alkahf.data.audio.AudioStore
 import app.alkahf.ui.theme.AlkahfColors
@@ -177,6 +180,7 @@ fun MushafScreen(
     startPage: Int? = null,
     highlightRange: AyahRange? = null,
     onBack: () -> Unit = {},
+    onImportReciter: (ReciterStatus) -> Unit = {},
 ) {
     val context = LocalContext.current
     val repository = remember { (context.applicationContext as AlkahfApplication).repository }
@@ -299,6 +303,23 @@ fun MushafScreen(
     var rangeMode by remember { mutableStateOf(MushafAudioMode.LISTEN) }
     var rangeSpeed by remember { mutableStateOf(1f) }
     var rangeTimes by remember { mutableStateOf(1) }
+    // Reciters available in the config panel (built-in + imported) and the one
+    // currently chosen for the range. Refreshed whenever the panel opens.
+    var reciters by remember { mutableStateOf<List<ReciterStatus>>(emptyList()) }
+    var rangeReciterKey by remember { mutableStateOf(repository.activeReciterPath) }
+    LaunchedEffect(rangeAudioOpen) {
+        if (rangeAudioOpen) {
+            reciters = repository.reciterStatuses()
+            if (reciters.none { it.key == rangeReciterKey }) {
+                rangeReciterKey = reciters.firstOrNull()?.key ?: rangeReciterKey
+            }
+        }
+    }
+    // Pending download confirmation: (reciter, surah, from, to) once the user
+    // hits Listen on an undownloaded built-in range; null while idle.
+    var downloadPrompt by remember { mutableStateOf<RangeDownloadRequest?>(null) }
+    var downloadProgress by remember { mutableStateOf<Float?>(null) }
+    var downloadJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
     LaunchedEffect(currentPageNumber) {
         selection = null
         menuAnchor = null
@@ -360,6 +381,80 @@ fun MushafScreen(
         audioController.setSpeed(rangeSpeed)
         audioController.playAyahIds(ids, repeat = rangeTimes)
         rangeMode = mode
+    }
+
+    // Listen pressed in the config panel. Applies the chosen reciter, then:
+    //  - imported reciter whose sūrah isn't imported+timed → route to import/time
+    //  - built-in reciter with audio not yet cached → confirm + download, play after
+    //  - otherwise → play immediately.
+    fun onRangeListen() {
+        val ids = audioRangeIds()
+        if (ids.isEmpty()) return
+        val chosen = reciters.firstOrNull { it.key == rangeReciterKey }
+        if (chosen == null) {
+            rangeAudioOpen = false
+            playRange(rangeMode)
+            return
+        }
+        if (chosen.isImported) {
+            // Imported playback in the Mushaf isn't wired to the Tawqīt engine
+            // yet; route the user to import + time the relevant sūrah instead.
+            rangeAudioOpen = false
+            onImportReciter(chosen)
+            return
+        }
+        // Built-in reciter: make it active for playback.
+        repository.setActiveReciter(chosen.key)
+        audioController.setReciter(chosen.key, chosen.displayName)
+        val surah = ids.first() / 1000
+        val nums = ids.filter { it / 1000 == surah }.map { it % 1000 }
+        val from = nums.min()
+        val to = nums.max()
+        scope.launch {
+            val ready = repository.rangeAudioAvailable(chosen.key, surah, from, to)
+            if (ready) {
+                rangeAudioOpen = false
+                playRange(rangeMode)
+            } else {
+                downloadPrompt = RangeDownloadRequest(
+                    reciterKey = chosen.key,
+                    reciterName = chosen.displayName,
+                    surah = surah,
+                    from = from,
+                    to = to,
+                    count = ids.size,
+                )
+            }
+        }
+    }
+
+    fun startRangeDownload(request: RangeDownloadRequest) {
+        downloadProgress = 0f
+        downloadJob = scope.launch {
+            try {
+                repository.downloadRange(request.reciterKey, request.surah, request.from, request.to) {
+                    downloadProgress = it
+                }
+                downloadProgress = null
+                downloadPrompt = null
+                downloadJob = null
+                rangeAudioOpen = false
+                playRange(rangeMode)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                downloadProgress = null
+                downloadPrompt = null
+                downloadJob = null
+            }
+        }
+    }
+
+    fun cancelRangeDownload() {
+        downloadJob?.cancel()
+        downloadJob = null
+        downloadProgress = null
+        downloadPrompt = null
     }
 
     // Long-pressing an ayah in reading mode opens the floating action menu,
@@ -470,13 +565,13 @@ fun MushafScreen(
                 mode = rangeMode,
                 speed = rangeSpeed,
                 times = rangeTimes,
+                reciters = reciters,
+                selectedReciterKey = rangeReciterKey,
                 onMode = { rangeMode = it },
                 onSpeed = { rangeSpeed = it },
                 onTimes = { rangeTimes = it },
-                onListen = {
-                    rangeAudioOpen = false
-                    playRange(rangeMode)
-                },
+                onReciter = { rangeReciterKey = it },
+                onListen = { onRangeListen() },
             )
             audioDockOpen -> MushafAudioDock(
                 state = audioState,
@@ -583,7 +678,28 @@ fun MushafScreen(
             onDismiss = { showJump = false },
         )
     }
+
+    val request = downloadPrompt
+    if (request != null) {
+        RangeDownloadDialog(
+            reciterName = request.reciterName,
+            count = request.count,
+            progress = downloadProgress,
+            onConfirm = { startRangeDownload(request) },
+            onCancel = { cancelRangeDownload() },
+        )
+    }
 }
+
+/** A pending built-in-reciter range download awaiting the user's confirmation. */
+private data class RangeDownloadRequest(
+    val reciterKey: String,
+    val reciterName: String,
+    val surah: Int,
+    val from: Int,
+    val to: Int,
+    val count: Int,
+)
 
 @Composable
 private fun MushafTopBar(
@@ -1395,9 +1511,12 @@ private fun RangeAudioDock(
     mode: MushafAudioMode,
     speed: Float,
     times: Int,
+    reciters: List<ReciterStatus>,
+    selectedReciterKey: String,
     onMode: (MushafAudioMode) -> Unit,
     onSpeed: (Float) -> Unit,
     onTimes: (Int) -> Unit,
+    onReciter: (String) -> Unit,
     onListen: () -> Unit,
 ) {
     Column(Modifier.fillMaxWidth().background(AlkahfColors.NavSurface)) {
@@ -1414,6 +1533,31 @@ private fun RangeAudioDock(
                 color = AlkahfColors.Ink,
                 modifier = Modifier.padding(bottom = 10.dp),
             )
+            if (reciters.isNotEmpty()) {
+                Text(
+                    text = stringResource(R.string.mushaf_reciter_label),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    letterSpacing = 0.6.sp,
+                    color = AlkahfColors.InkMuted,
+                    modifier = Modifier.padding(bottom = 6.dp),
+                )
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
+                        .padding(bottom = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    reciters.forEach { reciter ->
+                        ReciterChip(
+                            reciter = reciter,
+                            selected = reciter.key == selectedReciterKey,
+                            onClick = { onReciter(reciter.key) },
+                        )
+                    }
+                }
+            }
             AudioSegmented(
                 options = listOf(
                     MushafAudioMode.LISTEN to stringResource(R.string.mushaf_mode_normal),
@@ -1473,6 +1617,188 @@ private fun RangeAudioDock(
                         fontWeight = FontWeight.SemiBold,
                         color = AlkahfColors.OnAccent,
                     )
+                }
+            }
+        }
+    }
+}
+
+/** A selectable reciter pill: Arabic initial medallion + name (· "imported"). */
+@Composable
+private fun ReciterChip(
+    reciter: ReciterStatus,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(12.dp),
+        color = if (selected) AlkahfColors.AccentTint else AlkahfColors.Surface,
+        border = BorderStroke(
+            1.dp,
+            if (selected) AlkahfColors.Accent else AlkahfColors.CardBorder,
+        ),
+    ) {
+        Row(
+            Modifier.padding(start = 8.dp, end = 14.dp, top = 7.dp, bottom = 7.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                Modifier
+                    .size(26.dp)
+                    .background(
+                        if (selected) AlkahfColors.Accent else AlkahfColors.SegmentedTrack,
+                        CircleShape,
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = reciter.arabicInitial,
+                    fontFamily = KfgqpcHafs,
+                    fontSize = 14.sp,
+                    color = if (selected) AlkahfColors.OnAccent else AlkahfColors.InkChrome,
+                )
+            }
+            Column(Modifier.padding(start = 8.dp)) {
+                Text(
+                    text = reciter.displayName,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (selected) AlkahfColors.AccentDeep else AlkahfColors.Ink,
+                    maxLines = 1,
+                )
+                if (reciter.isImported) {
+                    Text(
+                        text = stringResource(R.string.mushaf_reciter_imported),
+                        fontSize = 9.5.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = AlkahfColors.InkFaint,
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Confirm-and-download modal for a built-in reciter range that isn't cached.
+ * Shows a determinate progress bar once [progress] is non-null; recitation
+ * starts only after the download finishes (handled by the caller).
+ */
+@Composable
+private fun RangeDownloadDialog(
+    reciterName: String,
+    count: Int,
+    progress: Float?,
+    onConfirm: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    val downloading = progress != null
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.34f))
+            .clickable(enabled = !downloading, onClick = onCancel),
+        contentAlignment = Alignment.Center,
+    ) {
+        Surface(
+            shape = RoundedCornerShape(22.dp),
+            color = AlkahfColors.Paper,
+            border = BorderStroke(1.dp, AlkahfColors.CardBorder),
+            shadowElevation = 16.dp,
+            modifier = Modifier
+                .padding(horizontal = 36.dp)
+                .fillMaxWidth()
+                .clickable(enabled = false) {},
+        ) {
+            Column(Modifier.padding(20.dp)) {
+                Text(
+                    text = stringResource(R.string.mushaf_download_title),
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = AlkahfColors.Ink,
+                    modifier = Modifier.padding(bottom = 6.dp),
+                )
+                Text(
+                    text = pluralStringResource(
+                        R.plurals.mushaf_download_body,
+                        count,
+                        count,
+                        reciterName,
+                    ),
+                    fontSize = 13.5.sp,
+                    color = AlkahfColors.InkMuted,
+                    lineHeight = 19.sp,
+                    modifier = Modifier.padding(bottom = 18.dp),
+                )
+                if (downloading) {
+                    LinearProgressIndicator(
+                        progress = { progress ?: 0f },
+                        modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
+                        color = AlkahfColors.Accent,
+                        trackColor = AlkahfColors.SegmentedTrack,
+                    )
+                    Text(
+                        text = stringResource(
+                            R.string.mushaf_download_progress,
+                            ((progress ?: 0f) * 100).roundToInt(),
+                        ),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = AlkahfColors.InkFaint,
+                        modifier = Modifier.padding(top = 10.dp),
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    Surface(
+                        onClick = onCancel,
+                        shape = RoundedCornerShape(14.dp),
+                        color = AlkahfColors.Surface,
+                        border = BorderStroke(1.dp, AlkahfColors.CardBorder),
+                        modifier = Modifier.fillMaxWidth().height(48.dp),
+                    ) {
+                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Text(
+                                text = stringResource(R.string.common_cancel),
+                                fontSize = 14.5.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = AlkahfColors.Ink,
+                            )
+                        }
+                    }
+                } else {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Surface(
+                            onClick = onCancel,
+                            shape = RoundedCornerShape(14.dp),
+                            color = AlkahfColors.Surface,
+                            border = BorderStroke(1.dp, AlkahfColors.CardBorder),
+                            modifier = Modifier.weight(1f).height(48.dp),
+                        ) {
+                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                Text(
+                                    text = stringResource(R.string.common_cancel),
+                                    fontSize = 14.5.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = AlkahfColors.Ink,
+                                )
+                            }
+                        }
+                        Surface(
+                            onClick = onConfirm,
+                            shape = RoundedCornerShape(14.dp),
+                            color = AlkahfColors.Accent,
+                            modifier = Modifier.weight(1f).height(48.dp).padding(start = 10.dp),
+                        ) {
+                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                Text(
+                                    text = stringResource(R.string.mushaf_download_confirm),
+                                    fontSize = 14.5.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = AlkahfColors.OnAccent,
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }

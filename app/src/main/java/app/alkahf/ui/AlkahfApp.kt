@@ -164,6 +164,10 @@ fun AlkahfApp(
                 startPage = mushafTargetPage,
                 highlightRange = mushafHighlight,
                 onBack = { destination = AlkahfDestination.Home },
+                onImportReciter = { reciter ->
+                    manageReciter = reciter
+                    destination = AlkahfDestination.ReciterDownloads
+                },
             )
         }
         AlkahfDestination.Loop -> {

@@ -137,6 +137,19 @@
     <string name="mushaf_hint_tap_to_start">انقر آية في الصفحة لتبدأ منها</string>
     <string name="mushaf_start_learning">بدء حفظ سورة %1$s</string>
     <string name="mushaf_start_learning_body">كل آية لم تُحفظ بعد ستُعلَّم بأنها قيد الحفظ، وستُقسَّم السورة إلى مقاطع، ويصبح المقطع الأول سبقك.</string>
+    <string name="mushaf_reciter_label">القارئ</string>
+    <string name="mushaf_reciter_imported">مستورد</string>
+    <string name="mushaf_download_title">تنزيل التلاوة</string>
+    <plurals name="mushaf_download_body">
+        <item quantity="zero">تنزيل %1$d آية من %2$s؟</item>
+        <item quantity="one">تنزيل آية واحدة من %2$s؟</item>
+        <item quantity="two">تنزيل آيتين من %2$s؟</item>
+        <item quantity="few">تنزيل %1$d آيات من %2$s؟</item>
+        <item quantity="many">تنزيل %1$d آية من %2$s؟</item>
+        <item quantity="other">تنزيل %1$d آية من %2$s؟</item>
+    </plurals>
+    <string name="mushaf_download_confirm">تنزيل</string>
+    <string name="mushaf_download_progress">جارٍ التنزيل… %1$d%%</string>
 
     <!-- Mushaf audio status -->
     <string name="mushaf_audio_download_failed">فشل تنزيل الصوت — تحقّق من اتصالك</string>

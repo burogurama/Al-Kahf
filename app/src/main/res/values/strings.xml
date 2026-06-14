@@ -129,6 +129,15 @@
     <string name="mushaf_hint_tap_to_start">Tap an āyah on the page to start from it</string>
     <string name="mushaf_start_learning">Start learning Sūrat %1$s</string>
     <string name="mushaf_start_learning_body">Every āyah not yet memorized will be marked as learning, the sūrah will be split into sections, and the first section becomes your sabaq.</string>
+    <string name="mushaf_reciter_label">Reciter</string>
+    <string name="mushaf_reciter_imported">imported</string>
+    <string name="mushaf_download_title">Download recitation</string>
+    <plurals name="mushaf_download_body">
+        <item quantity="one">Download %1$d āyah from %2$s?</item>
+        <item quantity="other">Download %1$d āyāt from %2$s?</item>
+    </plurals>
+    <string name="mushaf_download_confirm">Download</string>
+    <string name="mushaf_download_progress">Downloading… %1$d%%</string>
 
     <!-- Mushaf audio status (built from a non-composable controller / render blocks) -->
     <string name="mushaf_audio_download_failed">Audio download failed — check your connection</string>

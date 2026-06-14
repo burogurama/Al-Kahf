@@ -697,6 +697,23 @@ class QuranRepository(context: Context) {
         audioStore.downloadSurah(reciterPath, surah, ayahCount, onProgress)
     }
 
+    /**
+     * Downloads just the āyāt [from]..[to] of a built-in reciter's sūrah,
+     * reporting progress 0f..1f. Used by the Mushaf range-listening flow so a
+     * user only fetches what they're about to hear.
+     */
+    suspend fun downloadRange(
+        reciterPath: String,
+        surah: Int,
+        from: Int,
+        to: Int,
+        onProgress: (Float) -> Unit,
+    ) = audioStore.downloadRange(reciterPath, surah, from, to, onProgress)
+
+    /** True when every āyah of [from]..[to] is already cached for the reciter. */
+    suspend fun rangeAudioAvailable(reciterPath: String, surah: Int, from: Int, to: Int): Boolean =
+        audioStore.rangeDownloaded(reciterPath, surah, from, to)
+
     suspend fun deleteSurahAudio(reciterPath: String, surah: Int) =
         audioStore.deleteSurah(reciterPath, surah)
 

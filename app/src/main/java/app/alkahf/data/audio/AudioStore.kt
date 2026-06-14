@@ -76,6 +76,33 @@ class AudioStore(private val context: Context) {
         }
     }
 
+    /** Downloads āyāt [from]..[to] of a surah, reporting progress 0f..1f. */
+    suspend fun downloadRange(
+        reciter: String,
+        surah: Int,
+        from: Int,
+        to: Int,
+        onProgress: (Float) -> Unit,
+    ) {
+        val total = (to - from + 1).coerceAtLeast(1)
+        var done = 0
+        for (ayah in from..to) {
+            ayahFile(surah, ayah, reciter)
+            done++
+            onProgress(done.toFloat() / total)
+        }
+    }
+
+    /** True when every āyah of [from]..[to] is already cached for the reciter. */
+    fun rangeDownloaded(reciter: String, surah: Int, from: Int, to: Int): Boolean {
+        for (ayah in from..to) {
+            val name = String.format(Locale.ROOT, "%03d%03d.mp3", surah, ayah)
+            val file = File(reciterDir(reciter), name)
+            if (!file.exists() || file.length() <= 0) return false
+        }
+        return true
+    }
+
     suspend fun deleteSurah(reciter: String, surah: Int) = withContext(Dispatchers.IO) {
         val prefix = String.format(Locale.ROOT, "%03d", surah)
         reciterDir(reciter).listFiles { f ->

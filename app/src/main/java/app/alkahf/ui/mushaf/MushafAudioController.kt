@@ -70,6 +70,19 @@ class MushafAudioController(
         _state.update { it.copy(scope = scope) }
     }
 
+    /**
+     * Switches the reciter used for subsequent playback. Stops any current
+     * playback so the next āyah is fetched from the new reciter's files.
+     */
+    fun setReciter(path: String, name: String) {
+        if (path == _state.value.reciterPath) {
+            _state.update { it.copy(reciterName = name) }
+            return
+        }
+        stop()
+        _state.update { it.copy(reciterPath = path, reciterName = name) }
+    }
+
     /** Sets the playback rate applied to subsequent (and current) playback. */
     fun setSpeed(speed: Float) {
         playbackSpeed = speed
