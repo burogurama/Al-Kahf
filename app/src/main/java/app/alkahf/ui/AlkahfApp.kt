@@ -2,6 +2,7 @@ package app.alkahf.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -93,6 +94,7 @@ private fun MemorizationState.toHomeState(): AyahMemorizationState = when (this)
 
 @Composable
 fun AlkahfApp(
+    playDrillSignal: Int = 0,
     onThemeModeChange: (app.alkahf.ui.theme.ThemeMode) -> Unit = {},
     onLanguageChange: (String) -> Unit = {},
 ) {
@@ -138,6 +140,17 @@ fun AlkahfApp(
     val homeState by produceState(initialValue = HomeUiState(), destination, homeRefresh) {
         if (destination == AlkahfDestination.Home) {
             value = buildHomeUiState(resources, repository.homeData())
+        }
+    }
+
+    // A reminder's "Listen" action drops the user straight into the sabaq drill.
+    // Opening the Loop player applies the preset, which starts playback (so the
+    // drill is already reciting); loopPresetId null → the default sabaq drill.
+    LaunchedEffect(playDrillSignal) {
+        if (playDrillSignal > 0) {
+            loopPresetId = null
+            loopNewPreset = false
+            destination = AlkahfDestination.Loop
         }
     }
 

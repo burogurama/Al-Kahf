@@ -163,12 +163,18 @@ data class SettingsData(
     val autoLowerOnStumble: Boolean,
     val keepScreenOn: Boolean,
     val backgroundAudio: Boolean,
+    val remindersEnabled: Boolean,
+    /** Daily reminder times as minutes after midnight, ascending. */
+    val reminderTimes: List<Int>,
 )
 
 /** A surah + ayah range (e.g. the current sabaq). */
 data class AyahRange(val surah: Int, val from: Int, val to: Int) {
     val ayahIds: Set<Int> get() = (from..to).map { surah * 1000 + it }.toSet()
 }
+
+/** The sabaq summarised for a reminder notification. */
+data class SabaqReference(val surahNameLatin: String, val from: Int, val to: Int)
 
 /** The current sabaq (portion being learned) for the Home hero card. */
 data class SabaqCard(
@@ -381,6 +387,12 @@ class QuranRepository(context: Context) {
 
     suspend fun surahAyahCount(surah: Int): Int = quranDao.surah(surah).ayahCount
 
+    /** The current sabaq as a display reference, or null when there's no sabaq. */
+    suspend fun sabaqReference(): SabaqReference? {
+        val range = sabaqRange ?: return null
+        return SabaqReference(quranDao.surah(range.surah).nameLatin, range.from, range.to)
+    }
+
     fun setSabaq(surah: Int, from: Int, to: Int) {
         prefs.edit()
             .putInt(KEY_SABAQ_SURAH, surah)
@@ -518,6 +530,17 @@ class QuranRepository(context: Context) {
             .getOrDefault(ReviewPacing.STANDARD)
     val autoLowerOnStumble: Boolean get() = prefs.getBoolean(KEY_AUTO_LOWER, true)
 
+    /** Whether daily hifz reminders are armed. */
+    val remindersEnabled: Boolean get() = prefs.getBoolean(KEY_REMINDERS_ON, false)
+
+    /** Reminder times as minutes after midnight, ascending and de-duplicated. */
+    val reminderTimes: List<Int>
+        get() = (prefs.getString(KEY_REMINDER_TIMES, null) ?: DEFAULT_REMINDER_TIMES)
+            .split(',')
+            .mapNotNull { it.trim().toIntOrNull()?.takeIf { m -> m in 0..1439 } }
+            .distinct()
+            .sorted()
+
     fun settings(): SettingsData = SettingsData(
         themeMode = themeMode,
         appLanguage = appLanguage,
@@ -528,6 +551,8 @@ class QuranRepository(context: Context) {
         autoLowerOnStumble = autoLowerOnStumble,
         keepScreenOn = prefs.getBoolean(KEY_KEEP_SCREEN_ON, true),
         backgroundAudio = prefs.getBoolean(KEY_BACKGROUND_AUDIO, true),
+        remindersEnabled = remindersEnabled,
+        reminderTimes = reminderTimes,
     )
 
     fun updateSettings(s: SettingsData) {
@@ -540,6 +565,11 @@ class QuranRepository(context: Context) {
             .putBoolean(KEY_AUTO_LOWER, s.autoLowerOnStumble)
             .putBoolean(KEY_KEEP_SCREEN_ON, s.keepScreenOn)
             .putBoolean(KEY_BACKGROUND_AUDIO, s.backgroundAudio)
+            .putBoolean(KEY_REMINDERS_ON, s.remindersEnabled)
+            .putString(
+                KEY_REMINDER_TIMES,
+                s.reminderTimes.distinct().sorted().joinToString(","),
+            )
             .apply()
     }
 
@@ -1127,5 +1157,9 @@ class QuranRepository(context: Context) {
         private const val KEY_SABAQ_SURAH = "sabaq_surah"
         private const val KEY_SABAQ_FROM = "sabaq_from"
         private const val KEY_SABAQ_TO = "sabaq_to"
+        private const val KEY_REMINDERS_ON = "reminders_enabled"
+        private const val KEY_REMINDER_TIMES = "reminder_times"
+        // A single morning nudge by default (07:30 = 450 minutes).
+        private const val DEFAULT_REMINDER_TIMES = "450"
     }
 }

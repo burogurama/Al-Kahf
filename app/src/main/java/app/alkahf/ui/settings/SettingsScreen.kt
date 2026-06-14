@@ -1,5 +1,18 @@
 package app.alkahf.ui.settings
 
+import android.Manifest
+import android.app.TimePickerDialog
+import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
+import android.text.format.DateFormat
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
+import app.alkahf.notify.ReminderScheduler
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -57,10 +70,51 @@ fun SettingsScreen(
     val context = LocalContext.current
     val repository = remember { (context.applicationContext as AlkahfApplication).repository }
     var settings by remember { mutableStateOf(repository.settings()) }
+    var notificationsAllowed by remember { mutableStateOf(notificationsAllowed(context)) }
 
     fun apply(updated: SettingsData) {
         settings = updated
         repository.updateSettings(updated)
+    }
+
+    // Saving reminder config also (re-)arms the alarm set.
+    fun applyReminders(updated: SettingsData) {
+        apply(updated)
+        ReminderScheduler.reschedule(context)
+    }
+
+    val notifPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) {
+        notificationsAllowed = notificationsAllowed(context)
+        ReminderScheduler.reschedule(context)
+    }
+
+    fun requestNotifPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            notifPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+
+    fun openTimePicker() {
+        val now = LocalTime.now()
+        TimePickerDialog(
+            context,
+            { _, hour, minute ->
+                val mod = hour * 60 + minute
+                if (mod !in settings.reminderTimes) {
+                    applyReminders(
+                        settings.copy(reminderTimes = (settings.reminderTimes + mod).sorted()),
+                    )
+                }
+            },
+            now.hour,
+            now.minute,
+            DateFormat.is24HourFormat(context),
+        ).show()
     }
 
     Column(Modifier.fillMaxSize().background(AlkahfColors.Paper).statusBarsPadding()) {
@@ -227,6 +281,59 @@ fun SettingsScreen(
                 }
             }
 
+            SectionCaption(stringResource(R.string.settings_section_reminders))
+            SettingsCard {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    ToggleRow(
+                        label = stringResource(R.string.settings_reminders_enable),
+                        subtitle = stringResource(R.string.settings_reminders_enable_sub),
+                        checked = settings.remindersEnabled,
+                        onChange = { on ->
+                            applyReminders(settings.copy(remindersEnabled = on))
+                            if (on) requestNotifPermissionIfNeeded()
+                        },
+                    )
+                    if (settings.remindersEnabled) {
+                        Divider()
+                        RowLabel(stringResource(R.string.settings_reminders_times_label))
+                        if (settings.reminderTimes.isEmpty()) {
+                            Text(
+                                text = stringResource(R.string.settings_reminders_empty),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = AlkahfColors.InkFaint,
+                            )
+                        } else {
+                            settings.reminderTimes.forEach { minute ->
+                                ReminderTimeRow(
+                                    label = formatTime(context, minute),
+                                    onRemove = {
+                                        applyReminders(
+                                            settings.copy(
+                                                reminderTimes = settings.reminderTimes - minute,
+                                            ),
+                                        )
+                                    },
+                                )
+                            }
+                        }
+                        AddTimeButton(
+                            label = stringResource(R.string.settings_reminders_add_time),
+                            onClick = { openTimePicker() },
+                        )
+                        if (!notificationsAllowed) {
+                            Text(
+                                text = stringResource(R.string.settings_reminders_permission),
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = AlkahfColors.Accent,
+                                modifier = Modifier.clickable { requestNotifPermissionIfNeeded() },
+                            )
+                        }
+                    }
+                }
+            }
+
             Column(
                 Modifier.fillMaxWidth().padding(vertical = 22.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -253,6 +360,65 @@ private fun String.toMode(): ThemeMode = when (this) {
     "light" -> ThemeMode.LIGHT
     "dark" -> ThemeMode.DARK
     else -> ThemeMode.SYSTEM
+}
+
+private fun notificationsAllowed(context: Context): Boolean =
+    NotificationManagerCompat.from(context).areNotificationsEnabled()
+
+/** Formats minutes-after-midnight using the device's 12/24-hour preference. */
+private fun formatTime(context: Context, minute: Int): String {
+    val time = LocalTime.of(minute / 60, minute % 60)
+    val pattern = if (DateFormat.is24HourFormat(context)) "HH:mm" else "h:mm a"
+    return time.format(DateTimeFormatter.ofPattern(pattern))
+}
+
+@Composable
+private fun ReminderTimeRow(label: String, onRemove: () -> Unit) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            text = label,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = AlkahfColors.Ink,
+        )
+        Box(Modifier.weight(1f))
+        Surface(
+            onClick = onRemove,
+            shape = RoundedCornerShape(9.dp),
+            color = AlkahfColors.PageSurface,
+            border = BorderStroke(1.dp, AlkahfColors.ControlBorder),
+            modifier = Modifier.size(30.dp),
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Text(
+                    text = "✕",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = AlkahfColors.InkChrome,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AddTimeButton(label: String, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(12.dp),
+        color = AlkahfColors.PageSurface,
+        border = BorderStroke(1.dp, AlkahfColors.ControlBorder),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Box(Modifier.padding(vertical = 11.dp), contentAlignment = Alignment.Center) {
+            Text(
+                text = "+ $label",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                color = AlkahfColors.AccentDeep,
+            )
+        }
+    }
 }
 
 @Composable
