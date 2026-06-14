@@ -34,7 +34,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
@@ -60,9 +62,11 @@ fun PresetEditor(
     initial: LoopPreset,
     surahs: List<SurahOption>,
     loadReciters: suspend (String) -> List<Reciter>,
+    convertRange: suspend (Int, Int, Int, String, String) -> IntRange,
     onSave: (LoopPreset) -> Unit,
     onDismiss: () -> Unit,
 ) {
+    val scope = rememberCoroutineScope()
     var surahIndex by remember {
         mutableStateOf(surahs.indexOfFirst { it.number == initial.surah }.coerceAtLeast(0))
     }
@@ -176,7 +180,21 @@ fun PresetEditor(
                     ).forEach { (value, label) ->
                         val selected = value == riwayah
                         Surface(
-                            onClick = { riwayah = value },
+                            onClick = {
+                                if (value != riwayah) {
+                                    val old = riwayah
+                                    val s = surah.number
+                                    val f = ayahFrom
+                                    val t = ayahTo
+                                    riwayah = value
+                                    // Convert the range so the same passage carries over.
+                                    scope.launch {
+                                        val r = convertRange(s, f, t, old, value)
+                                        ayahFrom = r.first
+                                        ayahTo = r.last
+                                    }
+                                }
+                            },
                             shape = RoundedCornerShape(10.dp),
                             color = if (selected) AlkahfColors.AccentTint else AlkahfColors.ChipBg,
                             border = BorderStroke(1.dp, if (selected) AlkahfColors.Accent else AlkahfColors.CardBorder),

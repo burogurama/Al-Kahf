@@ -93,6 +93,7 @@ class LoopController(
     private var jumpTarget: Int? = null
     private var sessionJob: Job? = null
     private var loadedSurah = -1
+    private var loadedRiwayah = ""
     // Resolved when the current reciter is an imported one ("custom:<id>"): the
     // single audio file plus each āyah's segment. Null for built-in reciters.
     private var importedAudio: app.alkahf.data.ImportedSurahAudio? = null
@@ -195,7 +196,9 @@ class LoopController(
     }
 
     private suspend fun runSession() {
-        if (loadedSurah != _state.value.surah) {
+        // Reload when the sūrah OR the riwāyah changes, so the displayed text
+        // always matches the audio for the current reading.
+        if (loadedSurah != _state.value.surah || loadedRiwayah != _state.value.riwayah) {
             val surah = _state.value.surah
             // Load the drill's own riwāyah text (independent of the app setting).
             val ayahs = repository.ayahsForRange(surah, 1, 300, _state.value.riwayah)
@@ -210,6 +213,7 @@ class LoopController(
                 )
             }
             loadedSurah = surah
+            loadedRiwayah = _state.value.riwayah
         }
         // An imported reciter plays from its single timed file; resolve it once.
         val reciterPath = _state.value.reciterPath

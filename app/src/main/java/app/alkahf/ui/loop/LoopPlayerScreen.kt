@@ -101,10 +101,14 @@ fun LoopPlayerScreen(presetId: Long? = null, newPreset: Boolean = false, onBack:
     }
     var loadedPreset by remember { mutableStateOf<app.alkahf.data.LoopPreset?>(null) }
     DisposableEffect(Unit) {
-        scope.launch {
-            val preset = presetId?.let { repository.presetById(it) } ?: repository.defaultPreset()
-            loadedPreset = preset
-            controller.applyPreset(preset)
+        // "New preset" opens the editor on a blank template — don't load/play a
+        // drill behind it. Applying a preset starts playback, so skip it here.
+        if (!newPreset) {
+            scope.launch {
+                val preset = presetId?.let { repository.presetById(it) } ?: repository.defaultPreset()
+                loadedPreset = preset
+                controller.applyPreset(preset)
+            }
         }
         onDispose { controller.release() }
     }
@@ -145,6 +149,7 @@ fun LoopPlayerScreen(presetId: Long? = null, newPreset: Boolean = false, onBack:
             ),
             surahs = surahs,
             loadReciters = { repository.allReciters(it) },
+            convertRange = { s, f, t, fr, tr -> repository.convertAyahRange(s, f, t, fr, tr) },
             onSave = { preset ->
                 scope.launch {
                     val id = repository.savePreset(preset)

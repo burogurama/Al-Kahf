@@ -32,6 +32,14 @@ interface QuranDao {
 
     @Query("SELECT audio_from, audio_to FROM ayahs WHERE id = :id")
     suspend fun audioRange(id: Int): AudioRange?
+
+    // Reverse map (Hafs āyah → this DB's āyah): the lowest/highest āyah whose
+    // audio range covers a given Hafs-numbered āyah. Used to convert ranges.
+    @Query("SELECT number FROM ayahs WHERE surah = :surah AND :hafsAyah BETWEEN audio_from AND audio_to ORDER BY number ASC LIMIT 1")
+    suspend fun ayahCoveringHafsFirst(surah: Int, hafsAyah: Int): Int?
+
+    @Query("SELECT number FROM ayahs WHERE surah = :surah AND :hafsAyah BETWEEN audio_from AND audio_to ORDER BY number DESC LIMIT 1")
+    suspend fun ayahCoveringHafsLast(surah: Int, hafsAyah: Int): Int?
 }
 
 /** Minimal projection for whole-mushaf aggregations (Progress screen). */

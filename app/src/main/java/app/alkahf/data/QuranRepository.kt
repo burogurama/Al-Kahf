@@ -614,14 +614,13 @@ class QuranRepository(context: Context) {
     suspend fun presets(): List<LoopPreset> =
         userDao.allPresets().map { it.toLoopPreset() }
 
-    /** The auto-managed drill for the current sabaq, or null when there's none. */
-    suspend fun sabaqDrill(): LoopPreset? =
-        userDao.defaultPresetForRiwayah(riwayah)?.toLoopPreset()
+    /** The single auto-managed sabaq drill, or null when there's no sabaq. */
+    suspend fun sabaqDrill(): LoopPreset? = userDao.defaultPreset()?.toLoopPreset()
 
     /** A non-null base preset for the loop player (sabaq drill, else a template). */
     suspend fun defaultPreset(): LoopPreset =
         sabaqDrill()
-            ?: userDao.presetsForRiwayah(riwayah).firstOrNull()?.toLoopPreset()
+            ?: userDao.allPresets().firstOrNull()?.toLoopPreset()
             ?: activeReciter.let { r ->
                 LoopPreset(
                     surah = 18,
@@ -645,12 +644,14 @@ class QuranRepository(context: Context) {
      */
     suspend fun syncSabaqDrill() {
         val range = sabaqRange
-        // Scope to the active riwāyah so each reading keeps its own sabaq drill.
-        val existing = userDao.defaultPresetForRiwayah(riwayah)
+        val defaults = userDao.allPresets().filter { it.isDefault }
         if (range == null) {
-            existing?.let { userDao.deletePreset(it.id) }
+            defaults.forEach { userDao.deletePreset(it.id) }
             return
         }
+        // There is exactly one sabaq drill; drop any duplicates from older builds.
+        val existing = defaults.firstOrNull()
+        defaults.drop(1).forEach { userDao.deletePreset(it.id) }
         val surahName = quranDao.surah(range.surah).nameLatin
         if (existing == null) {
             val reciter = activeReciter
@@ -671,20 +672,26 @@ class QuranRepository(context: Context) {
                     riwayah = riwayah,
                 ),
             )
-        } else if (existing.surah != range.surah ||
-            existing.ayahFrom != range.from ||
-            existing.ayahTo != range.to
-        ) {
-            userDao.updatePreset(
-                existing.copy(
-                    name = surahName,
-                    surah = range.surah,
-                    surahName = surahName,
-                    ayahFrom = range.from,
-                    ayahTo = range.to,
-                ),
-            )
+            return
         }
+        // The single sabaq drill follows the system riwāyah: convert its reading
+        // and (if needed) reciter when the system reading toggled, and track the
+        // sabaq range.
+        val reciterValid = existing.reciterPath.startsWith("custom:") ||
+            recitersFor(riwayah).any { it.path == existing.reciterPath }
+        val reciter = if (existing.riwayah != riwayah || !reciterValid) activeReciter else null
+        userDao.updatePreset(
+            existing.copy(
+                name = surahName,
+                surah = range.surah,
+                surahName = surahName,
+                ayahFrom = range.from,
+                ayahTo = range.to,
+                riwayah = riwayah,
+                reciterPath = reciter?.path ?: existing.reciterPath,
+                reciterName = reciter?.displayName ?: existing.reciterName,
+            ),
+        )
     }
 
     /** Inserts a new preset, or updates it in place when it already has an id. */
@@ -894,6 +901,34 @@ class QuranRepository(context: Context) {
     suspend fun audioAyahs(surah: Int, ayah: Int, riwayah: String = this.riwayah): List<Int> {
         val r = daoFor(riwayah).audioRange(surah * 1000 + ayah) ?: return listOf(ayah)
         return (r.from..r.to).toList()
+    }
+
+    /**
+     * Converts an āyah range from one riwāyah's numbering to the other's so the
+     * same passage is referenced (Ḥafṣ ↔ Warsh differ where verses split/merge).
+     */
+    suspend fun convertAyahRange(
+        surah: Int,
+        from: Int,
+        to: Int,
+        fromRiwayah: String,
+        toRiwayah: String,
+    ): IntRange {
+        if (fromRiwayah == toRiwayah) return from..to
+        // Map both endpoints to the canonical Hafs numbering first.
+        val (hafsFrom, hafsTo) = if (fromRiwayah == "warsh") {
+            val a = warshDb.quranDao().audioRange(surah * 1000 + from)?.from ?: from
+            val b = warshDb.quranDao().audioRange(surah * 1000 + to)?.to ?: to
+            a to b
+        } else {
+            from to to
+        }
+        if (toRiwayah == "hafs") return hafsFrom..hafsTo
+        // Hafs → Warsh: the Warsh āyāt whose audio covers those Hafs āyāt.
+        val wDao = warshDb.quranDao()
+        val wFrom = wDao.ayahCoveringHafsFirst(surah, hafsFrom) ?: hafsFrom
+        val wTo = wDao.ayahCoveringHafsLast(surah, hafsTo) ?: hafsTo
+        return minOf(wFrom, wTo)..maxOf(wFrom, wTo)
     }
 
     /** The Hafs audio āyāh range spanning an app range [from]..[to]. */
