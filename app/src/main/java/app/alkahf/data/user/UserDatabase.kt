@@ -285,7 +285,9 @@ abstract class UserDatabase : RoomDatabase() {
         fun open(context: Context): UserDatabase =
             Room.databaseBuilder(context, UserDatabase::class.java, "user.db")
                 .addMigrations(MIGRATION_7_8)
-                .fallbackToDestructiveMigration()
+                // Pre-7 schemas have no migration path and may be recreated; from 7
+                // on, a missing migration must fail loudly rather than wipe data.
+                .fallbackToDestructiveMigrationFrom(1, 2, 3, 4, 5, 6)
                 .build()
     }
 }

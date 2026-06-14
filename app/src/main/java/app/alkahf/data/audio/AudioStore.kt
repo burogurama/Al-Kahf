@@ -2,6 +2,8 @@ package app.alkahf.data.audio
 
 import android.content.Context
 import java.io.File
+import java.io.IOException
+import java.net.HttpURLConnection
 import java.net.URL
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
@@ -20,11 +22,28 @@ class AudioStore(private val context: Context) {
             val file = File(dir, name)
             if (file.exists() && file.length() > 0) return@withContext file
             val temp = File(dir, "$name.part")
-            URL("$BASE_URL/$reciter/$name").openStream().use { input ->
-                temp.outputStream().use { output -> input.copyTo(output) }
+            try {
+                val connection = (URL("$BASE_URL/$reciter/$name").openConnection() as HttpURLConnection)
+                    .apply {
+                        connectTimeout = CONNECT_TIMEOUT_MS
+                        readTimeout = READ_TIMEOUT_MS
+                    }
+                try {
+                    if (connection.responseCode != HttpURLConnection.HTTP_OK) {
+                        throw IOException("HTTP ${connection.responseCode} for $name")
+                    }
+                    connection.inputStream.use { input ->
+                        temp.outputStream().use { output -> input.copyTo(output) }
+                    }
+                } finally {
+                    connection.disconnect()
+                }
+                if (!temp.renameTo(file)) throw IOException("Could not finalise $name")
+                file
+            } catch (e: IOException) {
+                temp.delete()
+                throw e
             }
-            temp.renameTo(file)
-            file
         }
 
     private fun reciterDir(reciter: String): File = File(context.filesDir, "audio/$reciter")
@@ -113,6 +132,8 @@ class AudioStore(private val context: Context) {
     companion object {
         private const val BASE_URL = "https://everyayah.com/data"
         const val DEFAULT_RECITER = "Husary_128kbps"
+        private const val CONNECT_TIMEOUT_MS = 15_000
+        private const val READ_TIMEOUT_MS = 30_000
     }
 }
 
