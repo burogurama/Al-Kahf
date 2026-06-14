@@ -23,6 +23,8 @@ data class HomeUiState(
     val reviewEstimatedMinutes: Int = 0,
     val reviewPortionNames: List<String> = emptyList(),
     val reviewOverflowCount: Int = 0,
+    val hasDrill: Boolean = false,
+    val drillPresetId: Long = 0,
     val drillPresetTitle: String = "",
     val drillPresetDetail: String = "",
     val weekSummary: String = "",

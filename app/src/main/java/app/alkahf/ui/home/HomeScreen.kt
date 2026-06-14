@@ -95,7 +95,9 @@ fun HomeScreen(
             HomeHeader(state, onOpenSettings)
             SabaqCard(state, onOpenSabaq, onMarkSabaq)
             MurajaahCard(state, onOpenReview)
-            ResumeDrillCard(state, onOpenLoop)
+            if (state.hasDrill) {
+                ResumeDrillCard(state, onOpenLoop)
+            }
             ThisWeekCard(state)
             Spacer(Modifier.height(3.dp))
         }

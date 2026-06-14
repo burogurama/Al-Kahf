@@ -34,9 +34,10 @@ private enum class AlkahfDestination {
     Home, Mushaf, Loop, Review, Progress, Library, ReciterDownloads, TawqitTagging, Settings
 }
 
-private fun buildHomeUiState(res: Resources, data: HomeData, preset: LoopPreset): HomeUiState {
+private fun buildHomeUiState(res: Resources, data: HomeData): HomeUiState {
     val names = data.review.names
     val sabaq = data.sabaq
+    val drill = data.drill
     return HomeUiState(
         streakDays = data.streakDays,
         hasSabaq = sabaq != null,
@@ -50,18 +51,20 @@ private fun buildHomeUiState(res: Resources, data: HomeData, preset: LoopPreset)
         reviewEstimatedMinutes = data.review.minutes,
         reviewPortionNames = names.take(4),
         reviewOverflowCount = (names.size - 4).coerceAtLeast(0),
-        drillPresetTitle = res.getString(
-            R.string.home_drill_title,
-            preset.reciterName,
-            preset.surahNameLatin,
-            preset.ayahFrom,
-            preset.ayahTo,
-        ),
-        drillPresetDetail = res.getString(
-            R.string.home_drill_detail,
-            preset.perAyah,
-            preset.perChain,
-        ),
+        hasDrill = drill != null,
+        drillPresetId = drill?.id ?: 0L,
+        drillPresetTitle = drill?.let {
+            res.getString(
+                R.string.home_drill_title,
+                it.reciterName,
+                it.surahNameLatin,
+                it.ayahFrom,
+                it.ayahTo,
+            )
+        } ?: "",
+        drillPresetDetail = drill?.let {
+            res.getString(R.string.home_drill_detail, it.perAyah, it.perChain)
+        } ?: "",
         weekSummary = res.getString(
             R.string.home_week_summary,
             data.week.daysPracticed,
@@ -134,7 +137,7 @@ fun AlkahfApp(
     var homeRefresh by remember { mutableStateOf(0) }
     val homeState by produceState(initialValue = HomeUiState(), destination, homeRefresh) {
         if (destination == AlkahfDestination.Home) {
-            value = buildHomeUiState(resources, repository.homeData(), repository.defaultPreset())
+            value = buildHomeUiState(resources, repository.homeData())
         }
     }
 
@@ -151,7 +154,7 @@ fun AlkahfApp(
                 }
             },
             onOpenLoop = {
-                loopPresetId = null
+                loopPresetId = homeState.drillPresetId.takeIf { it != 0L }
                 loopNewPreset = false
                 destination = AlkahfDestination.Loop
             },

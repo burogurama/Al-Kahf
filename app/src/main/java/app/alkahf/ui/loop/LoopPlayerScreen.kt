@@ -134,7 +134,7 @@ fun LoopPlayerScreen(presetId: Long? = null, newPreset: Boolean = false, onBack:
             surahs = surahs,
             onSave = { preset ->
                 scope.launch {
-                    val id = repository.savePreset(preset, makeDefault = preset.isDefault)
+                    val id = repository.savePreset(preset)
                     loadedPreset = preset.copy(id = id)
                     controller.applyPreset(preset)
                 }

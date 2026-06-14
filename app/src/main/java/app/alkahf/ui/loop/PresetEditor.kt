@@ -71,7 +71,6 @@ fun PresetEditor(
     var perChain by remember { mutableStateOf(initial.perChain) }
     var gap by remember { mutableStateOf(initial.gapMultiplier) }
     var speed by remember { mutableStateOf(initial.speed) }
-    var isDefault by remember { mutableStateOf(initial.isDefault) }
 
     val surah = surahs.getOrNull(surahIndex) ?: return
     val maxTo = minOf(ayahFrom + LoopController.MAX_SPAN - 1, surah.ayahCount)
@@ -206,38 +205,6 @@ fun PresetEditor(
                     onIncrement = { speed = (speed + 0.25f).coerceAtMost(1.5f) },
                 )
             }
-            EditorCard(stringResource(R.string.loop_card_default)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = stringResource(R.string.loop_resume_uses_preset),
-                        fontSize = 13.5.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = AlkahfColors.InkSecondaryDark,
-                        modifier = Modifier.weight(1f),
-                    )
-                    Surface(
-                        onClick = { isDefault = !isDefault },
-                        shape = RoundedCornerShape(10.dp),
-                        color = if (isDefault) AlkahfColors.AccentTint else AlkahfColors.ChipBg,
-                        border = BorderStroke(
-                            1.dp,
-                            if (isDefault) AlkahfColors.Accent else AlkahfColors.CardBorder,
-                        ),
-                    ) {
-                        Text(
-                            text = if (isDefault) {
-                                stringResource(R.string.loop_default_badge)
-                            } else {
-                                stringResource(R.string.loop_make_default)
-                            },
-                            fontSize = 12.5.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = if (isDefault) AlkahfColors.AccentDeep else AlkahfColors.InkMuted,
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
-                        )
-                    }
-                }
-            }
         }
         Button(
             onClick = {
@@ -255,7 +222,7 @@ fun PresetEditor(
                         perChain = perChain,
                         gapMultiplier = gap,
                         speed = speed,
-                        isDefault = isDefault,
+                        isDefault = initial.isDefault,
                     ),
                 )
             },

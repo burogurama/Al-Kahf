@@ -194,6 +194,7 @@ data class WeekSummary(
 data class HomeData(
     val streakDays: Int,
     val sabaq: SabaqCard?,
+    val drill: LoopPreset?,
     val review: ReviewSummary,
     val week: WeekSummary,
 )
@@ -382,10 +383,12 @@ class QuranRepository(context: Context) {
     suspend fun homeData(): HomeData {
         ensureSeeded()
         maybeAdvanceSabaq()
+        syncSabaqDrill()
         val today = LocalDate.now()
         return HomeData(
             streakDays = currentStreak(),
             sabaq = sabaqCard(),
+            drill = sabaqDrill(),
             review = reviewSummary(),
             week = weekSummary(today),
         )
@@ -531,20 +534,83 @@ class QuranRepository(context: Context) {
             .apply()
     }
 
-    // --- Loop presets (Room-backed; one is the default) ---
+    // --- Loop presets (Room-backed; the sabaq's drill is flagged isDefault) ---
 
-    suspend fun presets(): List<LoopPreset> {
-        ensurePresetSeed()
-        return userDao.allPresets().map { it.toLoopPreset() }
-    }
+    suspend fun presets(): List<LoopPreset> =
+        userDao.allPresets().map { it.toLoopPreset() }
 
-    suspend fun defaultPreset(): LoopPreset {
-        ensurePresetSeed()
-        return (userDao.defaultPreset() ?: userDao.allPresets().first()).toLoopPreset()
+    /** The auto-managed drill for the current sabaq, or null when there's none. */
+    suspend fun sabaqDrill(): LoopPreset? = userDao.defaultPreset()?.toLoopPreset()
+
+    /** A non-null base preset for the loop player (sabaq drill, else a template). */
+    suspend fun defaultPreset(): LoopPreset =
+        sabaqDrill()
+            ?: userDao.allPresets().firstOrNull()?.toLoopPreset()
+            ?: activeReciter.let { r ->
+                LoopPreset(
+                    surah = 18,
+                    surahNameLatin = "Al-Kahf",
+                    ayahFrom = 1,
+                    ayahTo = 5,
+                    reciterPath = r.path,
+                    reciterName = r.displayName,
+                    perAyah = 3,
+                    perChain = 5,
+                    gapMultiplier = 1.5f,
+                    speed = 1.0f,
+                )
+            }
+
+    /**
+     * Keeps a single auto-generated drill in step with the sabaq: created when a
+     * sabaq exists, its range refreshed (keeping the user's config) when the
+     * sabaq advances, and removed when there's no sabaq. Flagged isDefault to
+     * tell it apart from the user's own presets.
+     */
+    suspend fun syncSabaqDrill() {
+        val range = sabaqRange
+        val existing = userDao.defaultPreset()
+        if (range == null) {
+            existing?.let { userDao.deletePreset(it.id) }
+            return
+        }
+        val surahName = quranDao.surah(range.surah).nameLatin
+        if (existing == null) {
+            val reciter = activeReciter
+            userDao.insertPreset(
+                LoopPresetEntity(
+                    name = surahName,
+                    surah = range.surah,
+                    surahName = surahName,
+                    ayahFrom = range.from,
+                    ayahTo = range.to,
+                    reciterPath = reciter.path,
+                    reciterName = reciter.displayName,
+                    perAyah = 3,
+                    perChain = 5,
+                    gapMultiplier = 1.5f,
+                    speed = 1.0f,
+                    isDefault = true,
+                ),
+            )
+        } else if (existing.surah != range.surah ||
+            existing.ayahFrom != range.from ||
+            existing.ayahTo != range.to
+        ) {
+            userDao.updatePreset(
+                existing.copy(
+                    name = surahName,
+                    surah = range.surah,
+                    surahName = surahName,
+                    ayahFrom = range.from,
+                    ayahTo = range.to,
+                ),
+            )
+        }
     }
 
     /** Inserts a new preset, or updates it in place when it already has an id. */
-    suspend fun savePreset(preset: LoopPreset, makeDefault: Boolean): Long {
+    suspend fun savePreset(preset: LoopPreset): Long {
         val entity = LoopPresetEntity(
             id = preset.id,
             name = preset.name,
@@ -560,50 +626,19 @@ class QuranRepository(context: Context) {
             speed = preset.speed,
             isDefault = preset.isDefault,
         )
-        val id = if (preset.id == 0L) {
+        return if (preset.id == 0L) {
             userDao.insertPreset(entity)
         } else {
             userDao.updatePreset(entity)
             preset.id
         }
-        if (makeDefault) setDefaultPreset(id)
-        return id
     }
 
     suspend fun presetById(id: Long): LoopPreset? =
         userDao.allPresets().firstOrNull { it.id == id }?.toLoopPreset()
 
-    suspend fun setDefaultPreset(id: Long) {
-        userDao.clearDefaultPresets()
-        userDao.markDefaultPreset(id)
-    }
-
     suspend fun deletePreset(id: Long) {
         userDao.deletePreset(id)
-        if (userDao.defaultPreset() == null) {
-            userDao.allPresets().firstOrNull()?.let { userDao.markDefaultPreset(it.id) }
-        }
-    }
-
-    private suspend fun ensurePresetSeed() {
-        if (userDao.presetCount() > 0) return
-        val reciter = activeReciter
-        userDao.insertPreset(
-            LoopPresetEntity(
-                name = "Al-Kahf opening",
-                surah = 18,
-                surahName = "Al-Kahf",
-                ayahFrom = 1,
-                ayahTo = 5,
-                reciterPath = reciter.path,
-                reciterName = reciter.displayName,
-                perAyah = 3,
-                perChain = 5,
-                gapMultiplier = 1.5f,
-                speed = 1.0f,
-                isDefault = true,
-            ),
-        )
     }
 
     // --- Reciters (built-in + custom imported) ---
