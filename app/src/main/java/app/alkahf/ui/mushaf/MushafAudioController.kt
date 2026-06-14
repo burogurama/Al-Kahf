@@ -79,7 +79,8 @@ class MushafAudioController(
 
     /**
      * Plays the given ayat (ids encode surah * 1000 + number) in order,
-     * looping the whole list [repeat] times.
+     * looping the whole list [repeat] times. A [repeat] of 0 (or less) loops
+     * forever until stopped.
      */
     fun playAyahIds(ayahIds: List<Int>, repeat: Int = 1) {
         job?.cancel()
@@ -109,7 +110,10 @@ class MushafAudioController(
     }
 
     private suspend fun run(ayahIds: List<Int>, repeat: Int = 1) {
-        repeat(repeat.coerceAtLeast(1)) {
+        var pass = 0
+        // repeat <= 0 means loop forever (until stopped/cancelled).
+        while (repeat <= 0 || pass < repeat) {
+            pass++
             for (ayahId in ayahIds) {
                 _state.update { it.copy(currentAyahId = ayahId, phase = MushafAudioPhase.PREPARING) }
                 val file = try {

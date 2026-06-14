@@ -115,6 +115,7 @@
         <item quantity="other">%1$d āyāt selected</item>
     </plurals>
     <string name="mushaf_listen_to_selection">Listen to selection</string>
+    <string name="mushaf_listen_start">Listen</string>
     <string name="mushaf_speed">Speed</string>
     <string name="mushaf_repeat">Repeat</string>
     <string name="mushaf_mode_normal">Normal</string>

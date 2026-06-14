@@ -123,6 +123,7 @@
         <item quantity="other">%1$d آية محدّدة</item>
     </plurals>
     <string name="mushaf_listen_to_selection">الاستماع للتحديد</string>
+    <string name="mushaf_listen_start">استمع</string>
     <string name="mushaf_speed">السرعة</string>
     <string name="mushaf_repeat">التكرار</string>
     <string name="mushaf_mode_normal">عادي</string>

@@ -389,8 +389,10 @@ fun MushafScreen(
     }
     val onHeadsetLongPress = {
         if (audioRangeIds().isNotEmpty()) {
+            // Long-press toggles the config open/closed (closing it doesn't play;
+            // only the Listen button starts playback).
             audioDockOpen = false
-            rangeAudioOpen = true
+            rangeAudioOpen = !rangeAudioOpen
         } else {
             toggleAudioDock()
         }
@@ -468,15 +470,12 @@ fun MushafScreen(
                 mode = rangeMode,
                 speed = rangeSpeed,
                 times = rangeTimes,
-                state = audioState,
                 onMode = { rangeMode = it },
                 onSpeed = { rangeSpeed = it },
                 onTimes = { rangeTimes = it },
-                onPlay = { playRange(rangeMode) },
-                onStop = audioController::stop,
-                onClose = {
+                onListen = {
                     rangeAudioOpen = false
-                    audioController.stop()
+                    playRange(rangeMode)
                 },
             )
             audioDockOpen -> MushafAudioDock(
@@ -1396,43 +1395,25 @@ private fun RangeAudioDock(
     mode: MushafAudioMode,
     speed: Float,
     times: Int,
-    state: MushafAudioState,
     onMode: (MushafAudioMode) -> Unit,
     onSpeed: (Float) -> Unit,
     onTimes: (Int) -> Unit,
-    onPlay: () -> Unit,
-    onStop: () -> Unit,
-    onClose: () -> Unit,
+    onListen: () -> Unit,
 ) {
     Column(Modifier.fillMaxWidth().background(AlkahfColors.NavSurface)) {
         HorizontalDivider(thickness = 1.dp, color = AlkahfColors.DockBorder)
         Column(
             Modifier
                 .navigationBarsPadding()
-                .padding(start = 16.dp, top = 12.dp, end = 16.dp, bottom = 10.dp),
+                .padding(start = 16.dp, top = 12.dp, end = 16.dp, bottom = 12.dp),
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = stringResource(R.string.mushaf_listen_to_selection),
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = AlkahfColors.Ink,
-                    modifier = Modifier.weight(1f),
-                )
-                Box(
-                    modifier = Modifier.clickable(onClick = onClose).padding(horizontal = 8.dp, vertical = 4.dp),
-                ) {
-                    Text(
-                        text = stringResource(R.string.common_done),
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = AlkahfColors.AccentDeep,
-                    )
-                }
-            }
+            Text(
+                text = stringResource(R.string.mushaf_listen_to_selection),
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                color = AlkahfColors.Ink,
+                modifier = Modifier.padding(bottom = 10.dp),
+            )
             AudioSegmented(
                 options = listOf(
                     MushafAudioMode.LISTEN to stringResource(R.string.mushaf_mode_normal),
@@ -1455,64 +1436,95 @@ private fun RangeAudioDock(
                 selected = speed,
                 onSelect = onSpeed,
             )
-            Spacer(Modifier.height(10.dp))
-            Text(
-                text = stringResource(R.string.mushaf_repeat),
-                fontSize = 11.sp,
-                fontWeight = FontWeight.SemiBold,
-                letterSpacing = 0.6.sp,
-                color = AlkahfColors.InkMuted,
-                modifier = Modifier.padding(bottom = 5.dp),
-            )
-            AudioSegmented(
-                options = listOf(1 to "1×", 2 to "2×", 3 to "3×", 5 to "5×"),
-                selected = times,
-                onSelect = onTimes,
-            )
             Spacer(Modifier.height(12.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                val idle = state.phase == MushafAudioPhase.IDLE
-                Surface(
-                    onClick = if (idle) onPlay else onStop,
-                    shape = CircleShape,
-                    color = AlkahfColors.Accent,
-                    modifier = Modifier.size(46.dp),
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = if (idle) Icons.Filled.PlayArrow else Icons.Filled.Stop,
-                            contentDescription = if (idle) {
-                                stringResource(R.string.common_play)
-                            } else {
-                                stringResource(R.string.common_stop)
-                            },
-                            tint = AlkahfColors.OnAccent,
-                            modifier = Modifier.size(22.dp),
-                        )
-                    }
-                }
                 Text(
-                    text = when {
-                        state.errorMessage != null -> state.errorMessage
-                        state.phase == MushafAudioPhase.IDLE -> stringResource(R.string.mushaf_audio_ready)
-                        state.phase == MushafAudioPhase.PREPARING ->
-                            stringResource(R.string.mushaf_audio_preparing)
-                        state.phase == MushafAudioPhase.GAP ->
-                            stringResource(
-                                R.string.mushaf_audio_recite_back_ayah,
-                                (state.currentAyahId ?: 0) % 1000,
-                            )
-                        else -> stringResource(
-                            R.string.mushaf_audio_ayah,
-                            (state.currentAyahId ?: 0) % 1000,
-                        )
-                    },
-                    fontSize = 13.sp,
+                    text = stringResource(R.string.mushaf_repeat),
+                    fontSize = 11.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color = if (state.errorMessage != null) AlkahfColors.StumbleInk else AlkahfColors.Ink,
-                    modifier = Modifier.weight(1f).padding(start = 12.dp),
+                    letterSpacing = 0.6.sp,
+                    color = AlkahfColors.InkMuted,
+                    modifier = Modifier.weight(1f),
+                )
+                RepeatStepper(times = times, onChange = onTimes)
+            }
+            Spacer(Modifier.height(14.dp))
+            Surface(
+                onClick = onListen,
+                shape = RoundedCornerShape(14.dp),
+                color = AlkahfColors.Accent,
+                modifier = Modifier.fillMaxWidth().height(50.dp),
+            ) {
+                Row(
+                    Modifier.fillMaxSize(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.PlayArrow,
+                        contentDescription = null,
+                        tint = AlkahfColors.OnAccent,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = stringResource(R.string.mushaf_listen_start),
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = AlkahfColors.OnAccent,
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** Repeat count: a stepper (1–99×) with an ∞ (loop-forever) toggle. */
+@Composable
+private fun RepeatStepper(times: Int, onChange: (Int) -> Unit) {
+    val infinite = times <= 0
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        StepButton("−") { onChange(if (infinite) 1 else (times - 1).coerceAtLeast(1)) }
+        Box(Modifier.width(50.dp), contentAlignment = Alignment.Center) {
+            Text(
+                text = if (infinite) "∞" else "$times×",
+                fontSize = if (infinite) 20.sp else 15.sp,
+                fontWeight = FontWeight.Bold,
+                color = AlkahfColors.Ink,
+            )
+        }
+        StepButton("+") { onChange(if (infinite) 1 else (times + 1).coerceAtMost(99)) }
+        Spacer(Modifier.width(8.dp))
+        Surface(
+            onClick = { onChange(if (infinite) 1 else 0) },
+            shape = RoundedCornerShape(12.dp),
+            color = if (infinite) AlkahfColors.Accent else AlkahfColors.Surface,
+            border = BorderStroke(1.dp, if (infinite) AlkahfColors.Accent else AlkahfColors.CardBorder),
+            modifier = Modifier.size(40.dp),
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Text(
+                    text = "∞",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = if (infinite) AlkahfColors.OnAccent else AlkahfColors.InkMuted,
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun StepButton(label: String, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(12.dp),
+        color = AlkahfColors.Surface,
+        border = BorderStroke(1.dp, AlkahfColors.CardBorder),
+        modifier = Modifier.size(40.dp),
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Text(label, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = AlkahfColors.InkChrome)
         }
     }
 }
