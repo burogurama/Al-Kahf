@@ -397,10 +397,27 @@ fun MushafScreen(
             return
         }
         if (chosen.isImported) {
-            // Imported playback in the Mushaf isn't wired to the Tawqīt engine
-            // yet; route the user to import + time the relevant sūrah instead.
-            rangeAudioOpen = false
-            onImportReciter(chosen)
+            // Imported reciter: play from the Tawqīt timings if the range is
+            // timed (partial timings are fine for their covered āyāt); otherwise
+            // route the user to import + time the sūrah.
+            val surah = ids.first() / 1000
+            val nums = ids.filter { it / 1000 == surah }.map { it % 1000 }
+            scope.launch {
+                val playback = repository.importedRangePlayback(chosen.key, surah, nums.min(), nums.max())
+                rangeAudioOpen = false
+                if (playback != null) {
+                    audioController.setMode(rangeMode)
+                    audioController.setSpeed(rangeSpeed)
+                    audioController.playImported(
+                        playback.fileUri,
+                        playback.ayahIds,
+                        playback.segments,
+                        repeat = rangeTimes,
+                    )
+                } else {
+                    onImportReciter(chosen)
+                }
+            }
             return
         }
         // Built-in reciter: make it active for playback.

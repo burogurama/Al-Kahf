@@ -62,6 +62,17 @@ class TawqitController(
         player.setMediaItems(uris.map { MediaItem.fromUri(it) })
         player.setPlaybackSpeed(speed)
         player.prepare()
+        // Resume where tagging left off instead of replaying from the start.
+        val resumeAt = existingEndTimes.lastOrNull()
+        if (resumeAt != null) {
+            if (uris.size <= 1) {
+                // Single imported file: marks are ms within that one file.
+                player.seekTo(0, resumeAt)
+            } else {
+                // Per-ayah playlist: jump to the current ayah's file.
+                player.seekTo(existingEndTimes.size.coerceAtMost(uris.lastIndex), 0)
+            }
+        }
         startTicker()
     }
 

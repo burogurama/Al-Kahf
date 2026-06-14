@@ -104,6 +104,23 @@ class MushafAudioController(
 
     fun playSingle(ayahId: Int) = playAyahIds(listOf(ayahId))
 
+    /**
+     * Plays an imported reciter's single audio file by [segments] (one start..end
+     * millisecond range per āyah, parallel to [ayahIds]), looping [repeat] times
+     * (0 = forever).
+     */
+    fun playImported(
+        fileUri: String,
+        ayahIds: List<Int>,
+        segments: List<LongRange>,
+        repeat: Int = 1,
+    ) {
+        job?.cancel()
+        player.stop()
+        _state.update { it.copy(isPaused = false, errorMessage = null) }
+        job = coroutineScope.launch { runImported(fileUri, ayahIds, segments, repeat) }
+    }
+
     fun togglePause() {
         _state.update { it.copy(isPaused = !it.isPaused) }
         player.playWhenReady = !_state.value.isPaused
@@ -149,6 +166,46 @@ class MushafAudioController(
                 }
             }
         }
+        _state.update { it.copy(phase = MushafAudioPhase.IDLE, currentAyahId = null) }
+    }
+
+    private suspend fun runImported(
+        fileUri: String,
+        ayahIds: List<Int>,
+        segments: List<LongRange>,
+        repeat: Int,
+    ) {
+        player.setMediaItem(MediaItem.fromUri(Uri.parse(fileUri)))
+        player.prepare()
+        player.setPlaybackSpeed(playbackSpeed)
+        var pass = 0
+        while (repeat <= 0 || pass < repeat) {
+            pass++
+            for (i in segments.indices) {
+                val seg = segments[i]
+                _state.update {
+                    it.copy(currentAyahId = ayahIds.getOrNull(i), phase = MushafAudioPhase.PREPARING)
+                }
+                player.seekTo(seg.first)
+                player.playWhenReady = !_state.value.isPaused
+                _state.update { it.copy(phase = MushafAudioPhase.PLAYING) }
+                while (true) {
+                    when (player.playbackState) {
+                        Player.STATE_IDLE -> return // stopped
+                        Player.STATE_ENDED -> break
+                        else -> if (player.currentPosition >= seg.last) break
+                    }
+                    delay(40)
+                }
+                player.pause()
+                lastDurationMs = (seg.last - seg.first).coerceAtLeast(0)
+                repository.logPractice(type = "listen", ayahCount = 1, durationMs = lastDurationMs)
+                if (_state.value.mode == MushafAudioMode.RECITE_BACK) {
+                    reciteBackGap()
+                }
+            }
+        }
+        player.pause()
         _state.update { it.copy(phase = MushafAudioPhase.IDLE, currentAyahId = null) }
     }
 
