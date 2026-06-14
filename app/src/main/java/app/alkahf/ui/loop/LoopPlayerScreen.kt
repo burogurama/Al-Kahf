@@ -114,6 +114,9 @@ fun LoopPlayerScreen(presetId: Long? = null, newPreset: Boolean = false, onBack:
     val surahs by produceState(initialValue = emptyList<SurahOption>()) {
         value = repository.surahOptions()
     }
+    val reciters by produceState(initialValue = emptyList<app.alkahf.data.audio.Reciter>()) {
+        value = repository.allReciters()
+    }
 
     if (showEditor) {
         // Don't flash the drill UI behind the editor while the surah list loads.
@@ -132,6 +135,7 @@ fun LoopPlayerScreen(presetId: Long? = null, newPreset: Boolean = false, onBack:
                 isDefault = if (creatingNew) false else (base?.isDefault ?: false),
             ),
             surahs = surahs,
+            reciters = reciters,
             onSave = { preset ->
                 scope.launch {
                     val id = repository.savePreset(preset)

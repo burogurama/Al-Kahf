@@ -45,6 +45,7 @@ import app.alkahf.R
 import app.alkahf.data.LoopPreset
 import app.alkahf.data.SurahOption
 import app.alkahf.data.audio.RECITERS
+import app.alkahf.data.audio.Reciter
 import app.alkahf.ui.theme.AlkahfColors
 
 /**
@@ -56,6 +57,7 @@ import app.alkahf.ui.theme.AlkahfColors
 fun PresetEditor(
     initial: LoopPreset,
     surahs: List<SurahOption>,
+    reciters: List<Reciter>,
     onSave: (LoopPreset) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -64,8 +66,11 @@ fun PresetEditor(
     }
     var ayahFrom by remember { mutableStateOf(initial.ayahFrom) }
     var ayahTo by remember { mutableStateOf(initial.ayahTo) }
-    var reciter by remember {
-        mutableStateOf(RECITERS.firstOrNull { it.path == initial.reciterPath } ?: RECITERS.first())
+    val reciterOptions = reciters.ifEmpty { RECITERS }
+    var reciter by remember(reciterOptions) {
+        mutableStateOf(
+            reciterOptions.firstOrNull { it.path == initial.reciterPath } ?: reciterOptions.first(),
+        )
     }
     var perAyah by remember { mutableStateOf(initial.perAyah) }
     var perChain by remember { mutableStateOf(initial.perChain) }
@@ -157,7 +162,7 @@ fun PresetEditor(
                     horizontalArrangement = Arrangement.spacedBy(7.dp),
                     verticalArrangement = Arrangement.spacedBy(7.dp),
                 ) {
-                    RECITERS.forEach { option ->
+                    reciterOptions.forEach { option ->
                         val selected = option.path == reciter.path
                         Surface(
                             onClick = { reciter = option },

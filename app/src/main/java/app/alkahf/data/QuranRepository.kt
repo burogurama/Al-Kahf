@@ -148,6 +148,9 @@ data class ImportedPlayback(
     val segments: List<LongRange>,
 )
 
+/** An imported sūrah's single file plus each timed āyah's segment, by āyah number. */
+data class ImportedSurahAudio(val fileUri: String, val segments: Map<Int, LongRange>)
+
 enum class ReviewPacing(val growthFactor: Double) {
     GENTLE(3.0), STANDARD(2.5), AGGRESSIVE(2.0),
 }
@@ -906,6 +909,37 @@ class QuranRepository(context: Context) {
             segments = segments,
         )
     }
+
+    /**
+     * The imported file for [reciterKey]'s [surah] plus the start..end segment of
+     * every timed āyah (keyed by āyah number). Null when the reciter hasn't
+     * imported/timed that sūrah. Used to play imported audio in the drill.
+     */
+    suspend fun importedSurahAudio(reciterKey: String, surah: Int): ImportedSurahAudio? {
+        val customId = customReciterId(reciterKey) ?: return null
+        val import = userDao.importedSurah(customId, surah) ?: return null
+        val track = userDao.allTimingTracks()
+            .firstOrNull { it.sourceRef == import.uri && it.surah == surah }
+            ?.toTawqitTrack() ?: return null
+        val ends = track.endTimesMs
+        if (ends.isEmpty()) return null
+        val firstTimed = track.ayahFrom
+        val offset = track.globalOffsetMs
+        val segments = buildMap {
+            for (i in ends.indices) {
+                val startMs = if (i == 0) 0L else ends[i - 1]
+                put(
+                    firstTimed + i,
+                    (startMs + offset).coerceAtLeast(0L)..(ends[i] + offset).coerceAtLeast(0L),
+                )
+            }
+        }
+        return ImportedSurahAudio(import.uri, segments)
+    }
+
+    /** Built-in reciters plus every imported one (keyed "custom:<id>"). */
+    suspend fun allReciters(): List<Reciter> =
+        RECITERS + userDao.customReciters().map { Reciter("custom:${it.id}", it.name) }
 
     private fun TimingTrackEntity.toTawqitTrack() = TawqitTrack(
         id = id,

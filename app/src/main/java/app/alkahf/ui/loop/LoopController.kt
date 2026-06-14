@@ -91,6 +91,9 @@ class LoopController(
     private var jumpTarget: Int? = null
     private var sessionJob: Job? = null
     private var loadedSurah = -1
+    // Resolved when the current reciter is an imported one ("custom:<id>"): the
+    // single audio file plus each āyah's segment. Null for built-in reciters.
+    private var importedAudio: app.alkahf.data.ImportedSurahAudio? = null
 
     fun applyPreset(preset: LoopPreset) {
         _state.update { applyPresetTo(it, preset) }
@@ -203,6 +206,13 @@ class LoopController(
             }
             loadedSurah = surah
         }
+        // An imported reciter plays from its single timed file; resolve it once.
+        val reciterPath = _state.value.reciterPath
+        importedAudio = if (reciterPath.startsWith("custom:")) {
+            repository.importedSurahAudio(reciterPath, _state.value.surah)
+        } else {
+            null
+        }
         val config = _state.value
         steps = LoopSequencer.steps(
             config.mode, config.rangeStart, config.rangeEnd, config.perAyah, config.perChain,
@@ -211,8 +221,7 @@ class LoopController(
         while (true) {
             val step = steps.getOrNull(stepIndex) ?: break
             applyStep(step)
-            val file = downloadStep(step) ?: return
-            val finishedNaturally = playFile(file)
+            val finishedNaturally = playAyah(step) ?: return
             val jumped = consumeJump()
             if (jumped != null) {
                 stepIndex = jumped
@@ -250,6 +259,62 @@ class LoopController(
                 highlightIndex = -1,
             )
         }
+    }
+
+    /**
+     * Plays one āyah of [step]. Returns whether it finished naturally (false when
+     * a jump interrupted it), or null when the audio couldn't be obtained.
+     */
+    private suspend fun playAyah(step: LoopStep): Boolean? {
+        if (_state.value.reciterPath.startsWith("custom:")) {
+            val segment = importedAudio?.segments?.get(step.ayah)
+            if (importedAudio == null || segment == null) {
+                // The imported reciter hasn't timed this āyah — nothing to play.
+                _state.update {
+                    it.copy(
+                        phase = LoopPhase.ERROR,
+                        errorMessage = context.getString(R.string.loop_audio_download_failed),
+                    )
+                }
+                return null
+            }
+            return playImportedSegment(importedAudio!!.fileUri, segment)
+        }
+        val file = downloadStep(step) ?: return null
+        return playFile(file)
+    }
+
+    /** Plays a single āyah's [segment] of an imported file. False if a jump cut it. */
+    private suspend fun playImportedSegment(fileUri: String, segment: LongRange): Boolean {
+        player.setMediaItem(MediaItem.fromUri(Uri.parse(fileUri)))
+        player.prepare()
+        player.setPlaybackSpeed(_state.value.speed)
+        player.seekTo(segment.first)
+        player.playWhenReady = !_state.value.isPaused
+        val total = (segment.last - segment.first).coerceAtLeast(0)
+        _state.update { it.copy(phase = LoopPhase.PLAYING, durationMs = total) }
+        while (true) {
+            when (player.playbackState) {
+                Player.STATE_IDLE -> return false
+                Player.STATE_ENDED -> break
+                else -> {
+                    val position = (player.currentPosition - segment.first).coerceIn(0, total)
+                    if (player.currentPosition >= segment.last) break
+                    val words = _state.value.ayahs[_state.value.currentAyah]?.words.orEmpty()
+                    val highlight = if (total > 0 && words.isNotEmpty()) {
+                        ((position * words.size) / total).toInt().coerceIn(0, words.size - 1)
+                    } else {
+                        -1
+                    }
+                    _state.update {
+                        it.copy(positionMs = position, durationMs = total, highlightIndex = highlight)
+                    }
+                }
+            }
+            delay(120)
+        }
+        player.pause()
+        return true
     }
 
     private suspend fun downloadStep(step: LoopStep): File? {
