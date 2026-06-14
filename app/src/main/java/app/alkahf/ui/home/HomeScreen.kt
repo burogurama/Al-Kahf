@@ -297,7 +297,12 @@ private fun AyahBlock(state: HomeUiState) {
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
         Text(
             text = ayah,
-            style = AyahTextStyle.copy(fontFamily = LocalQuranFont.current),
+            // AyahTextStyle's baked-in colour is the light theme's; read the live
+            // token here so the text stays legible in dark mode.
+            style = AyahTextStyle.copy(
+                fontFamily = LocalQuranFont.current,
+                color = AlkahfColors.Ink,
+            ),
             textAlign = TextAlign.Start,
             modifier = Modifier
                 .fillMaxWidth()
