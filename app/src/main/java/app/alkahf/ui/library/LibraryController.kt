@@ -27,18 +27,31 @@ class LibraryController(private val repository: QuranRepository) {
     suspend fun load() {
         _state.value = LibraryUiState(
             storage = repository.storageInfo(),
-            reciters = repository.reciterStatuses(),
+            reciters = repository.allReciterStatuses(),
             presets = repository.presets(),
         )
     }
 
-    suspend fun activateReciter(key: String) {
-        repository.setActiveReciter(key)
+    /**
+     * Makes [reciter] the active voice. If it belongs to a different riwāyah than
+     * the system one, switches the reading too and returns true so the caller can
+     * recreate the activity to apply it; otherwise activates in place.
+     */
+    suspend fun activateReciter(reciter: ReciterStatus): Boolean {
+        if (reciter.riwayah != repository.riwayah) {
+            repository.riwayah = reciter.riwayah
+            repository.setActiveReciter(reciter.key)
+            return true
+        }
+        repository.setActiveReciter(reciter.key)
         load()
+        return false
     }
 
-    suspend fun createReciter(name: String, riwayah: Riwayah) {
-        repository.createCustomReciter(name, riwayah)
-        load()
+    /** Creates an imported reciter; returns false (without creating) if the name is taken. */
+    suspend fun createReciter(name: String, riwayah: Riwayah): Boolean {
+        val created = repository.createCustomReciter(name, riwayah) != null
+        if (created) load()
+        return created
     }
 }

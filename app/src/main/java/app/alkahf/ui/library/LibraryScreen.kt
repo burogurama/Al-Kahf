@@ -1,5 +1,6 @@
 package app.alkahf.ui.library
 
+import android.app.Activity
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -74,6 +75,8 @@ fun LibraryScreen(
     val reciters = state.reciters
     val presets = state.presets
     var showNewReciter by remember { mutableStateOf(false) }
+    // True after a create attempt whose name was already taken.
+    var reciterError by remember { mutableStateOf(false) }
 
     androidx.compose.runtime.LaunchedEffect(Unit) { controller.load() }
 
@@ -98,13 +101,19 @@ fun LibraryScreen(
                         if (reciter.isImported) {
                             onManageReciter(reciter)
                         } else {
-                            scope.launch { controller.activateReciter(reciter.key) }
+                            scope.launch {
+                                // A reciter from another riwāyah switches the reading,
+                                // which needs an activity recreate to take effect.
+                                if (controller.activateReciter(reciter)) {
+                                    (context as? Activity)?.recreate()
+                                }
+                            }
                         }
                     },
                     onManage = { onManageReciter(reciter) },
                 )
             }
-            NewReciterButton { showNewReciter = true }
+            NewReciterButton { showNewReciter = true; reciterError = false }
             SectionCaption(stringResource(R.string.library_section_drill_presets))
             presets.forEach { preset ->
                 PresetRow(preset = preset, onClick = { onOpenPreset(preset.id) })
@@ -117,11 +126,17 @@ fun LibraryScreen(
     if (showNewReciter) {
         NewReciterDialog(
             defaultRiwayah = controller.defaultRiwayah,
-            onDismiss = { showNewReciter = false },
+            nameTaken = reciterError,
+            onClearError = { reciterError = false },
+            onDismiss = { showNewReciter = false; reciterError = false },
             onCreate = { name, riwayah ->
                 scope.launch {
-                    controller.createReciter(name, riwayah)
-                    showNewReciter = false
+                    if (controller.createReciter(name, riwayah)) {
+                        showNewReciter = false
+                        reciterError = false
+                    } else {
+                        reciterError = true
+                    }
                 }
             },
         )
@@ -157,6 +172,8 @@ private fun NewReciterButton(onClick: () -> Unit) {
 @Composable
 private fun NewReciterDialog(
     defaultRiwayah: app.alkahf.data.Riwayah,
+    nameTaken: Boolean,
+    onClearError: () -> Unit,
     onDismiss: () -> Unit,
     onCreate: (String, app.alkahf.data.Riwayah) -> Unit,
 ) {
@@ -176,11 +193,21 @@ private fun NewReciterDialog(
                 )
                 androidx.compose.material3.OutlinedTextField(
                     value = name,
-                    onValueChange = { name = it },
+                    onValueChange = { name = it; onClearError() },
                     singleLine = true,
+                    isError = nameTaken,
                     placeholder = { Text(stringResource(R.string.library_import_reciter_name_hint)) },
                     modifier = Modifier.fillMaxWidth(),
                 )
+                if (nameTaken) {
+                    Text(
+                        text = stringResource(R.string.library_reciter_name_taken),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = AlkahfColors.StumbleInk,
+                        modifier = Modifier.padding(top = 6.dp),
+                    )
+                }
                 Text(
                     stringResource(R.string.library_reciter_riwayah_label),
                     fontSize = 12.sp,
@@ -343,14 +370,24 @@ private fun ReciterRow(
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
                     color = AlkahfColors.Ink,
-                )
-                Text(
-                    text = reciterSubtitle(reciter),
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = if (reciter.isActive) AlkahfColors.InkSecondary else AlkahfColors.InkFaint,
                     maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                 )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(top = 3.dp),
+                ) {
+                    RiwayahTag(reciter.riwayah)
+                    Box(Modifier.width(7.dp))
+                    Text(
+                        text = reciterSubtitle(reciter),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = if (reciter.isActive) AlkahfColors.InkSecondary else AlkahfColors.InkFaint,
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                    )
+                }
             }
             if (reciter.isActive) {
                 Surface(shape = CircleShape, color = AlkahfColors.AccentTint) {
@@ -371,8 +408,7 @@ private fun ReciterRow(
                 border = BorderStroke(1.dp, AlkahfColors.Chevron),
             ) {
                 Text(
-                    text = if (reciter.isImported) stringResource(R.string.library_action_open)
-                    else stringResource(R.string.library_action_manage),
+                    text = stringResource(R.string.library_action_manage),
                     fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = AlkahfColors.InkChrome,
@@ -380,6 +416,23 @@ private fun ReciterRow(
                 )
             }
         }
+    }
+}
+
+/** A small chip showing which riwāyah a reciter belongs to. */
+@Composable
+private fun RiwayahTag(riwayah: app.alkahf.data.Riwayah) {
+    Surface(shape = RoundedCornerShape(7.dp), color = AlkahfColors.ChipBg) {
+        Text(
+            text = stringResource(
+                if (riwayah == app.alkahf.data.Riwayah.WARSH) R.string.settings_riwayah_warsh
+                else R.string.settings_riwayah_hafs,
+            ),
+            fontSize = 10.5.sp,
+            fontWeight = FontWeight.Bold,
+            color = AlkahfColors.InkSecondaryDark,
+            modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
+        )
     }
 }
 

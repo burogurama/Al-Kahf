@@ -100,6 +100,7 @@ data class ReciterStatus(
     val isImported: Boolean,
     val itemCount: Int, // downloaded sūrahs (built-in) or imported sūrahs (custom)
     val bytes: Long,
+    val riwayah: Riwayah,
 )
 
 /** One surah row in a reciter's surah list. */
@@ -470,7 +471,11 @@ class QuranRepository(context: Context) {
     suspend fun reciterStatuses(riwayah: Riwayah = this.riwayah): List<ReciterStatus> =
         reciters.statuses(riwayah)
 
-    suspend fun createCustomReciter(name: String, riwayah: Riwayah = this.riwayah): String =
+    /** Every reciter across both riwāyāt, each tagged with its riwāyah. */
+    suspend fun allReciterStatuses(): List<ReciterStatus> = reciters.allStatuses()
+
+    /** Creates an imported reciter, or returns null when the name is already taken. */
+    suspend fun createCustomReciter(name: String, riwayah: Riwayah = this.riwayah): String? =
         reciters.createCustom(name, riwayah)
 
     /** Re-tags an imported reciter with a riwāyah. */

@@ -1,6 +1,7 @@
 package app.alkahf.data
 
 import app.alkahf.data.audio.AudioStore
+import app.alkahf.data.audio.RECITERS
 import app.alkahf.data.audio.Reciter
 import app.alkahf.data.audio.recitersFor
 import app.alkahf.data.user.CustomReciterEntity
@@ -50,6 +51,7 @@ class ReciterLibrary(
                 isImported = false,
                 itemCount = audioStore.downloadedSurahs(reciter.path).size,
                 bytes = audioStore.reciterBytes(reciter.path),
+                riwayah = reciter.riwayah,
             )
         }
         val customs = userDao.customRecitersForRiwayah(riwayah.key).map { reciter ->
@@ -61,16 +63,60 @@ class ReciterLibrary(
                 isImported = true,
                 itemCount = userDao.importedSurahs(reciter.id).size,
                 bytes = 0L,
+                riwayah = Riwayah.fromKey(reciter.riwayah),
             )
         }
         return builtins + customs
     }
 
-    suspend fun createCustom(name: String, riwayah: Riwayah = this.riwayah): String {
-        val initial = name.trim().firstOrNull { !it.isWhitespace() }?.toString() ?: "ق"
+    /** Every reciter across both riwāyāt, each tagged with its own riwāyah. */
+    suspend fun allStatuses(): List<ReciterStatus> {
+        val active = activeReciterPath
+        val systemRiwayah = settings.riwayah
+        val builtins = RECITERS.map { reciter ->
+            ReciterStatus(
+                key = reciter.path,
+                displayName = reciter.displayName,
+                arabicInitial = reciterInitial(reciter.path),
+                // The active voice is the stored one within the active riwāyah.
+                isActive = reciter.riwayah == systemRiwayah && reciter.path == active,
+                isImported = false,
+                itemCount = audioStore.downloadedSurahs(reciter.path).size,
+                bytes = audioStore.reciterBytes(reciter.path),
+                riwayah = reciter.riwayah,
+            )
+        }
+        val customs = userDao.customReciters().map { reciter ->
+            ReciterStatus(
+                key = customReciterKey(reciter.id),
+                displayName = reciter.name,
+                arabicInitial = reciter.initial,
+                isActive = false,
+                isImported = true,
+                itemCount = userDao.importedSurahs(reciter.id).size,
+                bytes = 0L,
+                riwayah = Riwayah.fromKey(reciter.riwayah),
+            )
+        }
+        return builtins + customs
+    }
+
+    /** True when a reciter (built-in or imported) already uses [name] (case-insensitive). */
+    suspend fun nameExists(name: String): Boolean {
+        val trimmed = name.trim()
+        if (trimmed.isEmpty()) return false
+        val taken = RECITERS.map { it.displayName } + userDao.customReciters().map { it.name }
+        return taken.any { it.equals(trimmed, ignoreCase = true) }
+    }
+
+    /** Creates an imported reciter, or returns null when the name is already taken. */
+    suspend fun createCustom(name: String, riwayah: Riwayah = this.riwayah): String? {
+        val trimmed = name.trim()
+        if (trimmed.isEmpty() || nameExists(trimmed)) return null
+        val initial = trimmed.firstOrNull { !it.isWhitespace() }?.toString() ?: "ق"
         val id = userDao.insertCustomReciter(
             CustomReciterEntity(
-                name = name.trim(),
+                name = trimmed,
                 initial = initial,
                 createdAt = System.currentTimeMillis(),
                 riwayah = riwayah.key,

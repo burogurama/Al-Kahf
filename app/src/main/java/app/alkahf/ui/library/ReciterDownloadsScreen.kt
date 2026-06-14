@@ -4,7 +4,9 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -39,7 +41,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -73,6 +77,13 @@ fun ReciterDownloadsScreen(
     val surahs = state.surahs
     val progress = state.progress
     var importTargetSurah by remember { mutableStateOf(0) }
+    var query by remember { mutableStateOf("") }
+    val q = query.trim()
+    val visibleSurahs = if (q.isEmpty()) {
+        surahs
+    } else {
+        surahs.filter { it.nameLatin.contains(q, ignoreCase = true) || it.surah.toString().contains(q) }
+    }
 
     LaunchedEffect(Unit) { controller.load() }
 
@@ -166,12 +177,18 @@ fun ReciterDownloadsScreen(
             )
         }
 
+        SurahSearchField(
+            value = query,
+            onValueChange = { query = it },
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 6.dp),
+        )
+
         LazyColumn(
             modifier = Modifier.fillMaxSize().navigationBarsPadding().padding(horizontal = 18.dp),
             contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 6.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            items(surahs, key = { it.surah }) { surah ->
+            items(visibleSurahs, key = { it.surah }) { surah ->
                 SurahRow(
                     surah = surah,
                     progress = progress[surah.surah],
@@ -182,6 +199,42 @@ fun ReciterDownloadsScreen(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun SurahSearchField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier
+            .height(46.dp)
+            .background(AlkahfColors.Surface, RoundedCornerShape(13.dp))
+            .border(1.dp, AlkahfColors.CardBorder, RoundedCornerShape(13.dp))
+            .padding(horizontal = 14.dp),
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        BasicTextField(
+            value = value,
+            onValueChange = onValueChange,
+            singleLine = true,
+            textStyle = TextStyle(fontSize = 14.sp, color = AlkahfColors.Ink),
+            cursorBrush = SolidColor(AlkahfColors.Accent),
+            decorationBox = { inner ->
+                Box(contentAlignment = Alignment.CenterStart) {
+                    if (value.isEmpty()) {
+                        Text(
+                            stringResource(R.string.library_surah_search_hint),
+                            fontSize = 14.sp,
+                            color = AlkahfColors.InkFaint,
+                        )
+                    }
+                    inner()
+                }
+            },
+        )
     }
 }
 

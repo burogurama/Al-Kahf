@@ -364,9 +364,10 @@
     <string name="library_import_reciter_message">سمِّ ملف القارئ هذا، ثم استورد ملفًا صوتيًا لكل سورة.</string>
     <string name="library_import_reciter_name_hint">مثال: مشاري (تسجيلي)</string>
     <string name="library_reciter_riwayah_label">الرواية</string>
+    <string name="library_reciter_name_taken">يوجد قارئ بهذا الاسم بالفعل.</string>
+    <string name="library_surah_search_hint">ابحث عن سورة — بالاسم أو الرقم</string>
     <string name="library_badge_active">نشط</string>
     <string name="library_badge_default">السبق</string>
-    <string name="library_action_open">فتح</string>
     <string name="library_action_manage">إدارة</string>
     <string name="library_action_import">استيراد</string>
     <string name="library_action_download">تنزيل</string>
