@@ -1,7 +1,6 @@
 package app.alkahf.data
 
 import android.content.Context
-import app.alkahf.data.quran.QuranDatabase
 import app.alkahf.data.review.ReviewGrade
 import app.alkahf.data.review.ReviewScheduler
 import app.alkahf.data.audio.AudioStore
@@ -251,18 +250,13 @@ fun Int.toArabicIndic(): String =
     toString().map { digit -> '٠' + (digit - '0') }.joinToString("")
 
 class QuranRepository(context: Context) {
-    // Both riwāyāt's read-only DBs are available so the Mushaf can briefly show
-    // the other reading without restarting; the Warsh one only opens on first use.
-    private val hafsDb by lazy { QuranDatabase.openFor(context, "hafs") }
-    private val warshDb by lazy { QuranDatabase.openFor(context, "warsh") }
-    private fun daoFor(riwayah: Riwayah) =
-        (if (riwayah == Riwayah.WARSH) warshDb else hafsDb).quranDao()
-    private val quranDao get() = daoFor(riwayah)
-    private val userDao = UserDatabase.open(context).userDao()
     private val settings = UserPreferences(context)
+    // The read-only Qur'an text (both riwāyāt) lives in its own store; the Mushaf
+    // can briefly show the other reading by passing an explicit riwāyah.
+    private val quranText = QuranTextStore(context) { settings.riwayah }
+    private val userDao = UserDatabase.open(context).userDao()
     private val audioStore = AudioStore(context)
     private val filesDir = context.filesDir
-    private var cachedHafsBasmala: String? = null
 
     /** Last page open in the Mushaf, so reading resumes where the user left off. */
     var lastMushafPage: Int?
@@ -281,7 +275,7 @@ class QuranRepository(context: Context) {
 
     /** Marks a whole surah as learning and starts its sabaq at the first section. */
     suspend fun startLearningSurah(surah: Int) {
-        val len = quranDao.surah(surah).ayahCount
+        val len = quranText.surahAyahCount(surah)
         val ids = (1..len).map { surah * 1000 + it }
         val states = ayahStatesForPage(ids)
         val toLearning = ids
@@ -356,7 +350,7 @@ class QuranRepository(context: Context) {
      */
     suspend fun maybeAdvanceSabaq() {
         var range = sabaqRange ?: return
-        val len = quranDao.surah(range.surah).ayahCount
+        val len = quranText.surahAyahCount(range.surah)
         val l = sectionLength
         while (true) {
             val ids = (range.from..range.to).map { range.surah * 1000 + it }
@@ -384,14 +378,14 @@ class QuranRepository(context: Context) {
         setSabaq(range.surah, range.from, range.to)
     }
 
-    suspend fun pageOfAyah(surah: Int, ayah: Int): Int = quranDao.pageOfAyahId(surah * 1000 + ayah)
+    suspend fun pageOfAyah(surah: Int, ayah: Int): Int = quranText.pageOfAyah(surah, ayah)
 
-    suspend fun surahAyahCount(surah: Int): Int = quranDao.surah(surah).ayahCount
+    suspend fun surahAyahCount(surah: Int): Int = quranText.surahAyahCount(surah)
 
     /** The current sabaq as a display reference, or null when there's no sabaq. */
     suspend fun sabaqReference(): SabaqReference? {
         val range = sabaqRange ?: return null
-        return SabaqReference(quranDao.surah(range.surah).nameLatin, range.from, range.to)
+        return SabaqReference(quranText.surahNameLatin(range.surah), range.from, range.to)
     }
 
     fun setSabaq(surah: Int, from: Int, to: Int) = settings.setSabaq(surah, from, to)
@@ -411,7 +405,7 @@ class QuranRepository(context: Context) {
 
     private suspend fun sabaqCard(): SabaqCard? {
         val range = sabaqRange ?: return null
-        val nameLatin = quranDao.surah(range.surah).nameLatin
+        val nameLatin = quranText.surahNameLatin(range.surah)
         val ayahs = ayahsForRange(range.surah, range.from, range.to)
         if (ayahs.isEmpty()) return null
         val states = userDao.allAyahStates().associate { it.ayahId to it.state }
@@ -429,7 +423,7 @@ class QuranRepository(context: Context) {
 
     private suspend fun reviewSummary(): ReviewSummary {
         val due = userDao.duePortions(LocalDate.now().toEpochDay())
-        val names = due.map { quranDao.surah(it.surah).nameLatin }
+        val names = due.map { quranText.surahNameLatin(it.surah) }
         return ReviewSummary(
             count = due.size,
             minutes = (due.size * 1.6f + 0.5f).toInt().coerceAtLeast(if (due.isEmpty()) 0 else 1),
@@ -450,51 +444,12 @@ class QuranRepository(context: Context) {
         )
     }
 
-    suspend fun firstPageOfSurah(surah: Int): Int = quranDao.firstPageOfSurah(surah)
+    suspend fun firstPageOfSurah(surah: Int): Int = quranText.firstPageOfSurah(surah)
 
     /** A mushaf page, optionally in a riwāyah other than the active one (the
      * Mushaf's temporary toggle). Defaults to the active riwāyah. */
-    suspend fun page(number: Int, riwayah: Riwayah = this.riwayah): MushafPage {
-        val dao = daoFor(riwayah)
-        val ayahs = dao.ayahsOnPage(number)
-        // In Warsh, id 1001 is "al-ḥamdu" (basmala isn't a counted āyah), so the
-        // basmala header comes from a fixed Warsh-orthography string instead.
-        val basmala = if (riwayah == Riwayah.WARSH) {
-            WARSH_BASMALA
-        } else {
-            cachedHafsBasmala ?: dao.basmala().also { cachedHafsBasmala = it }
-        }
-        val groups = ayahs
-            .groupBy { it.surah }
-            .map { (surahNumber, surahAyahs) ->
-                val surah = dao.surah(surahNumber)
-                val beginsHere = surahAyahs.first().number == 1
-                PageGroup(
-                    surahNumber = surahNumber,
-                    surahNameArabic = "سُورَةُ ${surah.nameArabic}",
-                    surahNameLatin = surah.nameLatin,
-                    surahMeta = surahMeta(surah.revelationType, surah.ayahCount),
-                    showSurahHeader = beginsHere,
-                    basmala = basmala.takeIf { beginsHere && surahAyahs.first().hasBasmala },
-                    ayahs = surahAyahs.map { ayah ->
-                        PageAyah(
-                            id = ayah.id,
-                            surah = ayah.surah,
-                            number = ayah.number,
-                            words = ayah.text.split(' '),
-                            marker = "۝${ayah.number.toArabicIndic()}",
-                        )
-                    },
-                )
-            }
-        val first = ayahs.first()
-        return MushafPage(
-            number = number,
-            juz = first.juz,
-            hizb = (first.hizbQuarter - 1) / 4 + 1,
-            groups = groups,
-        )
-    }
+    suspend fun page(number: Int, riwayah: Riwayah = this.riwayah): MushafPage =
+        quranText.page(number, riwayah)
 
     // --- Riwāyah (Hafs / Warsh) ---
 
@@ -590,7 +545,7 @@ class QuranRepository(context: Context) {
         // Keep exactly one sabaq drill, dropping any duplicates.
         val existing = defaults.firstOrNull()
         defaults.drop(1).forEach { userDao.deletePreset(it.id) }
-        val surahName = quranDao.surah(range.surah).nameLatin
+        val surahName = quranText.surahNameLatin(range.surah)
         if (existing == null) {
             val reciter = activeReciter
             userDao.insertPreset(
@@ -735,7 +690,7 @@ class QuranRepository(context: Context) {
 
     /** Per-surah rows for a reciter's surah list (download or import state). */
     suspend fun reciterSurahItems(reciterKey: String): List<ReciterSurahItem> {
-        val surahs = quranDao.allSurahs()
+        val surahs = quranText.allSurahs()
         val customId = customReciterId(reciterKey)
         if (customId == null) {
             return surahs.map { surah ->
@@ -778,7 +733,7 @@ class QuranRepository(context: Context) {
     suspend fun tawqitDraftForImport(reciterKey: String, surah: Int): TawqitTrack? {
         val id = customReciterId(reciterKey) ?: return null
         val import = userDao.importedSurah(id, surah) ?: return null
-        val surahRow = quranDao.surah(surah)
+        val surahRow = quranText.surah(surah)
         val reciterName = userDao.customReciters().firstOrNull { it.id == id }?.name ?: "Imported"
         val existing = userDao.allTimingTracks()
             .firstOrNull { it.sourceRef == import.uri && it.surah == surah }
@@ -797,7 +752,7 @@ class QuranRepository(context: Context) {
     }
 
     suspend fun downloadSurah(reciterPath: String, surah: Int, onProgress: (Float) -> Unit) {
-        val ayahCount = quranDao.surah(surah).ayahCount
+        val ayahCount = quranText.surahAyahCount(surah)
         audioStore.downloadSurah(reciterPath, surah, ayahCount, onProgress)
     }
 
@@ -835,10 +790,8 @@ class QuranRepository(context: Context) {
      * in Warsh it maps each verse to the everyayah file(s) that cover it (the
      * everyayah library numbers all audio by the Hafs counting).
      */
-    suspend fun audioAyahs(surah: Int, ayah: Int, riwayah: Riwayah = this.riwayah): List<Int> {
-        val r = daoFor(riwayah).audioRange(surah * 1000 + ayah) ?: return listOf(ayah)
-        return (r.from..r.to).toList()
-    }
+    suspend fun audioAyahs(surah: Int, ayah: Int, riwayah: Riwayah = this.riwayah): List<Int> =
+        quranText.audioAyahs(surah, ayah, riwayah)
 
     /**
      * Converts an āyah range from one riwāyah's numbering to the other's so the
@@ -850,23 +803,7 @@ class QuranRepository(context: Context) {
         to: Int,
         fromRiwayah: Riwayah,
         toRiwayah: Riwayah,
-    ): IntRange {
-        if (fromRiwayah == toRiwayah) return from..to
-        // Map both endpoints to the canonical Hafs numbering first.
-        val (hafsFrom, hafsTo) = if (fromRiwayah == Riwayah.WARSH) {
-            val a = warshDb.quranDao().audioRange(surah * 1000 + from)?.from ?: from
-            val b = warshDb.quranDao().audioRange(surah * 1000 + to)?.to ?: to
-            a to b
-        } else {
-            from to to
-        }
-        if (toRiwayah == Riwayah.HAFS) return hafsFrom..hafsTo
-        // Hafs → Warsh: the Warsh āyāt whose audio covers those Hafs āyāt.
-        val wDao = warshDb.quranDao()
-        val wFrom = wDao.ayahCoveringHafsFirst(surah, hafsFrom) ?: hafsFrom
-        val wTo = wDao.ayahCoveringHafsLast(surah, hafsTo) ?: hafsTo
-        return minOf(wFrom, wTo)..maxOf(wFrom, wTo)
-    }
+    ): IntRange = quranText.convertAyahRange(surah, from, to, fromRiwayah, toRiwayah)
 
     /** The Hafs audio āyāh range spanning an app range [from]..[to]. */
     suspend fun audioHafsRange(
@@ -874,12 +811,7 @@ class QuranRepository(context: Context) {
         from: Int,
         to: Int,
         riwayah: Riwayah = this.riwayah,
-    ): IntRange {
-        val dao = daoFor(riwayah)
-        val lo = dao.audioRange(surah * 1000 + from)?.from ?: from
-        val hi = dao.audioRange(surah * 1000 + to)?.to ?: to
-        return lo..hi
-    }
+    ): IntRange = quranText.audioHafsRange(surah, from, to, riwayah)
 
     suspend fun deleteSurahAudio(reciterPath: String, surah: Int) =
         audioStore.deleteSurah(reciterPath, surah)
@@ -1012,26 +944,16 @@ class QuranRepository(context: Context) {
         complete = complete,
     )
 
-    suspend fun surahOptions(): List<SurahOption> =
-        quranDao.allSurahs().map { SurahOption(it.number, it.nameLatin, it.nameArabic, it.ayahCount) }
+    suspend fun surahOptions(): List<SurahOption> = quranText.surahOptions()
 
     suspend fun ayahsForRange(
         surah: Int,
         from: Int,
         to: Int,
         riwayah: Riwayah = this.riwayah,
-    ): List<PageAyah> =
-        daoFor(riwayah).ayahRange(surah, from, to).map { ayah ->
-            PageAyah(
-                id = ayah.id,
-                surah = ayah.surah,
-                number = ayah.number,
-                words = ayah.text.split(' '),
-                marker = "۝${ayah.number.toArabicIndic()}",
-            )
-        }
+    ): List<PageAyah> = quranText.ayahsForRange(surah, from, to, riwayah)
 
-    suspend fun surahNameLatin(surah: Int): String = quranDao.surah(surah).nameLatin
+    suspend fun surahNameLatin(surah: Int): String = quranText.surahNameLatin(surah)
 
     suspend fun stumblesForPage(page: MushafPage): List<WordStumble> =
         userDao.stumblesForAyahs(page.ayahs.map { it.id })
@@ -1073,13 +995,14 @@ class QuranRepository(context: Context) {
         // Cap the queue to the daily time budget (≈1.6 min per portion).
         val budgetLimit = (dailyBudgetMin / 1.6f).toInt().coerceAtLeast(1)
         return userDao.duePortions(LocalDate.now().toEpochDay()).take(budgetLimit).map { entity ->
-            val surahLen = quranDao.surah(entity.surah).ayahCount
+            val surahRow = quranText.surah(entity.surah)
+            val surahLen = surahRow.ayahCount
             // Load two āyāt of context on each side (shown, not concealed) so the
             // hafiz can place the portion they're reciting from memory.
             ReviewPortion(
                 id = entity.id,
                 surah = entity.surah,
-                surahNameLatin = quranDao.surah(entity.surah).nameLatin,
+                surahNameLatin = surahRow.nameLatin,
                 ayahFrom = entity.ayahFrom,
                 ayahTo = entity.ayahTo,
                 intervalDays = entity.intervalDays,
@@ -1125,7 +1048,7 @@ class QuranRepository(context: Context) {
 
     suspend fun progressSnapshot(): ProgressSnapshot {
         val states = userDao.allAyahStates().associate { it.ayahId to it.state }
-        val locations = quranDao.ayahLocations()
+        val locations = quranText.ayahLocations()
 
         val pageWeakest = IntArray(PAGE_COUNT) { MemorizationState.STRONG.value }
         val pageTouched = BooleanArray(PAGE_COUNT)
@@ -1198,11 +1121,6 @@ class QuranRepository(context: Context) {
         return streak
     }
 
-    private fun surahMeta(revelationType: String, ayahCount: Int): String {
-        val place = if (revelationType == "Meccan") "MAKKĪ" else "MADANĪ"
-        return "$place · $ayahCount ĀYĀT"
-    }
-
     private fun LoopPresetEntity.toLoopPreset() = LoopPreset(
         id = id,
         name = name,
@@ -1231,7 +1149,5 @@ class QuranRepository(context: Context) {
     companion object {
         const val PAGE_COUNT = 604
         const val TOTAL_AYAH_COUNT = 6236
-        // Warsh-orthography basmala (basmala is not a counted āyah in Warsh).
-        private const val WARSH_BASMALA = "بِسْمِ اِ۬للَّهِ اِ۬لرَّحْمَٰنِ اِ۬لرَّحِيمِ"
     }
 }
