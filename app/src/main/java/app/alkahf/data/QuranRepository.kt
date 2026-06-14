@@ -281,7 +281,16 @@ class QuranRepository(context: Context) {
             .filter { (states[it] ?: MemorizationState.NOT_STARTED).value < MemorizationState.MEMORIZED.value }
             .map { AyahStateEntity(it, MemorizationState.LEARNING.value) }
         if (toLearning.isNotEmpty()) userDao.upsertAyahStates(toLearning)
-        setSabaq(surah, 1, minOf(sectionLength, len))
+        // Begin at the first not-yet-memorized āyah so already-memorized leading
+        // āyāt aren't re-served as new material; sections then align from there.
+        val start = (1..len).firstOrNull {
+            (states[surah * 1000 + it] ?: MemorizationState.NOT_STARTED).value < MemorizationState.MEMORIZED.value
+        }
+        if (start == null) {
+            setSabaq(0, 0, 0) // whole surah already memorized — nothing to learn
+            return
+        }
+        setSabaq(surah, start, minOf(start + sectionLength - 1, len))
         maybeAdvanceSabaq()
     }
 
