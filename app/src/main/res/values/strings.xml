@@ -92,6 +92,10 @@
 
     <!-- Mushaf -->
     <string name="mushaf_location">Juzʼ %1$d · Page %2$d</string>
+    <string name="mushaf_goto_title">Go to</string>
+    <string name="mushaf_goto_page_hint">Page (1–604)</string>
+    <string name="mushaf_goto_go">Go</string>
+    <string name="mushaf_goto_surah_hint">Search sūrah — name or number</string>
     <string name="mushaf_listening_on">Listening on</string>
     <string name="mushaf_listening_off">Listening off</string>
     <string name="mushaf_hide_mode_on">Hide mode on</string>

@@ -8,8 +8,13 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.layout.Arrangement
@@ -40,6 +45,7 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.outlined.Headphones
+import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.HorizontalDivider
@@ -63,11 +69,13 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -85,6 +93,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -100,6 +109,7 @@ import app.alkahf.data.PageAyah
 import app.alkahf.data.PageGroup
 import app.alkahf.data.MemorizationState
 import app.alkahf.data.QuranRepository
+import app.alkahf.data.SurahOption
 import app.alkahf.data.audio.AudioStore
 import app.alkahf.ui.theme.AlkahfColors
 import app.alkahf.ui.theme.KfgqpcHafs
@@ -302,6 +312,16 @@ fun MushafScreen(
     val selectedIds = orderedSelectedIds.toSet()
     // The surah whose "start learning" confirmation is open (header tapped).
     var learnSurah by remember { mutableStateOf<Pair<Int, String>?>(null) }
+    // The "go to" sheet (jump to a surah or page) for the regular mushaf.
+    var showJump by remember { mutableStateOf(false) }
+    val surahOptions by produceState(initialValue = emptyList<SurahOption>()) {
+        value = repository.surahOptions()
+    }
+    fun jumpToPage(page: Int) {
+        val target = page.coerceIn(windowStart, windowStart + windowCount - 1)
+        scope.launch { pagerState.scrollToPage(target - windowStart) }
+        showJump = false
+    }
 
     // Re-pull the current page's memorization states after a bulk change.
     suspend fun reloadMemStates() {
@@ -382,6 +402,8 @@ fun MushafScreen(
             location = currentSession?.page?.let {
                 stringResource(R.string.mushaf_location, it.juz, it.number)
             } ?: "",
+            // Tapping the title opens "go to"; the locked sabaq view can't jump.
+            onTitleClick = { showJump = true }.takeIf { !sabaqMode },
             hideMode = hideMode,
             audioActive = audioDockOpen || rangeAudioOpen,
             onAudioTap = onHeadsetTap,
@@ -551,12 +573,24 @@ fun MushafScreen(
             onDismiss = { learnSurah = null },
         )
     }
+
+    if (showJump) {
+        GoToSheet(
+            surahs = surahOptions,
+            onPickSurah = { surah ->
+                scope.launch { jumpToPage(repository.firstPageOfSurah(surah)) }
+            },
+            onPickPage = { page -> jumpToPage(page) },
+            onDismiss = { showJump = false },
+        )
+    }
 }
 
 @Composable
 private fun MushafTopBar(
     title: String,
     location: String,
+    onTitleClick: (() -> Unit)? = null,
     hideMode: Boolean,
     audioActive: Boolean,
     onAudioTap: () -> Unit,
@@ -590,7 +624,16 @@ private fun MushafTopBar(
                 )
             }
             Column(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier
+                    .weight(1f)
+                    .then(
+                        if (onTitleClick != null) {
+                            Modifier.clip(RoundedCornerShape(10.dp)).clickable(onClick = onTitleClick)
+                        } else {
+                            Modifier
+                        },
+                    )
+                    .padding(vertical = 4.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(
@@ -600,13 +643,23 @@ private fun MushafTopBar(
                     color = AlkahfColors.Ink,
                     letterSpacing = (-0.2).sp,
                 )
-                Text(
-                    text = location,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = AlkahfColors.InkFaint,
-                    modifier = Modifier.padding(top = 1.dp),
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = location,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = AlkahfColors.InkFaint,
+                        modifier = Modifier.padding(top = 1.dp),
+                    )
+                    if (onTitleClick != null) {
+                        Icon(
+                            imageVector = Icons.Outlined.KeyboardArrowDown,
+                            contentDescription = stringResource(R.string.mushaf_goto_title),
+                            tint = AlkahfColors.InkFaint,
+                            modifier = Modifier.size(14.dp),
+                        )
+                    }
+                }
             }
             Box(
                 modifier = Modifier.size(40.dp).pointerInput(Unit) {
@@ -1539,6 +1592,162 @@ private fun LearnSurahSheet(
                 }
             }
         }
+    }
+}
+
+/** "Go to" sheet: jump to a page by number, or search a sūrah by name/number. */
+@Composable
+private fun GoToSheet(
+    surahs: List<SurahOption>,
+    onPickSurah: (Int) -> Unit,
+    onPickPage: (Int) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var query by remember { mutableStateOf("") }
+    var pageText by remember { mutableStateOf("") }
+    val filtered = remember(query, surahs) {
+        val q = query.trim()
+        if (q.isEmpty()) {
+            surahs
+        } else {
+            surahs.filter {
+                it.nameLatin.contains(q, ignoreCase = true) ||
+                    it.nameArabic.contains(q) ||
+                    it.number.toString().startsWith(q)
+            }
+        }
+    }
+    Box(
+        Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.34f)).clickable(onClick = onDismiss),
+        contentAlignment = Alignment.BottomCenter,
+    ) {
+        Surface(
+            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+            color = AlkahfColors.Paper,
+            modifier = Modifier.fillMaxWidth().fillMaxHeight(0.85f).clickable(enabled = false) {},
+        ) {
+            Column(
+                Modifier.navigationBarsPadding().padding(start = 20.dp, top = 12.dp, end = 20.dp, bottom = 12.dp),
+            ) {
+                Box(Modifier.fillMaxWidth().padding(bottom = 12.dp), contentAlignment = Alignment.Center) {
+                    Box(Modifier.width(38.dp).height(4.dp).background(AlkahfColors.DashedNode, RoundedCornerShape(2.dp)))
+                }
+                Text(
+                    text = stringResource(R.string.mushaf_goto_title),
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = AlkahfColors.Ink,
+                    modifier = Modifier.padding(bottom = 14.dp),
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    JumpField(
+                        value = pageText,
+                        onValueChange = { pageText = it.filter(Char::isDigit).take(3) },
+                        placeholder = stringResource(R.string.mushaf_goto_page_hint),
+                        numeric = true,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Spacer(Modifier.width(10.dp))
+                    Surface(
+                        onClick = { pageText.toIntOrNull()?.let(onPickPage) },
+                        shape = RoundedCornerShape(14.dp),
+                        color = AlkahfColors.Accent,
+                        modifier = Modifier.height(50.dp),
+                    ) {
+                        Box(Modifier.padding(horizontal = 22.dp).fillMaxHeight(), contentAlignment = Alignment.Center) {
+                            Text(
+                                text = stringResource(R.string.mushaf_goto_go),
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = AlkahfColors.OnAccent,
+                            )
+                        }
+                    }
+                }
+                Spacer(Modifier.height(14.dp))
+                JumpField(
+                    value = query,
+                    onValueChange = { query = it },
+                    placeholder = stringResource(R.string.mushaf_goto_surah_hint),
+                    numeric = false,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(8.dp))
+                LazyColumn(Modifier.fillMaxWidth().weight(1f)) {
+                    items(filtered) { s ->
+                        SurahRow(s) { onPickSurah(s.number) }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun JumpField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String,
+    numeric: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier
+            .height(50.dp)
+            .background(AlkahfColors.Surface, RoundedCornerShape(14.dp))
+            .border(1.dp, AlkahfColors.CardBorder, RoundedCornerShape(14.dp))
+            .padding(horizontal = 14.dp),
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        BasicTextField(
+            value = value,
+            onValueChange = onValueChange,
+            singleLine = true,
+            textStyle = TextStyle(fontSize = 15.sp, color = AlkahfColors.Ink),
+            cursorBrush = SolidColor(AlkahfColors.Accent),
+            keyboardOptions = if (numeric) {
+                KeyboardOptions(keyboardType = KeyboardType.Number)
+            } else {
+                KeyboardOptions.Default
+            },
+            decorationBox = { inner ->
+                Box(contentAlignment = Alignment.CenterStart) {
+                    if (value.isEmpty()) {
+                        Text(placeholder, fontSize = 15.sp, color = AlkahfColors.InkFaint)
+                    }
+                    inner()
+                }
+            },
+        )
+    }
+}
+
+@Composable
+private fun SurahRow(s: SurahOption, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 11.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            Modifier.size(32.dp).background(AlkahfColors.Surface, CircleShape)
+                .border(1.dp, AlkahfColors.CardBorder, CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text("${s.number}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = AlkahfColors.InkSecondary)
+        }
+        Text(
+            text = s.nameLatin,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = AlkahfColors.Ink,
+            modifier = Modifier.weight(1f).padding(start = 14.dp),
+        )
+        Text(
+            text = s.nameArabic,
+            fontFamily = KfgqpcHafs,
+            fontSize = 19.sp,
+            color = AlkahfColors.InkChrome,
+        )
     }
 }
 

@@ -96,6 +96,10 @@
 
     <!-- Mushaf -->
     <string name="mushaf_location">جزء %1$d · صفحة %2$d</string>
+    <string name="mushaf_goto_title">الانتقال إلى</string>
+    <string name="mushaf_goto_page_hint">الصفحة (1–604)</string>
+    <string name="mushaf_goto_go">انتقل</string>
+    <string name="mushaf_goto_surah_hint">ابحث عن سورة — بالاسم أو الرقم</string>
     <string name="mushaf_listening_on">الاستماع مُفعَّل</string>
     <string name="mushaf_listening_off">الاستماع مُعطَّل</string>
     <string name="mushaf_hide_mode_on">وضع الإخفاء مُفعَّل</string>

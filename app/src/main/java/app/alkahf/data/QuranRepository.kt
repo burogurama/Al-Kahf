@@ -208,7 +208,12 @@ data class TawqitTrack(
 }
 
 /** A surah picker entry. */
-data class SurahOption(val number: Int, val nameLatin: String, val ayahCount: Int)
+data class SurahOption(
+    val number: Int,
+    val nameLatin: String,
+    val nameArabic: String,
+    val ayahCount: Int,
+)
 
 /** A portion due for murājaʿah, with its text loaded for the self-test. */
 data class ReviewPortion(
@@ -757,7 +762,7 @@ class QuranRepository(context: Context) {
     )
 
     suspend fun surahOptions(): List<SurahOption> =
-        quranDao.allSurahs().map { SurahOption(it.number, it.nameLatin, it.ayahCount) }
+        quranDao.allSurahs().map { SurahOption(it.number, it.nameLatin, it.nameArabic, it.ayahCount) }
 
     suspend fun ayahsForRange(surah: Int, from: Int, to: Int): List<PageAyah> =
         quranDao.ayahRange(surah, from, to).map { ayah ->
