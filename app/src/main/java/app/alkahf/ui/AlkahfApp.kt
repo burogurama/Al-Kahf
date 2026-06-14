@@ -4,6 +4,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -13,9 +14,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.rememberCoroutineScope
 import app.alkahf.AlkahfApplication
 import app.alkahf.R
+import app.alkahf.data.AyahRange
 import app.alkahf.data.HomeData
 import app.alkahf.data.LoopPreset
 import app.alkahf.data.MemorizationState
+import app.alkahf.data.ReciterStatus
+import app.alkahf.data.TawqitTrack
 import app.alkahf.ui.components.AlkahfTab
 import app.alkahf.ui.home.AyahMemorizationState
 import app.alkahf.ui.home.DayActivity
@@ -31,8 +35,20 @@ import app.alkahf.ui.review.ReviewScreen
 import app.alkahf.ui.tawqit.TawqitTaggingScreen
 import kotlinx.coroutines.launch
 
-private enum class AlkahfDestination {
-    Home, Mushaf, Loop, Review, Progress, Library, ReciterDownloads, TawqitTagging, Settings
+/**
+ * A destination on the navigation back stack. Each entry carries the arguments
+ * the screen needs, so popping back restores the previous view exactly.
+ */
+private sealed interface Screen {
+    object Home : Screen
+    data class Mushaf(val startSurah: Int?, val startPage: Int?, val highlight: AyahRange?) : Screen
+    data class Loop(val presetId: Long?, val newPreset: Boolean) : Screen
+    object Review : Screen
+    object Progress : Screen
+    object Library : Screen
+    data class ReciterDownloads(val reciter: ReciterStatus) : Screen
+    data class TawqitTagging(val draft: TawqitTrack) : Screen
+    object Settings : Screen
 }
 
 private fun buildHomeUiState(res: Resources, data: HomeData): HomeUiState {
@@ -98,66 +114,64 @@ fun AlkahfApp(
     onThemeModeChange: (app.alkahf.ui.theme.ThemeMode) -> Unit = {},
     onLanguageChange: (String) -> Unit = {},
 ) {
-    var destination by remember { mutableStateOf(AlkahfDestination.Home) }
-    // Set when the Mushaf is opened for a specific surah (the sabaq) or page
-    // (from the Progress map); both null means resume the last page read.
-    var mushafTargetSurah by remember { mutableStateOf<Int?>(null) }
-    var mushafTargetPage by remember { mutableStateOf<Int?>(null) }
-    // The preset to open in the Loop player; null means the default preset.
-    var loopPresetId by remember { mutableStateOf<Long?>(null) }
-    // True when the Loop player should open straight into the new-preset editor.
-    var loopNewPreset by remember { mutableStateOf(false) }
-    var manageReciter by remember { mutableStateOf<app.alkahf.data.ReciterStatus?>(null) }
-    // The Tawqīt track being tagged (a fresh draft or an existing track).
-    var tawqitDraft by remember { mutableStateOf<app.alkahf.data.TawqitTrack?>(null) }
-    // The sabaq range to highlight + scroll to when the Mushaf opens for it.
-    var mushafHighlight by remember { mutableStateOf<app.alkahf.data.AyahRange?>(null) }
+    // The navigation back stack; the last entry is the visible screen. Each entry
+    // carries its own arguments so popping back restores the previous view.
+    val backStack = remember { mutableStateListOf<Screen>(Screen.Home) }
+    val current = backStack.last()
     val repository = (LocalContext.current.applicationContext as AlkahfApplication).repository
     val scope = rememberCoroutineScope()
 
-    fun openMushaf(surah: Int?, page: Int?, highlight: app.alkahf.data.AyahRange? = null) {
-        mushafTargetSurah = surah
-        mushafTargetPage = page
-        mushafHighlight = highlight
-        destination = AlkahfDestination.Mushaf
+    fun navigate(screen: Screen) {
+        if (backStack.last() != screen) backStack.add(screen)
     }
-
-    fun onTab(tab: AlkahfTab) {
-        when (tab) {
-            AlkahfTab.TODAY -> destination = AlkahfDestination.Home
-            AlkahfTab.MUSHAF -> openMushaf(null, null)
-            AlkahfTab.REVIEW -> destination = AlkahfDestination.Review
-            AlkahfTab.PROGRESS -> destination = AlkahfDestination.Progress
-            AlkahfTab.LIBRARY -> destination = AlkahfDestination.Library
+    fun back() {
+        if (backStack.size > 1) backStack.removeAt(backStack.lastIndex)
+    }
+    // Bottom-nav tab: jump back to the tab if it's already in the stack, else open
+    // it — so tab switching never stacks duplicates or strands a forward history.
+    fun selectTab(screen: Screen) {
+        val index = backStack.indexOfLast { it == screen }
+        if (index >= 0) {
+            while (backStack.size > index + 1) backStack.removeAt(backStack.lastIndex)
+        } else {
+            backStack.add(screen)
         }
     }
+    fun onTab(tab: AlkahfTab) = selectTab(
+        when (tab) {
+            AlkahfTab.TODAY -> Screen.Home
+            AlkahfTab.MUSHAF -> Screen.Mushaf(null, null, null)
+            AlkahfTab.REVIEW -> Screen.Review
+            AlkahfTab.PROGRESS -> Screen.Progress
+            AlkahfTab.LIBRARY -> Screen.Library
+        },
+    )
 
     val resources = LocalContext.current.resources
     // Bumped to reload the Home dashboard after an in-place change (e.g. marking
-    // the sabaq memorized) that doesn't switch destination.
+    // the sabaq memorized) that doesn't change the visible screen.
     var homeRefresh by remember { mutableStateOf(0) }
-    val homeState by produceState(initialValue = HomeUiState(), destination, homeRefresh) {
-        if (destination == AlkahfDestination.Home) {
+    val homeState by produceState(initialValue = HomeUiState(), current, homeRefresh) {
+        if (current is Screen.Home) {
             value = buildHomeUiState(resources, repository.homeData())
         }
     }
 
     // A reminder's "Listen" action drops the user straight into the sabaq drill.
     // Opening the Loop player applies the preset, which starts playback (so the
-    // drill is already reciting); loopPresetId null → the default sabaq drill.
+    // drill is already reciting); presetId null → the default sabaq drill.
     LaunchedEffect(playDrillSignal) {
-        if (playDrillSignal > 0) {
-            loopPresetId = null
-            loopNewPreset = false
-            destination = AlkahfDestination.Loop
-        }
+        if (playDrillSignal > 0) navigate(Screen.Loop(presetId = null, newPreset = false))
     }
 
-    when (destination) {
-        AlkahfDestination.Home -> HomeScreen(
+    // System back pops the stack; at the root, let the OS handle it (exit).
+    BackHandler(enabled = backStack.size > 1) { back() }
+
+    when (val screen = current) {
+        Screen.Home -> HomeScreen(
             state = homeState,
-            onOpenMushaf = { openMushaf(null, null) },
-            onOpenSabaq = { openMushaf(null, null, highlight = repository.sabaqRange) },
+            onOpenMushaf = { navigate(Screen.Mushaf(null, null, null)) },
+            onOpenSabaq = { navigate(Screen.Mushaf(null, null, highlight = repository.sabaqRange)) },
             // (sabaqRange is null when there's no sabaq → opens the Mushaf normally)
             onMarkSabaq = {
                 scope.launch {
@@ -166,102 +180,57 @@ fun AlkahfApp(
                 }
             },
             onOpenLoop = {
-                loopPresetId = homeState.drillPresetId.takeIf { it != 0L }
-                loopNewPreset = false
-                destination = AlkahfDestination.Loop
+                navigate(Screen.Loop(presetId = homeState.drillPresetId.takeIf { it != 0L }, newPreset = false))
             },
-            onOpenReview = { destination = AlkahfDestination.Review },
-            onOpenProgress = { destination = AlkahfDestination.Progress },
-            onOpenLibrary = { destination = AlkahfDestination.Library },
-            onOpenSettings = { destination = AlkahfDestination.Settings },
+            onOpenReview = { navigate(Screen.Review) },
+            onOpenProgress = { navigate(Screen.Progress) },
+            onOpenLibrary = { navigate(Screen.Library) },
+            onOpenSettings = { navigate(Screen.Settings) },
         )
-        AlkahfDestination.Mushaf -> {
-            BackHandler { destination = AlkahfDestination.Home }
-            MushafScreen(
-                startSurah = mushafTargetSurah,
-                startPage = mushafTargetPage,
-                highlightRange = mushafHighlight,
-                onBack = { destination = AlkahfDestination.Home },
-                onImportReciter = { reciter ->
-                    manageReciter = reciter
-                    destination = AlkahfDestination.ReciterDownloads
-                },
-            )
-        }
-        AlkahfDestination.Loop -> {
-            BackHandler { destination = AlkahfDestination.Home }
-            LoopPlayerScreen(
-                presetId = loopPresetId,
-                newPreset = loopNewPreset,
-                onBack = { destination = AlkahfDestination.Home },
-            )
-        }
-        AlkahfDestination.Review -> {
-            BackHandler { destination = AlkahfDestination.Home }
-            ReviewScreen(onBack = { destination = AlkahfDestination.Home })
-        }
-        AlkahfDestination.Progress -> {
-            BackHandler { destination = AlkahfDestination.Home }
-            ProgressScreen(
-                onOpenPage = { page -> openMushaf(null, page) },
-                onSelectTab = ::onTab,
-            )
-        }
-        AlkahfDestination.Library -> {
-            BackHandler { destination = AlkahfDestination.Home }
-            LibraryScreen(
-                onOpenPreset = { id ->
-                    loopPresetId = id
-                    loopNewPreset = false
-                    destination = AlkahfDestination.Loop
-                },
-                onNewPreset = {
-                    loopPresetId = null
-                    loopNewPreset = true
-                    destination = AlkahfDestination.Loop
-                },
-                onManageReciter = { reciter ->
-                    manageReciter = reciter
-                    destination = AlkahfDestination.ReciterDownloads
-                },
-                onSelectTab = ::onTab,
-            )
-        }
-        AlkahfDestination.Settings -> {
-            BackHandler { destination = AlkahfDestination.Home }
-            app.alkahf.ui.settings.SettingsScreen(
-                onBack = { destination = AlkahfDestination.Home },
-                onThemeModeChange = onThemeModeChange,
-                onLanguageChange = onLanguageChange,
-            )
-        }
-        AlkahfDestination.TawqitTagging -> {
-            BackHandler { destination = AlkahfDestination.ReciterDownloads }
-            tawqitDraft?.let { draft ->
-                TawqitTaggingScreen(
-                    draft = draft,
-                    onSaved = { destination = AlkahfDestination.ReciterDownloads },
-                    onClose = { destination = AlkahfDestination.ReciterDownloads },
-                )
-            }
-        }
-        AlkahfDestination.ReciterDownloads -> {
-            BackHandler { destination = AlkahfDestination.Library }
-            val reciter = manageReciter
-            if (reciter != null) {
-                ReciterDownloadsScreen(
-                    reciterKey = reciter.key,
-                    reciterName = reciter.displayName,
-                    isImported = reciter.isImported,
-                    onTimeSurah = { surah ->
-                        scope.launch {
-                            tawqitDraft = repository.tawqitDraftForImport(reciter.key, surah)
-                            if (tawqitDraft != null) destination = AlkahfDestination.TawqitTagging
-                        }
-                    },
-                    onBack = { destination = AlkahfDestination.Library },
-                )
-            }
-        }
+        is Screen.Mushaf -> MushafScreen(
+            startSurah = screen.startSurah,
+            startPage = screen.startPage,
+            highlightRange = screen.highlight,
+            onBack = { back() },
+            onImportReciter = { reciter -> navigate(Screen.ReciterDownloads(reciter)) },
+        )
+        is Screen.Loop -> LoopPlayerScreen(
+            presetId = screen.presetId,
+            newPreset = screen.newPreset,
+            onBack = { back() },
+        )
+        Screen.Review -> ReviewScreen(onBack = { back() })
+        Screen.Progress -> ProgressScreen(
+            onOpenPage = { page -> navigate(Screen.Mushaf(null, page, null)) },
+            onSelectTab = ::onTab,
+        )
+        Screen.Library -> LibraryScreen(
+            onOpenPreset = { id -> navigate(Screen.Loop(presetId = id, newPreset = false)) },
+            onNewPreset = { navigate(Screen.Loop(presetId = null, newPreset = true)) },
+            onManageReciter = { reciter -> navigate(Screen.ReciterDownloads(reciter)) },
+            onSelectTab = ::onTab,
+        )
+        Screen.Settings -> app.alkahf.ui.settings.SettingsScreen(
+            onBack = { back() },
+            onThemeModeChange = onThemeModeChange,
+            onLanguageChange = onLanguageChange,
+        )
+        is Screen.TawqitTagging -> TawqitTaggingScreen(
+            draft = screen.draft,
+            onSaved = { back() },
+            onClose = { back() },
+        )
+        is Screen.ReciterDownloads -> ReciterDownloadsScreen(
+            reciterKey = screen.reciter.key,
+            reciterName = screen.reciter.displayName,
+            isImported = screen.reciter.isImported,
+            onTimeSurah = { surah ->
+                scope.launch {
+                    val draft = repository.tawqitDraftForImport(screen.reciter.key, surah)
+                    if (draft != null) navigate(Screen.TawqitTagging(draft))
+                }
+            },
+            onBack = { back() },
+        )
     }
 }
