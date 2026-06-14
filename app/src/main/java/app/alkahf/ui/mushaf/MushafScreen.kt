@@ -186,8 +186,9 @@ fun MushafScreen(
 ) {
     val context = LocalContext.current
     val repository = remember { (context.applicationContext as AlkahfApplication).repository }
+    val mushaf = remember { MushafController(repository) }
     val scope = rememberCoroutineScope()
-    val settings = remember { repository.settings() }
+    val settings = mushaf.settings
     // Keep the screen awake while reading, when enabled in Settings.
     if (settings.keepScreenOn) {
         val view = androidx.compose.ui.platform.LocalView.current
@@ -199,7 +200,7 @@ fun MushafScreen(
     // Opening the sabaq lands in reading mode (text shown); otherwise reopen
     // in whichever mode the Mushaf was last left in.
     var hideMode by remember {
-        mutableStateOf(if (highlightRange != null) false else repository.lastMushafHideMode)
+        mutableStateOf(if (highlightRange != null) false else mushaf.lastMushafHideMode)
     }
     // Sabaq focus mode: opening for the sabaq (a highlight range) locks the
     // reader to it — only its āyāt can be read, revealed, selected, or listened
@@ -228,18 +229,18 @@ fun MushafScreen(
     val pageSetup by produceState<Triple<Int, Int, Int>?>(initialValue = null) {
         value = if (highlightRange != null) {
             val r = highlightRange
-            val len = repository.surahAyahCount(r.surah)
-            val a = repository.pageOfAyah(r.surah, (r.from - 2).coerceAtLeast(1))
-            val b = repository.pageOfAyah(r.surah, (r.to + 2).coerceAtMost(len))
+            val len = mushaf.surahAyahCount(r.surah)
+            val a = mushaf.pageOfAyah(r.surah, (r.from - 2).coerceAtLeast(1))
+            val b = mushaf.pageOfAyah(r.surah, (r.to + 2).coerceAtMost(len))
             val lo = minOf(a, b)
             val hi = maxOf(a, b)
-            val openAt = repository.pageOfAyah(r.surah, r.from).coerceIn(lo, hi)
+            val openAt = mushaf.pageOfAyah(r.surah, r.from).coerceIn(lo, hi)
             Triple(lo, hi - lo + 1, openAt)
         } else {
             val start = startPage
-                ?: startSurah?.let { repository.firstPageOfSurah(it) }
-                ?: repository.lastMushafPage
-                ?: repository.firstPageOfSurah(DEFAULT_SURAH)
+                ?: startSurah?.let { mushaf.firstPageOfSurah(it) }
+                ?: mushaf.lastMushafPage
+                ?: mushaf.firstPageOfSurah(DEFAULT_SURAH)
             Triple(1, QuranRepository.PAGE_COUNT, start)
         }
     }
@@ -259,16 +260,16 @@ fun MushafScreen(
     val currentSession = sessions[currentPageNumber]
     // A temporary peek at the other reading — local to this Mushaf; it never
     // changes the saved riwāyah. Text, font, reciters and audio follow it here.
-    var displayRiwayah by remember { mutableStateOf(repository.riwayah) }
+    var displayRiwayah by remember { mutableStateOf(mushaf.systemRiwayah) }
 
     LaunchedEffect(pagerState) {
         snapshotFlow { pagerState.currentPage }.collect { page ->
-            if (!sabaqMode) repository.lastMushafPage = page + windowStart
+            if (!sabaqMode) mushaf.lastMushafPage = page + windowStart
         }
     }
 
     val audioController = remember {
-        val reciter = repository.activeReciter
+        val reciter = mushaf.activeReciter
         MushafAudioController(
             context = context.applicationContext,
             repository = repository,
@@ -307,7 +308,7 @@ fun MushafScreen(
     }
 
     val persistReveal: (Int, Int) -> Unit = remember {
-        { ayahId, count -> scope.launch { repository.saveRevealState(ayahId, count) } }
+        { ayahId, count -> scope.launch { mushaf.saveRevealState(ayahId, count) } }
     }
 
     // Reader-mode selection: a contiguous index range into the current page's
@@ -320,7 +321,7 @@ fun MushafScreen(
     // lives in its own controller; the panel opens on long-pressing the headset
     // with a selection.
     val rangeController = remember {
-        MushafRangeController(repository, audioController, scope, onImportReciter, repository.activeReciterPath)
+        MushafRangeController(repository, audioController, scope, onImportReciter, mushaf.activeReciterPath)
     }
     val rangeState by rangeController.state.collectAsState()
     LaunchedEffect(rangeState.open, displayRiwayah) {
@@ -349,7 +350,7 @@ fun MushafScreen(
     // The "go to" sheet (jump to a surah or page) for the regular mushaf.
     var showJump by remember { mutableStateOf(false) }
     val surahOptions by produceState(initialValue = emptyList<SurahOption>()) {
-        value = repository.surahOptions()
+        value = mushaf.surahOptions()
     }
     fun jumpToPage(page: Int) {
         val target = page.coerceIn(windowStart, windowStart + windowCount - 1)
@@ -360,7 +361,7 @@ fun MushafScreen(
     // Re-pull the current page's memorization states after a bulk change.
     suspend fun reloadMemStates() {
         currentSession?.let { s ->
-            val st = repository.ayahStatesForPage(s.page.ayahs.map { it.id })
+            val st = mushaf.ayahStates(s.page.ayahs.map { it.id })
             s.memStates.clear()
             s.memStates.putAll(st)
         }
@@ -450,14 +451,14 @@ fun MushafScreen(
                 onToggleHideMode = {
                     val turningOn = !hideMode
                     hideMode = turningOn
-                    repository.lastMushafHideMode = turningOn
+                    mushaf.lastMushafHideMode = turningOn
                     selection = null
                     // Re-entering hide mode starts a fresh self-test on this page.
                     if (turningOn) {
                         currentSession?.let { session ->
                             session.resetReveals()
                             scope.launch {
-                                repository.clearRevealStates(session.page.ayahs.map { it.id })
+                                mushaf.clearRevealStates(session.page.ayahs.map { it.id })
                             }
                         }
                     }
@@ -492,7 +493,7 @@ fun MushafScreen(
                         MushafPageView(
                             pageNumber = pageNumber,
                             riwayah = displayRiwayah,
-                            repository = repository,
+                            controller = mushaf,
                             hideMode = hideMode,
                             session = sessions[pageNumber],
                             onSessionReady = { sessions[pageNumber] = it },
@@ -547,7 +548,7 @@ fun MushafScreen(
                                     val surah = it.page.ayahs.first().surah
                                     scope.launch {
                                         audioController.playAyahIds(
-                                            repository.ayahsForRange(surah, 1, 300).map { ayah -> ayah.id },
+                                            mushaf.ayahsForRange(surah, 1, 300).map { ayah -> ayah.id },
                                         )
                                     }
                                 }
@@ -587,7 +588,7 @@ fun MushafScreen(
                         val surah = picked.first().surah
                         val nums = picked.filter { it.surah == surah }.map { it.number }
                         scope.launch {
-                            repository.setSabaqToRange(surah, nums.min(), nums.max())
+                            mushaf.setSabaqToRange(surah, nums.min(), nums.max())
                             reloadMemStates()
                         }
                     }
@@ -598,9 +599,9 @@ fun MushafScreen(
                     val ids = selectedIds.toList()
                     ids.forEach { menuSession.memStates[it] = state }
                     scope.launch {
-                        ids.forEach { repository.setAyahState(it, state) }
+                        ids.forEach { mushaf.setAyahState(it, state) }
                         // Memorizing the sabaq's ayat may complete its section.
-                        repository.maybeAdvanceSabaq()
+                        mushaf.maybeAdvanceSabaq()
                     }
                     selection = null
                     menuAnchor = null
@@ -615,7 +616,7 @@ fun MushafScreen(
                 surahName = prompt.second,
                 onConfirm = {
                     scope.launch {
-                        repository.startLearningSurah(prompt.first)
+                        mushaf.startLearningSurah(prompt.first)
                         reloadMemStates()
                     }
                     learnSurah = null
@@ -628,7 +629,7 @@ fun MushafScreen(
             GoToSheet(
                 surahs = surahOptions,
                 onPickSurah = { surah ->
-                    scope.launch { jumpToPage(repository.firstPageOfSurah(surah)) }
+                    scope.launch { jumpToPage(mushaf.firstPageOfSurah(surah)) }
                 },
                 onPickPage = { page -> jumpToPage(page) },
                 onDismiss = { showJump = false },
@@ -827,7 +828,7 @@ private fun MushafTopBar(
 private fun MushafPageView(
     pageNumber: Int,
     riwayah: Riwayah,
-    repository: QuranRepository,
+    controller: MushafController,
     hideMode: Boolean,
     session: SelfTestSession?,
     onSessionReady: (SelfTestSession) -> Unit,
@@ -844,11 +845,11 @@ private fun MushafPageView(
 ) {
     LaunchedEffect(pageNumber, riwayah) {
         if (session == null) {
-            val page = repository.page(pageNumber, riwayah)
+            val page = controller.page(pageNumber, riwayah)
             val newSession = SelfTestSession(page, persistReveal)
             val ayahIds = page.ayahs.map { it.id }
-            newSession.revealedCounts.putAll(repository.revealStates(ayahIds))
-            newSession.memStates.putAll(repository.ayahStatesForPage(ayahIds))
+            newSession.revealedCounts.putAll(controller.revealStates(ayahIds))
+            newSession.memStates.putAll(controller.ayahStates(ayahIds))
             onSessionReady(newSession)
         }
     }
