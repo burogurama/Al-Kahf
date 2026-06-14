@@ -369,6 +369,8 @@ class QuranRepository(context: Context) {
 
     suspend fun pageOfAyah(surah: Int, ayah: Int): Int = quranDao.pageOfAyahId(surah * 1000 + ayah)
 
+    suspend fun surahAyahCount(surah: Int): Int = quranDao.surah(surah).ayahCount
+
     fun setSabaq(surah: Int, from: Int, to: Int) {
         prefs.edit()
             .putInt(KEY_SABAQ_SURAH, surah)

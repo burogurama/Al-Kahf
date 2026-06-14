@@ -208,18 +208,31 @@ fun MushafScreen(
     val sabaqOrderedIds = remember(highlightRange) {
         highlightRange?.let { r -> (r.from..r.to).map { r.surah * 1000 + it } } ?: emptyList()
     }
+    // Two āyāt of context on each side of the sabaq: shown (muted), but not part
+    // of the sabaq — not concealed, selectable, or markable.
+    val contextIds = remember(highlightRange) {
+        highlightRange?.let { r ->
+            listOf(r.from - 2, r.from - 1, r.to + 1, r.to + 2)
+                .filter { it >= 1 }
+                .map { r.surah * 1000 + it }
+                .toSet()
+        } ?: emptySet()
+    }
     val scrollToAyahId = highlightRange?.let { it.surah * 1000 + it.from }
 
-    // Pager window as (firstPage, pageCount, openAt). In sabaq mode the window is
-    // only the pages the sabaq spans; otherwise the whole mushaf, opened at the
-    // explicit page/surah target or the last page read.
+    // Pager window as (firstPage, pageCount, openAt). In sabaq mode the window
+    // spans the pages of the sabaq plus its context āyāt (so the context is
+    // reachable); otherwise the whole mushaf, opened at the explicit target.
     val pageSetup by produceState<Triple<Int, Int, Int>?>(initialValue = null) {
         value = if (highlightRange != null) {
-            val a = repository.pageOfAyah(highlightRange.surah, highlightRange.from)
-            val b = repository.pageOfAyah(highlightRange.surah, highlightRange.to)
+            val r = highlightRange
+            val len = repository.surahAyahCount(r.surah)
+            val a = repository.pageOfAyah(r.surah, (r.from - 2).coerceAtLeast(1))
+            val b = repository.pageOfAyah(r.surah, (r.to + 2).coerceAtMost(len))
             val lo = minOf(a, b)
             val hi = maxOf(a, b)
-            Triple(lo, hi - lo + 1, lo)
+            val openAt = repository.pageOfAyah(r.surah, r.from).coerceIn(lo, hi)
+            Triple(lo, hi - lo + 1, openAt)
         } else {
             val start = startPage
                 ?: startSurah?.let { repository.firstPageOfSurah(it) }
@@ -571,6 +584,7 @@ fun MushafScreen(
                         playingAyahId = audioState.currentAyahId,
                         onAudioTap = onAudioTap,
                         sabaqIds = sabaqIds,
+                        contextIds = contextIds,
                         selectedIds = if (pageNumber == currentPageNumber) selectedIds else emptySet(),
                         scrollToAyahId = scrollToAyahId,
                     )
@@ -888,6 +902,7 @@ private fun MushafPageView(
     playingAyahId: Int?,
     onAudioTap: (Int) -> Boolean,
     sabaqIds: Set<Int>,
+    contextIds: Set<Int>,
     selectedIds: Set<Int>,
     scrollToAyahId: Int?,
 ) {
@@ -943,6 +958,7 @@ private fun MushafPageView(
                             onAyahLongPress = onAyahLongPress,
                             onLearnSurah = onLearnSurah,
                             sabaqIds = sabaqIds,
+                            contextIds = contextIds,
                             selectedIds = selectedIds,
                         )
                     }
@@ -964,6 +980,7 @@ private fun PageGroupView(
     onAyahLongPress: (Int, IntOffset) -> Unit,
     onLearnSurah: (Int, String) -> Unit,
     sabaqIds: Set<Int>,
+    contextIds: Set<Int>,
     selectedIds: Set<Int>,
 ) {
     if (group.showSurahHeader) {
@@ -981,7 +998,7 @@ private fun PageGroupView(
                 .padding(top = 12.dp, bottom = 10.dp),
         )
     }
-    AyatBody(group, hideMode, session, playingAyahId, onAudioTap, onSelectAyah, onAyahLongPress, sabaqIds, selectedIds)
+    AyatBody(group, hideMode, session, playingAyahId, onAudioTap, onSelectAyah, onAyahLongPress, sabaqIds, contextIds, selectedIds)
 }
 
 @Composable
@@ -1042,6 +1059,7 @@ private fun AyatBody(
     onSelectAyah: (Int) -> Unit,
     onAyahLongPress: (Int, IntOffset) -> Unit,
     sabaqIds: Set<Int>,
+    contextIds: Set<Int>,
     selectedIds: Set<Int>,
 ) {
     val revealedByAyah = group.ayahs.associate { it.id to session.revealedOf(it) }
@@ -1051,8 +1069,8 @@ private fun AyatBody(
     val litIds = remember(selectedIds, playingAyahId) {
         selectedIds + listOfNotNull(playingAyahId)
     }
-    val groupText = remember(revealedByAyah, hideMode, memByAyah, litIds, sabaqIds) {
-        buildGroupText(group, revealedByAyah, hideMode, memByAyah, litIds, sabaqIds)
+    val groupText = remember(revealedByAyah, hideMode, memByAyah, litIds, sabaqIds, contextIds) {
+        buildGroupText(group, revealedByAyah, hideMode, memByAyah, litIds, sabaqIds, contextIds)
     }
     val currentOnAudioTap by rememberUpdatedState(onAudioTap)
     val currentOnSelect by rememberUpdatedState(onSelectAyah)
@@ -1192,21 +1210,28 @@ private fun buildGroupText(
     memByAyah: Map<Int, MemorizationState> = emptyMap(),
     litIds: Set<Int> = emptySet(),
     sabaqIds: Set<Int> = emptySet(),
+    contextIds: Set<Int> = emptySet(),
 ): GroupText {
     val sabaqMode = sabaqIds.isNotEmpty()
     val spans = mutableListOf<PageSpan>()
     val annotated = buildAnnotatedString {
         group.ayahs.forEachIndexed { ayahIndex, ayah ->
             val revealed = revealedByAyah[ayah.id] ?: 0
-            // In sabaq mode every āyah outside the sabaq is permanently blurred.
+            // In sabaq mode the sabaq follows the hide/reveal logic, its context
+            // āyāt are always shown (muted), and everything else is blurred.
             val inSabaq = !sabaqMode || ayah.id in sabaqIds
+            val inContext = sabaqMode && !inSabaq && ayah.id in contextIds
             ayah.words.forEachIndexed { wordIndex, word ->
                 val start = length
                 append(word)
                 spans += PageSpan(ayah.id, wordIndex, start, length, isMarker = false)
-                val concealed = if (!inSabaq) true else hideMode && wordIndex >= revealed
+                val concealed = when {
+                    inSabaq -> hideMode && wordIndex >= revealed
+                    inContext -> false
+                    else -> true
+                }
                 // The highlight fill is drawn behind the text; the glyph colour
-                // never changes (spec).
+                // never changes (spec) — except context āyāt, which read muted.
                 addStyle(
                     style = if (concealed) {
                         SpanStyle(
@@ -1218,7 +1243,7 @@ private fun buildGroupText(
                             ),
                         )
                     } else {
-                        SpanStyle(color = AlkahfColors.Ink)
+                        SpanStyle(color = if (inContext) AlkahfColors.InkFaint else AlkahfColors.Ink)
                     },
                     start = start,
                     end = length,
@@ -1233,6 +1258,7 @@ private fun buildGroupText(
             // ayah's memorization state.
             val markerColor = when {
                 ayah.id in litIds -> AlkahfColors.AccentDeep
+                inContext -> AlkahfColors.InkFaint
                 !inSabaq -> AlkahfColors.ConcealedMedallion
                 hideMode -> if (revealed >= ayah.words.size) AlkahfColors.Accent else AlkahfColors.ConcealedMedallion
                 else -> memMedallionColor(memByAyah[ayah.id] ?: MemorizationState.NOT_STARTED)
