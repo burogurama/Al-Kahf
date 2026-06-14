@@ -112,8 +112,9 @@ private fun HomeHeader(state: HomeUiState, onOpenSettings: () -> Unit) {
             .fillMaxWidth()
             .padding(start = 4.dp, top = 10.dp, end = 4.dp, bottom = 6.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column {
+        Column(Modifier.weight(1f)) {
             Text(
                 text = stringResource(R.string.home_greeting),
                 fontSize = 14.sp,
@@ -127,8 +128,8 @@ private fun HomeHeader(state: HomeUiState, onOpenSettings: () -> Unit) {
                 fontSize = 31.sp,
                 fontWeight = FontWeight.Bold,
                 color = AlkahfColors.Ink,
-                letterSpacing = (-0.5).sp,
                 lineHeight = 34.sp,
+                maxLines = 1,
                 modifier = Modifier.padding(top = 3.dp),
             )
             Text(
@@ -136,6 +137,7 @@ private fun HomeHeader(state: HomeUiState, onOpenSettings: () -> Unit) {
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Medium,
                 color = AlkahfColors.InkFaint,
+                maxLines = 1,
                 modifier = Modifier.padding(top = 4.dp),
             )
         }
@@ -498,7 +500,6 @@ private fun MurajaahCard(state: HomeUiState, onOpenReview: () -> Unit) {
                     fontSize = 24.sp,
                     fontWeight = FontWeight.Bold,
                     color = AlkahfColors.Ink,
-                    letterSpacing = (-0.4).sp,
                     maxLines = 1,
                     modifier = Modifier.alignByBaseline(),
                 )

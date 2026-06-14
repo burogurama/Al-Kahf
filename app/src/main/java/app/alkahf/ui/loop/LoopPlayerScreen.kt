@@ -208,7 +208,6 @@ private fun LoopTopBar(state: LoopUiState, onBack: () -> Unit, onOpenEditor: () 
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Bold,
                 color = AlkahfColors.Ink,
-                letterSpacing = (-0.2).sp,
                 modifier = Modifier.padding(top = 2.dp),
             )
         }

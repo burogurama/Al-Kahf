@@ -101,7 +101,6 @@ private fun ProgressHeader(data: ProgressSnapshot) {
                 fontSize = 31.sp,
                 fontWeight = FontWeight.Bold,
                 color = AlkahfColors.Ink,
-                letterSpacing = (-0.5).sp,
             )
             Text(
                 text = pluralStringResource(

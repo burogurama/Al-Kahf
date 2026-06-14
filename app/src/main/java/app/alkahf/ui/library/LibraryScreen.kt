@@ -261,7 +261,6 @@ private fun LibraryHeader() {
             fontSize = 31.sp,
             fontWeight = FontWeight.Bold,
             color = AlkahfColors.Ink,
-            letterSpacing = (-0.5).sp,
         )
         Text(
             text = stringResource(R.string.library_subtitle),
