@@ -1078,7 +1078,10 @@ private fun AyatBody(
     val layoutResult = remember { mutableStateOf<TextLayoutResult?>(null) }
     var coords by remember { mutableStateOf<LayoutCoordinates?>(null) }
     val bodySize = LocalMushafTextSize.current.sp
-    val fill = AlkahfColors.AyahHighlightFill
+    // The āyah currently being recited gets its own fill so it stands out from a
+    // selection (which shares the green fill).
+    val selectionFill = AlkahfColors.AyahHighlightFill
+    val nowPlayingFill = AlkahfColors.NowPlayingFill
 
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
         Text(
@@ -1102,6 +1105,7 @@ private fun AyatBody(
                     litIds.forEach { ayahId ->
                         val ayahSpans = groupText.spans.filter { it.ayahId == ayahId }
                         if (ayahSpans.isEmpty()) return@forEach
+                        val fill = if (ayahId == playingAyahId) nowPlayingFill else selectionFill
                         val start = ayahSpans.minOf { it.start }
                         val end = ayahSpans.maxOf { it.end }
                         // One rounded rect per wrapped line the ayah covers.
