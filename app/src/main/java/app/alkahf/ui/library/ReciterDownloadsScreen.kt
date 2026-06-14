@@ -64,6 +64,8 @@ fun ReciterDownloadsScreen(
         ReciterDownloadsController(
             (context.applicationContext as AlkahfApplication).repository,
             reciterKey,
+            reciterName,
+            androidx.work.WorkManager.getInstance(context.applicationContext),
             scope,
         )
     }

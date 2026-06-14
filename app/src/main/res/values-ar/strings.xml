@@ -110,6 +110,12 @@
     <!-- إشعار التذكير -->
     <string name="notify_channel_name">تذكيرات الحفظ</string>
     <string name="notify_channel_desc">تنبيهات يومية لأداء السبق</string>
+
+    <!-- إشعار التنزيل -->
+    <string name="download_channel_name">تنزيل التلاوات</string>
+    <string name="download_channel_desc">تقدّم تنزيل صوت القارئ</string>
+    <string name="download_notification_title">جارٍ تنزيل %1$s</string>
+    <string name="download_notification_progress">%1$d من %2$d سورة</string>
     <string name="notify_reminder_title">حان وقت سبقك</string>
     <string name="notify_reminder_body">سبق اليوم: %1$s · %2$d–%3$d</string>
     <string name="notify_reminder_body_empty">افتح الكهف لبدء حفظ اليوم</string>

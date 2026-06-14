@@ -106,6 +106,12 @@
     <!-- Reminder notification -->
     <string name="notify_channel_name">Hifz reminders</string>
     <string name="notify_channel_desc">Daily nudges to do your sabaq</string>
+
+    <!-- Download notification -->
+    <string name="download_channel_name">Audio downloads</string>
+    <string name="download_channel_desc">Progress while reciter audio downloads</string>
+    <string name="download_notification_title">Downloading %1$s</string>
+    <string name="download_notification_progress">%1$d of %2$d sūrahs</string>
     <string name="notify_reminder_title">Time for your sabaq</string>
     <string name="notify_reminder_body">Today\'s sabaq: %1$s · %2$d–%3$d</string>
     <string name="notify_reminder_body_empty">Open Alkahf to start today\'s hifz</string>
