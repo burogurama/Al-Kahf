@@ -69,7 +69,7 @@ class QuranTextStore(context: Context, private val riwayahProvider: () -> Riwaya
                             surah = ayah.surah,
                             number = ayah.number,
                             words = ayah.text.split(' '),
-                            marker = "۝${ayah.number.toArabicIndic()}",
+                            marker = ayah.number.toArabicIndic(),
                         )
                     },
                 )
@@ -95,7 +95,7 @@ class QuranTextStore(context: Context, private val riwayahProvider: () -> Riwaya
                 surah = ayah.surah,
                 number = ayah.number,
                 words = ayah.text.split(' '),
-                marker = "۝${ayah.number.toArabicIndic()}",
+                marker = ayah.number.toArabicIndic(),
             )
         }
 
