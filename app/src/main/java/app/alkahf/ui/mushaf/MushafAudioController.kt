@@ -7,6 +7,7 @@ import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import app.alkahf.R
 import app.alkahf.data.QuranRepository
+import app.alkahf.data.Riwayah
 import app.alkahf.data.audio.AudioStore
 import java.io.File
 import java.io.IOException
@@ -60,9 +61,9 @@ class MushafAudioController(
     private var lastDurationMs = 0L
     private var playbackSpeed = 1f
     // The riwāyah whose audio mapping is used (the Mushaf's temporary view).
-    private var riwayah = "hafs"
+    private var riwayah = Riwayah.HAFS
 
-    fun setRiwayah(value: String) {
+    fun setRiwayah(value: Riwayah) {
         if (value == riwayah) return
         stop()
         riwayah = value

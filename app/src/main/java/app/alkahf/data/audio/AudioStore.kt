@@ -1,6 +1,7 @@
 package app.alkahf.data.audio
 
 import android.content.Context
+import app.alkahf.data.Riwayah
 import java.io.File
 import java.io.IOException
 import java.net.HttpURLConnection
@@ -141,16 +142,16 @@ class AudioStore(private val context: Context) {
 data class Reciter(
     val path: String,
     val displayName: String,
-    val riwayah: String = "hafs",
+    val riwayah: Riwayah = Riwayah.HAFS,
 )
 
 val RECITERS = listOf(
     Reciter("Husary_128kbps", "Ḥuṣarī"),
     Reciter("Abdul_Basit_Murattal_192kbps", "Abdul Basit"),
     Reciter("Minshawy_Murattal_128kbps", "Minshawy"),
-    Reciter("warsh/warsh_yassin_al_jazaery_64kbps", "Yāsīn al-Jazāʼirī", "warsh"),
-    Reciter("warsh/warsh_ibrahim_aldosary_128kbps", "Ibrāhīm al-Dawsarī", "warsh"),
+    Reciter("warsh/warsh_yassin_al_jazaery_64kbps", "Yāsīn al-Jazāʼirī", Riwayah.WARSH),
+    Reciter("warsh/warsh_ibrahim_aldosary_128kbps", "Ibrāhīm al-Dawsarī", Riwayah.WARSH),
 )
 
-/** Built-in reciters for a riwāyah ("hafs" | "warsh"). */
-fun recitersFor(riwayah: String): List<Reciter> = RECITERS.filter { it.riwayah == riwayah }
+/** Built-in reciters for a riwāyah. */
+fun recitersFor(riwayah: Riwayah): List<Reciter> = RECITERS.filter { it.riwayah == riwayah }

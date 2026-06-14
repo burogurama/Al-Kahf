@@ -111,6 +111,7 @@ import app.alkahf.data.PageAyah
 import app.alkahf.data.PageGroup
 import app.alkahf.data.MemorizationState
 import app.alkahf.data.QuranRepository
+import app.alkahf.data.Riwayah
 import app.alkahf.data.ReciterStatus
 import app.alkahf.data.SurahOption
 import app.alkahf.data.audio.AudioStore
@@ -573,14 +574,14 @@ fun MushafScreen(
                     null
                 } else {
                     stringResource(
-                        if (displayRiwayah == "warsh") R.string.settings_riwayah_warsh else R.string.settings_riwayah_hafs,
+                        if (displayRiwayah == Riwayah.WARSH) R.string.settings_riwayah_warsh else R.string.settings_riwayah_hafs,
                     )
                 },
                 onToggleRiwayah = {
                     // Clear sessions in the same frame as the riwāyah change so the
                     // page reloads with the new text (the load guard checks session).
                     sessions.clear()
-                    displayRiwayah = if (displayRiwayah == "warsh") "hafs" else "warsh"
+                    displayRiwayah = if (displayRiwayah == Riwayah.WARSH) Riwayah.HAFS else Riwayah.WARSH
                 }.takeIf { !sabaqMode },
             )
             // RTL pager: swiping toward the right turns to the next page, as in a
@@ -941,7 +942,7 @@ private fun MushafTopBar(
 @Composable
 private fun MushafPageView(
     pageNumber: Int,
-    riwayah: String,
+    riwayah: Riwayah,
     repository: QuranRepository,
     hideMode: Boolean,
     session: SelfTestSession?,

@@ -39,9 +39,9 @@ val KfgqpcWarsh = FontFamily(
     Font(R.font.kfgqpc_warsh, weight = FontWeight.Normal),
 )
 
-/** The mushaf font for a riwāyah ("hafs" | "warsh"). */
-fun quranFontFor(riwayah: String): FontFamily =
-    if (riwayah == "warsh") KfgqpcWarsh else KfgqpcHafs
+/** The mushaf font for a riwāyah. */
+fun quranFontFor(riwayah: app.alkahf.data.Riwayah): FontFamily =
+    if (riwayah == app.alkahf.data.Riwayah.WARSH) KfgqpcWarsh else KfgqpcHafs
 
 /** The Qur'an font for the active riwāyah, provided at each screen root. */
 val LocalQuranFont = staticCompositionLocalOf { KfgqpcHafs }

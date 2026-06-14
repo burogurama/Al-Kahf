@@ -47,6 +47,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.alkahf.R
 import app.alkahf.data.LoopPreset
+import app.alkahf.data.Riwayah
 import app.alkahf.data.SurahOption
 import app.alkahf.data.audio.RECITERS
 import app.alkahf.data.audio.Reciter
@@ -61,8 +62,8 @@ import app.alkahf.ui.theme.AlkahfColors
 fun PresetEditor(
     initial: LoopPreset,
     surahs: List<SurahOption>,
-    loadReciters: suspend (String) -> List<Reciter>,
-    convertRange: suspend (Int, Int, Int, String, String) -> IntRange,
+    loadReciters: suspend (Riwayah) -> List<Reciter>,
+    convertRange: suspend (Int, Int, Int, Riwayah, Riwayah) -> IntRange,
     onSave: (LoopPreset) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -175,8 +176,8 @@ fun PresetEditor(
             EditorCard(stringResource(R.string.settings_riwayah)) {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                     listOf(
-                        "hafs" to stringResource(R.string.settings_riwayah_hafs),
-                        "warsh" to stringResource(R.string.settings_riwayah_warsh),
+                        Riwayah.HAFS to stringResource(R.string.settings_riwayah_hafs),
+                        Riwayah.WARSH to stringResource(R.string.settings_riwayah_warsh),
                     ).forEach { (value, label) ->
                         val selected = value == riwayah
                         Surface(

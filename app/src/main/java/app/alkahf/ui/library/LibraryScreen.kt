@@ -160,9 +160,9 @@ private fun NewReciterButton(onClick: () -> Unit) {
 
 @Composable
 private fun NewReciterDialog(
-    defaultRiwayah: String,
+    defaultRiwayah: app.alkahf.data.Riwayah,
     onDismiss: () -> Unit,
-    onCreate: (String, String) -> Unit,
+    onCreate: (String, app.alkahf.data.Riwayah) -> Unit,
 ) {
     var name by remember { mutableStateOf("") }
     var riwayah by remember { mutableStateOf(defaultRiwayah) }
@@ -194,8 +194,8 @@ private fun NewReciterDialog(
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf(
-                        "hafs" to stringResource(R.string.settings_riwayah_hafs),
-                        "warsh" to stringResource(R.string.settings_riwayah_warsh),
+                        app.alkahf.data.Riwayah.HAFS to stringResource(R.string.settings_riwayah_hafs),
+                        app.alkahf.data.Riwayah.WARSH to stringResource(R.string.settings_riwayah_warsh),
                     ).forEach { (value, label) ->
                         val selected = value == riwayah
                         Surface(
@@ -440,7 +440,7 @@ private fun PresetRow(preset: LoopPreset, onClick: () -> Unit) {
                     Surface(shape = RoundedCornerShape(6.dp), color = AlkahfColors.ChipBg) {
                         Text(
                             text = stringResource(
-                                if (preset.riwayah == "warsh") {
+                                if (preset.riwayah == app.alkahf.data.Riwayah.WARSH) {
                                     R.string.settings_riwayah_warsh
                                 } else {
                                     R.string.settings_riwayah_hafs

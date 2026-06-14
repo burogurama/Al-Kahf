@@ -77,7 +77,7 @@ fun SettingsScreen(
     // Switching riwāyah swaps the Qur'an DB, font, and reciter list, all resolved
     // resolved when the screen tree is rebuilt — recreating the activity reloads
     // the DB, font, and reciter list for the new reading.
-    fun changeRiwayah(value: String) {
+    fun changeRiwayah(value: app.alkahf.data.Riwayah) {
         if (value == riwayah) return
         repository.riwayah = value
         riwayah = value
@@ -184,8 +184,8 @@ fun SettingsScreen(
                     RowLabel(stringResource(R.string.settings_riwayah))
                     Segmented(
                         options = listOf(
-                            "hafs" to stringResource(R.string.settings_riwayah_hafs),
-                            "warsh" to stringResource(R.string.settings_riwayah_warsh),
+                            app.alkahf.data.Riwayah.HAFS to stringResource(R.string.settings_riwayah_hafs),
+                            app.alkahf.data.Riwayah.WARSH to stringResource(R.string.settings_riwayah_warsh),
                         ),
                         selected = riwayah,
                         onSelect = { changeRiwayah(it) },
@@ -250,7 +250,7 @@ fun SettingsScreen(
                     Divider()
                     NavRow(
                         label = stringResource(R.string.settings_script),
-                        value = "KFGQPC Uthmanic · ${if (riwayah == "warsh") "WARSH" else "HAFS"}",
+                        value = "KFGQPC Uthmanic · ${if (riwayah == app.alkahf.data.Riwayah.WARSH) "WARSH" else "HAFS"}",
                     )
                 }
             }

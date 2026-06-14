@@ -9,6 +9,7 @@ import app.alkahf.audio.LoopMode
 import app.alkahf.audio.LoopSequencer
 import app.alkahf.audio.LoopStep
 import app.alkahf.data.LoopPreset
+import app.alkahf.data.Riwayah
 import app.alkahf.data.PageAyah
 import app.alkahf.R
 import app.alkahf.data.QuranRepository
@@ -50,7 +51,7 @@ data class LoopUiState(
     val surahAyahCount: Int = 110,
     val reciterPath: String = AudioStore.DEFAULT_RECITER,
     val reciterName: String = "Ḥuṣarī",
-    val riwayah: String = "hafs",
+    val riwayah: Riwayah = Riwayah.HAFS,
     val ayahs: Map<Int, PageAyah> = emptyMap(),
     val errorMessage: String? = null,
 ) {
@@ -93,7 +94,7 @@ class LoopController(
     private var jumpTarget: Int? = null
     private var sessionJob: Job? = null
     private var loadedSurah = -1
-    private var loadedRiwayah = ""
+    private var loadedRiwayah: Riwayah? = null
     // Resolved when the current reciter is an imported one ("custom:<id>"): the
     // single audio file plus each āyah's segment. Null for built-in reciters.
     private var importedAudio: app.alkahf.data.ImportedSurahAudio? = null
