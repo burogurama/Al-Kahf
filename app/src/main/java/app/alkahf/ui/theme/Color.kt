@@ -6,10 +6,9 @@ import androidx.compose.ui.graphics.Color
 /**
  * The app's design tokens, swappable between a light and a dark palette.
  *
- * Call sites keep using `AlkahfColors.X`; each token is a getter that reads
- * the active [Palette] (a snapshot state), so switching themes recomposes /
- * redraws everything. The dark palette is the light one recolored through the
- * fixed token map in design_handoff_dark/README.md.
+ * Call sites use `AlkahfColors.X`; each token is a getter that reads the
+ * active [Palette] (a snapshot state), so switching themes recomposes /
+ * redraws everything.
  */
 data class Palette(
     val Paper: Color,

@@ -7,7 +7,7 @@ import androidx.room.RoomDatabase
 
 @Database(
     entities = [SurahEntity::class, AyahEntity::class],
-    version = 2, // v2: added audio_from/audio_to (Warsh→Hafs audio mapping)
+    version = 2, // v2: adds audio_from/audio_to (Warsh→Hafs audio mapping)
     exportSchema = false,
 )
 abstract class QuranDatabase : RoomDatabase() {
@@ -17,7 +17,7 @@ abstract class QuranDatabase : RoomDatabase() {
         /**
          * Opens the Qur'an DB for the active riwāyah. Hafs and Warsh are bundled
          * as separate assets and cached under distinct filenames, so switching
-         * just reopens the other (the process restarts on a riwāyah change).
+         * riwāyah just reopens the other one.
          */
         fun open(context: Context): QuranDatabase {
             val riwayah = context

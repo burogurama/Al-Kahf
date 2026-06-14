@@ -365,8 +365,7 @@ class LoopController(
             val duration = player.duration.takeIf { it > 0 } ?: 0
             val position = player.currentPosition
             val words = _state.value.ayahs[_state.value.currentAyah]?.words.orEmpty()
-            // Even-split word highlight; will be replaced by per-reciter QUL
-            // word timestamps.
+            // Word highlight is an even split across the āyah's words.
             val highlight = if (duration > 0 && words.isNotEmpty()) {
                 ((position * words.size) / duration).toInt().coerceIn(0, words.size - 1)
             } else {

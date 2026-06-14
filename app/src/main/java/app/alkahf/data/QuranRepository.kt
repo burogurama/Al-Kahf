@@ -303,7 +303,7 @@ class QuranRepository(context: Context) {
             (states[surah * 1000 + it] ?: MemorizationState.NOT_STARTED).value < MemorizationState.MEMORIZED.value
         }
         if (start == null) {
-            setSabaq(0, 0, 0) // whole surah already memorized — nothing to learn
+            setSabaq(0, 0, 0)
             return
         }
         setSabaq(surah, start, minOf(start + sectionLength - 1, len))
@@ -378,7 +378,7 @@ class QuranRepository(context: Context) {
             enrollReviewPortion(range.surah, range.from, range.to)
             val nextFrom = range.to + 1
             if (nextFrom > len) {
-                setSabaq(0, 0, 0) // surah complete — no active sabaq
+                setSabaq(0, 0, 0)
                 return
             }
             range = AyahRange(range.surah, nextFrom, minOf(nextFrom + l - 1, len))
@@ -649,7 +649,7 @@ class QuranRepository(context: Context) {
             defaults.forEach { userDao.deletePreset(it.id) }
             return
         }
-        // There is exactly one sabaq drill; drop any duplicates from older builds.
+        // Keep exactly one sabaq drill, dropping any duplicates.
         val existing = defaults.firstOrNull()
         defaults.drop(1).forEach { userDao.deletePreset(it.id) }
         val surahName = quranDao.surah(range.surah).nameLatin
@@ -674,9 +674,8 @@ class QuranRepository(context: Context) {
             )
             return
         }
-        // The single sabaq drill follows the system riwāyah: convert its reading
-        // and (if needed) reciter when the system reading toggled, and track the
-        // sabaq range.
+        // The sabaq drill follows the system riwāyah: convert its reading and (if
+        // needed) reciter when the system reading toggled, and track the sabaq range.
         val reciterValid = existing.reciterPath.startsWith("custom:") ||
             recitersFor(riwayah).any { it.path == existing.reciterPath }
         val reciter = if (existing.riwayah != riwayah || !reciterValid) activeReciter else null
@@ -745,7 +744,7 @@ class QuranRepository(context: Context) {
         }
         val customs = userDao.customRecitersForRiwayah(riwayah).map { reciter ->
             ReciterStatus(
-                key = "custom:${reciter.id}", // imported reciter
+                key = "custom:${reciter.id}",
                 displayName = reciter.name,
                 arabicInitial = reciter.initial,
                 isActive = false,
@@ -1264,9 +1263,9 @@ class QuranRepository(context: Context) {
     }
 
     private suspend fun ensureSeeded() {
-        // Nothing is seeded any more: the review queue is built from real hifz —
-        // a sabaq section becomes a review portion once it's fully memorized
-        // (see maybeAdvanceSabaq → enrollReviewPortion).
+        // No-op: the review queue is built from real hifz — a sabaq section
+        // becomes a review portion once fully memorized (see maybeAdvanceSabaq →
+        // enrollReviewPortion).
     }
 
     private fun surahMeta(revelationType: String, ayahCount: Int): String {

@@ -9,8 +9,7 @@ import kotlinx.coroutines.withContext
 
 /**
  * Per-ayah reciter audio, downloaded on demand from everyayah.com and cached
- * in app storage for offline replay. A proper per-surah download manager
- * (Library screen) will build on this cache.
+ * in app storage for offline replay.
  */
 class AudioStore(private val context: Context) {
 

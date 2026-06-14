@@ -107,7 +107,6 @@ fun AlkahfApp(
     var loopPresetId by remember { mutableStateOf<Long?>(null) }
     // True when the Loop player should open straight into the new-preset editor.
     var loopNewPreset by remember { mutableStateOf(false) }
-    // The reciter whose surahs are being managed.
     var manageReciter by remember { mutableStateOf<app.alkahf.data.ReciterStatus?>(null) }
     // The Tawqīt track being tagged (a fresh draft or an existing track).
     var tawqitDraft by remember { mutableStateOf<app.alkahf.data.TawqitTrack?>(null) }
@@ -134,8 +133,8 @@ fun AlkahfApp(
     }
 
     val resources = LocalContext.current.resources
-    // Bumped to force the Home dashboard to reload after an in-place change
-    // (e.g. marking the sabaq memorized) that doesn't switch destination.
+    // Bumped to reload the Home dashboard after an in-place change (e.g. marking
+    // the sabaq memorized) that doesn't switch destination.
     var homeRefresh by remember { mutableStateOf(0) }
     val homeState by produceState(initialValue = HomeUiState(), destination, homeRefresh) {
         if (destination == AlkahfDestination.Home) {

@@ -154,8 +154,8 @@ class MushafAudioController(
             pass++
             for (ayahId in ayahIds) {
                 _state.update { it.copy(currentAyahId = ayahId, phase = MushafAudioPhase.PREPARING) }
-                // One app āyah maps to one (Hafs) or, where Warsh counting merges
-                // verses, several everyayah files; play them back to back.
+                // One app āyah maps to one Ḥafṣ file, or several where Warsh
+                // counting merges verses; play them back to back.
                 val surah = ayahId / 1000
                 val hafsAyahs = repository.audioAyahs(surah, ayahId % 1000, riwayah)
                 for (hafsAyah in hafsAyahs) {

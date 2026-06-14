@@ -188,7 +188,7 @@ fun MushafScreen(
     val repository = remember { (context.applicationContext as AlkahfApplication).repository }
     val scope = rememberCoroutineScope()
     val settings = remember { repository.settings() }
-    // Keep the screen awake while reading, if enabled in Settings.
+    // Keep the screen awake while reading, when enabled in Settings.
     if (settings.keepScreenOn) {
         val view = androidx.compose.ui.platform.LocalView.current
         DisposableEffect(Unit) {
@@ -197,7 +197,7 @@ fun MushafScreen(
         }
     }
     // Opening the sabaq lands in reading mode (text shown); otherwise reopen
-    // in whichever mode the Mushaf was left in.
+    // in whichever mode the Mushaf was last left in.
     var hideMode by remember {
         mutableStateOf(if (highlightRange != null) false else repository.lastMushafHideMode)
     }
@@ -450,7 +450,7 @@ fun MushafScreen(
             }
             return
         }
-        // Built-in reciter: make it active for playback.
+        // Built-in reciter.
         repository.setActiveReciter(chosen.key)
         audioController.setReciter(chosen.key, chosen.displayName)
         val surah = ids.first() / 1000
@@ -1202,15 +1202,14 @@ private fun AyatBody(
                             if (sabaqIds.isNotEmpty() && ayahId !in sabaqIds) return@detectTapGestures
                             if (currentOnAudioTap(ayahId)) return@detectTapGestures
                             if (hideMode) {
-                                // Reveal through the tapped word (or the whole
-                                // ayah when its medallion is tapped).
+                                // Reveal through the tapped word, or the whole
+                                // ayah when its medallion is tapped.
                                 if (span != null) {
                                     session.revealUpTo(span.ayahId, span.wordIndex)
                                 } else {
                                     session.revealAyah(ayahId)
                                 }
                             } else {
-                                // Reading mode: tap selects the ayah for marking.
                                 currentOnSelect(ayahId)
                             }
                         },
@@ -1222,8 +1221,8 @@ private fun AyatBody(
                             if (hideMode) {
                                 session.revealAyah(ayahId)
                             } else {
-                                // Reading mode: open the floating action menu at
-                                // the press point (in window coordinates).
+                                // Open the floating action menu at the press
+                                // point, in window coordinates.
                                 val win = coords?.localToWindow(position) ?: return@detectTapGestures
                                 currentOnLongPress(
                                     ayahId,
@@ -1291,7 +1290,7 @@ private fun buildGroupText(
                     else -> true
                 }
                 // The highlight fill is drawn behind the text; the glyph colour
-                // never changes (spec) — except context āyāt, which read muted.
+                // stays constant, except context āyāt, which read muted.
                 addStyle(
                     style = if (concealed) {
                         SpanStyle(

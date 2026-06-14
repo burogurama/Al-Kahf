@@ -5,10 +5,7 @@ import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
-/**
- * Read-only entities backed by the bundled quran.db asset.
- * Schema must stay in sync with tools/build_quran_db.py.
- */
+/** Read-only entities backed by the bundled quran.db asset. */
 @Entity(tableName = "surahs")
 data class SurahEntity(
     @PrimaryKey val number: Int,

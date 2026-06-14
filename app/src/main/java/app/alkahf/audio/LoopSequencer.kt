@@ -18,9 +18,9 @@ data class LoopStep(
 /**
  * Expands a drill configuration into the flat list of plays.
  *
- * Chain mode follows the handoff algorithm: 1×N, 2×N, 1–2×M, 3×N, 1–3×M …
- * — each new ayah is drilled solo ×N, then the chain grown to include it
- * runs ×M passes. A silent recite-back gap follows every play.
+ * Chain mode: 1×N, 2×N, 1–2×M, 3×N, 1–3×M … — each new ayah is drilled
+ * solo ×N, then the chain grown to include it runs ×M passes. A silent
+ * recite-back gap follows every play.
  */
 object LoopSequencer {
     fun steps(

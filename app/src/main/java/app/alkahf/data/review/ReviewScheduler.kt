@@ -5,12 +5,7 @@ import kotlin.math.roundToInt
 
 enum class ReviewGrade { FORGOT, HESITANT, PERFECT }
 
-/**
- * SM-2-style interval scheduling for murājaʿah portions.
- *
- * The grade buttons in the review UI must show the intervals this object
- * actually assigns — they are the honest consequence of each grade.
- */
+/** SM-2-style interval scheduling for murājaʿah portions. */
 object ReviewScheduler {
 
     /**

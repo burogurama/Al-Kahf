@@ -40,8 +40,7 @@ val KfgqpcWarsh = FontFamily(
 
 /**
  * The Qur'an font for the active riwāyah. Set once at process start
- * (AlkahfApplication) so it works in both composable and text-builder code;
- * a riwāyah change restarts the process, so this never changes mid-run.
+ * (AlkahfApplication) so it works in both composable and text-builder code.
  */
 var quranFont: FontFamily = KfgqpcHafs
 
@@ -65,7 +64,7 @@ val AlkahfTypography = Typography().run {
     )
 }
 
-/** Ayah text style per handoff: 25sp, line-height 1.88. */
+/** Ayah text style: 25sp, line-height 1.88. */
 val AyahTextStyle = TextStyle(
     fontFamily = quranFont,
     fontWeight = FontWeight.Normal,

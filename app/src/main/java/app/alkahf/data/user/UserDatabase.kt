@@ -274,7 +274,7 @@ abstract class UserDatabase : RoomDatabase() {
     abstract fun userDao(): UserDao
 
     companion object {
-        // v8: tag custom reciters and drills with a riwāyah (preserve user data).
+        // v8: adds a riwayah column to custom_reciters and loop_presets.
         private val MIGRATION_7_8 = object : androidx.room.migration.Migration(7, 8) {
             override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE custom_reciters ADD COLUMN riwayah TEXT NOT NULL DEFAULT 'hafs'")
