@@ -244,6 +244,10 @@
     <string name="mushaf_download_confirm">Download</string>
     <string name="mushaf_download_progress">Downloading… %1$d%%</string>
 
+    <!-- Foreground playback service (notification keeping audio alive when backgrounded) -->
+    <string name="playback_channel_name">Playback</string>
+    <string name="playback_notification_default">Playing</string>
+
     <!-- Mushaf audio status (built from a non-composable controller / render blocks) -->
     <string name="mushaf_audio_download_failed">Audio download failed — check your connection</string>
     <string name="mushaf_audio_ready">Ready</string>

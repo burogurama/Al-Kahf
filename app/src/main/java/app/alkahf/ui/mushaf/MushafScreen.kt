@@ -103,7 +103,6 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
-import androidx.media3.exoplayer.ExoPlayer
 import app.alkahf.AlkahfApplication
 import app.alkahf.R
 import app.alkahf.data.AyahRange
@@ -115,7 +114,6 @@ import app.alkahf.data.QuranRepository
 import app.alkahf.data.Riwayah
 import app.alkahf.data.ReciterStatus
 import app.alkahf.data.SurahOption
-import app.alkahf.data.audio.AudioStore
 import app.alkahf.ui.theme.AlkahfColors
 import app.alkahf.ui.theme.LocalQuranFont
 import app.alkahf.ui.theme.quranFontFor
@@ -271,20 +269,18 @@ fun MushafScreen(
         }
     }
 
+    // The app-singleton listening engine: it owns the shared ExoPlayer and a
+    // long-lived scope, so navigating away (or backgrounding with the screen off)
+    // no longer tears down playback — the foreground PlaybackService keeps it
+    // alive and this screen reconnects to its StateFlow on reopen.
     val audioController = remember {
-        val reciter = mushaf.activeReciter
-        MushafAudioController(
-            context = context.applicationContext,
-            repository = repository,
-            audioStore = AudioStore(context.applicationContext),
-            player = ExoPlayer.Builder(context).build(),
-            coroutineScope = scope,
-            reciterPath = reciter.path,
-            reciterName = reciter.displayName,
-        )
+        (context.applicationContext as AlkahfApplication).mushafAudio
     }
-    DisposableEffect(Unit) {
-        onDispose { audioController.release() }
+    // Sync the controller to this Mushaf's active reciter on open (the singleton
+    // may still hold the previous screen's reciter).
+    LaunchedEffect(Unit) {
+        val reciter = mushaf.activeReciter
+        audioController.setReciter(reciter.path, reciter.displayName)
     }
     val audioState by audioController.state.collectAsState()
     var audioDockOpen by remember { mutableStateOf(false) }

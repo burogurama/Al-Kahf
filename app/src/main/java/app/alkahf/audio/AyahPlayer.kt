@@ -2,6 +2,7 @@ package app.alkahf.audio
 
 import android.net.Uri
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import java.io.File
@@ -26,9 +27,10 @@ object AyahPlayer {
         speed: Float,
         isPaused: () -> Boolean,
         pollMs: Long = 120,
+        metadata: MediaMetadata? = null,
         onTick: (positionMs: Long, durationMs: Long) -> Unit = { _, _ -> },
     ): PlayResult {
-        player.setMediaItem(MediaItem.fromUri(Uri.fromFile(file)))
+        player.setMediaItem(mediaItem(Uri.fromFile(file), metadata))
         player.prepare()
         player.setPlaybackSpeed(speed)
         player.playWhenReady = !isPaused()
@@ -56,10 +58,11 @@ object AyahPlayer {
         isPaused: () -> Boolean,
         prepare: Boolean = true,
         pollMs: Long = 120,
+        metadata: MediaMetadata? = null,
         onTick: (positionMs: Long, durationMs: Long) -> Unit = { _, _ -> },
     ): PlayResult {
         if (prepare) {
-            player.setMediaItem(MediaItem.fromUri(Uri.parse(fileUri)))
+            player.setMediaItem(mediaItem(Uri.parse(fileUri), metadata))
             player.prepare()
         }
         player.setPlaybackSpeed(speed)
@@ -79,4 +82,11 @@ object AyahPlayer {
             delay(pollMs)
         }
     }
+
+    /** Builds a media item, attaching [metadata] (surah/reciter) when given so
+     *  the foreground notification and lock screen show something meaningful. */
+    private fun mediaItem(uri: Uri, metadata: MediaMetadata?): MediaItem =
+        MediaItem.Builder().setUri(uri).apply {
+            if (metadata != null) setMediaMetadata(metadata)
+        }.build()
 }

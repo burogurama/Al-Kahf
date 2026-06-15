@@ -42,7 +42,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.activity.compose.BackHandler
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -72,12 +71,10 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.media3.exoplayer.ExoPlayer
 import app.alkahf.AlkahfApplication
 import app.alkahf.R
 import app.alkahf.audio.LoopMode
 import app.alkahf.data.SurahOption
-import app.alkahf.data.audio.AudioStore
 import app.alkahf.ui.theme.AlkahfColors
 import app.alkahf.ui.theme.LocalQuranFont
 import app.alkahf.ui.theme.quranFontFor
@@ -87,27 +84,22 @@ import kotlinx.coroutines.launch
 fun LoopPlayerScreen(presetId: Long? = null, newPreset: Boolean = false, onBack: () -> Unit = {}) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    // The app-singleton drill engine: it owns the shared ExoPlayer and a
+    // long-lived scope, so leaving this screen (or backgrounding with the screen
+    // off) no longer stops the drill — the foreground PlaybackService keeps it
+    // alive and the screen reconnects to its StateFlow on reopen.
     val controller = remember {
-        LoopController(
-            repository = (context.applicationContext as AlkahfApplication).repository,
-            audioStore = AudioStore(context.applicationContext),
-            player = ExoPlayer.Builder(context).build(),
-            scope = scope,
-            context = context.applicationContext,
-        )
+        (context.applicationContext as AlkahfApplication).loopAudio
     }
     var loadedPreset by remember { mutableStateOf<app.alkahf.data.LoopPreset?>(null) }
-    DisposableEffect(Unit) {
+    LaunchedEffect(Unit) {
         // "New preset" opens the editor on a blank template — don't load/play a
         // drill behind it. Applying a preset starts playback, so skip it here.
         if (!newPreset) {
-            scope.launch {
-                val preset = controller.resolvePreset(presetId)
-                loadedPreset = preset
-                controller.applyPreset(preset)
-            }
+            val preset = controller.resolvePreset(presetId)
+            loadedPreset = preset
+            controller.applyPreset(preset)
         }
-        onDispose { controller.release() }
     }
     val state by controller.state.collectAsState()
     // "New preset" opens straight into the editor in create mode (id 0 → save

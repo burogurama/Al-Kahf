@@ -3,6 +3,7 @@ package app.alkahf.ui.mushaf
 import android.content.Context
 import android.net.Uri
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import app.alkahf.R
@@ -53,6 +54,7 @@ class MushafAudioController(
     private val coroutineScope: CoroutineScope,
     reciterPath: String,
     reciterName: String,
+    private val onPlaybackIdle: () -> Unit = {},
 ) {
     private val _state = MutableStateFlow(
         MushafAudioState(reciterPath = reciterPath, reciterName = reciterName),
@@ -60,6 +62,10 @@ class MushafAudioController(
     val state: StateFlow<MushafAudioState> = _state.asStateFlow()
 
     private var job: Job? = null
+
+    /** Whether a sequencer is currently running (drives the foreground service). */
+    val isActive: Boolean get() = job?.isActive == true
+
     private var lastDurationMs = 0L
     private var playbackSpeed = 1f
     // The riwāyah whose audio mapping is used (the Mushaf's temporary view).
@@ -111,6 +117,7 @@ class MushafAudioController(
         player.stop()
         _state.update { it.copy(isPaused = false, errorMessage = null) }
         job = coroutineScope.launch { run(ayahIds, repeat) }
+            .also { it.invokeOnCompletion { onPlaybackIdle() } }
     }
 
     fun playSingle(ayahId: Int) = playAyahIds(listOf(ayahId))
@@ -130,6 +137,7 @@ class MushafAudioController(
         player.stop()
         _state.update { it.copy(isPaused = false, errorMessage = null) }
         job = coroutineScope.launch { runImported(fileUri, ayahIds, segments, repeat) }
+            .also { it.invokeOnCompletion { onPlaybackIdle() } }
     }
 
     fun togglePause() {
@@ -145,11 +153,6 @@ class MushafAudioController(
         }
     }
 
-    fun release() {
-        job?.cancel()
-        player.release()
-    }
-
     private suspend fun run(ayahIds: List<Int>, repeat: Int = 1) {
         var pass = 0
         // repeat <= 0 means loop forever (until stopped/cancelled).
@@ -160,6 +163,7 @@ class MushafAudioController(
                 // One app āyah maps to one Ḥafṣ file, or several where Warsh
                 // counting merges verses; play them back to back.
                 val surah = ayahId / 1000
+                val metadata = metadataFor(surah)
                 val hafsAyahs = repository.audioAyahs(surah, ayahId % 1000, riwayah)
                 for (hafsAyah in hafsAyahs) {
                     val file = try {
@@ -174,7 +178,7 @@ class MushafAudioController(
                         }
                         return
                     }
-                    val finished = playFile(file)
+                    val finished = playFile(file, metadata)
                     if (!finished) return
                 }
                 repository.logPractice(type = "listen", ayahCount = 1, durationMs = lastDurationMs)
@@ -192,7 +196,13 @@ class MushafAudioController(
         segments: List<LongRange>,
         repeat: Int,
     ) {
-        player.setMediaItem(MediaItem.fromUri(Uri.parse(fileUri)))
+        val surah = ayahIds.firstOrNull()?.let { it / 1000 }
+        player.setMediaItem(
+            MediaItem.Builder()
+                .setUri(Uri.parse(fileUri))
+                .setMediaMetadata(metadataFor(surah))
+                .build(),
+        )
         player.prepare()
         player.setPlaybackSpeed(playbackSpeed)
         // Recite-back wants a pause after every āyah; plain listening should flow
@@ -283,14 +293,26 @@ class MushafAudioController(
     }
 
     /** Plays the file to its end. Returns false if playback was stopped. */
-    private suspend fun playFile(file: File): Boolean {
+    private suspend fun playFile(file: File, metadata: MediaMetadata): Boolean {
         _state.update { it.copy(phase = MushafAudioPhase.PLAYING) }
         val result = AyahPlayer.playFile(
             player, file, playbackSpeed, { _state.value.isPaused }, pollMs = 150,
+            metadata = metadata,
         )
         if (result == PlayResult.STOPPED) return false
         lastDurationMs = player.duration.coerceAtLeast(0)
         return true
+    }
+
+    /** Title = sūrah name (Arabic, falling back to the number), artist = reciter,
+     *  for the foreground notification / lock screen. */
+    private fun metadataFor(surah: Int?): MediaMetadata {
+        val name = surah?.let { repository.cachedSurahNames(riwayah)?.get(it)?.arabic }
+            ?: surah?.toString().orEmpty()
+        return MediaMetadata.Builder()
+            .setTitle(name)
+            .setArtist(_state.value.reciterName)
+            .build()
     }
 
     private suspend fun reciteBackGap() {

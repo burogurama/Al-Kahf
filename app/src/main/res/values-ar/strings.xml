@@ -256,6 +256,10 @@
     <string name="mushaf_download_confirm">تنزيل</string>
     <string name="mushaf_download_progress">جارٍ التنزيل… %1$d%%</string>
 
+    <!-- Foreground playback service -->
+    <string name="playback_channel_name">التشغيل</string>
+    <string name="playback_notification_default">يُشغَّل الآن</string>
+
     <!-- Mushaf audio status -->
     <string name="mushaf_audio_download_failed">فشل تنزيل الصوت — تحقّق من اتصالك</string>
     <string name="mushaf_audio_ready">جاهز</string>

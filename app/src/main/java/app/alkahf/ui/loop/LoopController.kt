@@ -1,6 +1,7 @@
 package app.alkahf.ui.loop
 
 import android.content.Context
+import androidx.media3.common.MediaMetadata
 import androidx.media3.exoplayer.ExoPlayer
 import app.alkahf.audio.AyahPlayer
 import app.alkahf.audio.LoopMode
@@ -83,6 +84,7 @@ class LoopController(
     private val scope: CoroutineScope,
     private val context: Context,
     initialPreset: LoopPreset? = null,
+    private val onPlaybackIdle: () -> Unit = {},
 ) {
     private val _state = MutableStateFlow(
         initialPreset?.let { applyPresetTo(LoopUiState(), it) } ?: LoopUiState(),
@@ -93,6 +95,10 @@ class LoopController(
     private var stepIndex = 0
     private var jumpTarget: Int? = null
     private var sessionJob: Job? = null
+
+    /** Whether a drill session is currently running (drives the foreground service). */
+    val isActive: Boolean get() = sessionJob?.isActive == true
+
     private var loadedSurah = -1
     private var loadedRiwayah: Riwayah? = null
     // Resolved when the current reciter is an imported one ("custom:<id>"): the
@@ -126,11 +132,16 @@ class LoopController(
         jumpTarget = null
         player.stop()
         sessionJob = scope.launch { runSession() }
+            .also { it.invokeOnCompletion { onPlaybackIdle() } }
     }
 
-    fun release() {
+    /** Cancels the drill and stops audio (used when the app is swiped away). */
+    fun stop() {
         sessionJob?.cancel()
-        player.release()
+        player.stop()
+        _state.update {
+            it.copy(phase = LoopPhase.COMPLETE, isPaused = false, highlightIndex = -1)
+        }
     }
 
     // --- Screen/editor data access (kept here so the composable touches no repo) ---
@@ -332,6 +343,7 @@ class LoopController(
         _state.update { it.copy(phase = LoopPhase.PLAYING, durationMs = total) }
         val result = AyahPlayer.playSegment(
             player, fileUri, segment, _state.value.speed, { _state.value.isPaused },
+            metadata = metadata(),
         ) { position, durationMs ->
             _state.update {
                 it.copy(positionMs = position, durationMs = durationMs, highlightIndex = highlight(position, durationMs))
@@ -362,6 +374,7 @@ class LoopController(
         _state.update { it.copy(phase = LoopPhase.PLAYING) }
         val result = AyahPlayer.playFile(
             player, file, _state.value.speed, { _state.value.isPaused },
+            metadata = metadata(),
         ) { position, durationMs ->
             _state.update {
                 it.copy(positionMs = position, durationMs = durationMs, highlightIndex = highlight(position, durationMs))
@@ -394,6 +407,18 @@ class LoopController(
             }
             delay(GAP_TICK_MS)
         }
+    }
+
+    /** Title = sūrah name (Arabic, falling back to latin/number), artist =
+     *  reciter, for the foreground notification / lock screen. */
+    private fun metadata(): MediaMetadata {
+        val s = _state.value
+        val title = repository.cachedSurahNames(s.riwayah)?.get(s.surah)?.arabic
+            ?: s.surahLatin.ifBlank { s.surah.toString() }
+        return MediaMetadata.Builder()
+            .setTitle(title)
+            .setArtist(s.reciterName)
+            .build()
     }
 
     private fun consumeJump(): Int? {
