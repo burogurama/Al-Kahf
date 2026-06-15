@@ -314,8 +314,10 @@ fun MushafScreen(
         { ayahId, count -> scope.launch { mushaf.saveRevealState(ayahId, count) } }
     }
 
-    // Reader-mode selection: a contiguous index range into the current page's
-    // ayat, for marking several at once. Cleared on page change / mode toggle.
+    // Reader-mode selection: a contiguous range of āyah ids (id = surah*1000 +
+    // number, which is monotonic in reading order), so a selection can span page
+    // boundaries. Within a sūrah every id between the ends is a real āyah, and the
+    // tap-to-extend logic only grows by ±1, so a selection never crosses sūrahs.
     var selection by remember { mutableStateOf<IntRange?>(null) }
     // Floating action menu for the selection: anchored at the long-press point
     // in window coordinates (null = closed).
@@ -338,15 +340,14 @@ fun MushafScreen(
         rangeController.loadReciters(displayRiwayah)
     }
     LaunchedEffect(currentPageNumber) {
-        selection = null
+        // Keep the selection across page turns so a range can span pages; only the
+        // transient floating menu and audio dock close on a swipe.
         menuAnchor = null
         rangeController.setOpen(false)
     }
-    val orderedSelectedIds: List<Int> = currentSession?.page?.ayahs?.let { ayahs ->
-        // Bounds-guard: during a page swap the old range may not fit the new page.
-        selection?.takeIf { it.first >= 0 && it.last < ayahs.size }
-            ?.let { range -> ayahs.slice(range).map { it.id } }
-    } ?: emptyList()
+    // The selection is an āyah-id range within one sūrah, so every id between its
+    // ends is a real āyah in reading order — list them directly (spans pages).
+    val orderedSelectedIds: List<Int> = selection?.let { (it.first..it.last).toList() } ?: emptyList()
     val selectedIds = orderedSelectedIds.toSet()
     // The surah whose actions sheet is open (its header was tapped).
     var learnSurah by remember { mutableStateOf<Pair<Int, String>?>(null) }
@@ -380,20 +381,18 @@ fun MushafScreen(
         }
     }
 
-    val onSelectAyah: (Int) -> Unit = onSelect@{ ayahId ->
-        val ayahs = currentSession?.page?.ayahs ?: return@onSelect
-        val index = ayahs.indexOfFirst { it.id == ayahId }
-        if (index < 0) return@onSelect
+    val onSelectAyah: (Int) -> Unit = { ayahId ->
         val sel = selection
         selection = when {
-            sel == null -> index..index
-            index == sel.first - 1 -> index..sel.last
-            index == sel.last + 1 -> sel.first..index
-            sel.first == sel.last && index == sel.first -> null
-            index == sel.first -> (sel.first + 1)..sel.last
-            index == sel.last -> sel.first..(sel.last - 1)
-            index in sel -> index..index
-            else -> index..index
+            sel == null -> ayahId..ayahId
+            // Extend by an adjacent āyah; ids are contiguous within a sūrah, so this
+            // grows across a page boundary and naturally stops at a sūrah boundary.
+            ayahId == sel.first - 1 -> ayahId..sel.last
+            ayahId == sel.last + 1 -> sel.first..ayahId
+            sel.first == sel.last && ayahId == sel.first -> null
+            ayahId == sel.first -> (sel.first + 1)..sel.last
+            ayahId == sel.last -> sel.first..(sel.last - 1)
+            else -> ayahId..ayahId
         }
     }
 
@@ -413,13 +412,10 @@ fun MushafScreen(
     // Long-pressing an ayah in reading mode opens the floating action menu,
     // re-selecting that ayah alone when it lies outside the current selection.
     val onAyahLongPress: (Int, IntOffset) -> Unit = { ayahId, offset ->
-        val ayahs = currentSession?.page?.ayahs
-        val index = ayahs?.indexOfFirst { it.id == ayahId } ?: -1
-        if (index >= 0) {
-            val sel = selection
-            if (sel == null || index !in sel) selection = index..index
-            menuAnchor = offset
-        }
+        val sel = selection
+        // Long-pressing outside the current selection re-selects that āyah alone.
+        if (sel == null || ayahId !in sel) selection = ayahId..ayahId
+        menuAnchor = offset
     }
 
     fun toggleAudioDock() {
@@ -524,7 +520,9 @@ fun MushafScreen(
                             onAudioTap = onAudioTap,
                             sabaqIds = sabaqIds,
                             contextIds = contextIds,
-                            selectedIds = if (pageNumber == currentPageNumber) selectedIds else emptySet(),
+                            // Pass the whole selection; each page lights only its
+                            // own āyāt whose ids fall in the range, so it spans pages.
+                            selectedIds = selectedIds,
                             scrollToAyahId = scrollToAyahId,
                         )
                     }
@@ -596,12 +594,12 @@ fun MushafScreen(
                     menuAnchor = null
                 },
                 onSetSabaq = {
-                    val picked = menuSession.page.ayahs.filter { it.id in selectedIds }
-                    if (picked.isNotEmpty()) {
-                        val surah = picked.first().surah
-                        val nums = picked.filter { it.surah == surah }.map { it.number }
+                    // The selection is an id range within one sūrah → derive the
+                    // sūrah and āyah numbers from its ends (works across pages).
+                    selection?.let { sel ->
+                        val surah = sel.first / 1000
                         scope.launch {
-                            mushaf.setSabaqToRange(surah, nums.min(), nums.max())
+                            mushaf.setSabaqToRange(surah, sel.first % 1000, sel.last % 1000)
                             reloadMemStates()
                         }
                     }
@@ -610,7 +608,11 @@ fun MushafScreen(
                 },
                 onSetState = { state ->
                     val ids = selectedIds.toList()
-                    ids.forEach { menuSession.memStates[it] = state }
+                    // Reflect the change on every loaded page, not just the current
+                    // one, since the selection can span pages.
+                    sessions.values.forEach { s ->
+                        ids.forEach { id -> if (s.memStates.containsKey(id)) s.memStates[id] = state }
+                    }
                     scope.launch {
                         ids.forEach { mushaf.setAyahState(it, state) }
                     }
