@@ -178,7 +178,7 @@
     <string name="settings_reminders_empty">No times yet — add one to be reminded</string>
     <string name="settings_reminders_permission">Allow notifications to receive reminders</string>
     <string name="settings_reminders_remove">Remove %1$s</string>
-    <string name="settings_app_version">Alkahf · v1.5.0</string>
+    <string name="settings_app_version">Alkahf · v1.6.0</string>
     <string name="settings_footer_privacy">All data stored on this device · no account</string>
 
     <!-- Reminder notification -->
