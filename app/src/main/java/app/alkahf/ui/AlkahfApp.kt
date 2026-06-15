@@ -210,6 +210,10 @@ fun AlkahfApp(
     val surahName = rememberSurahNamer()
     val khatamController = remember { app.alkahf.ui.khatam.KhatamController(repository) }
     val khatamState by khatamController.state.collectAsState()
+    // False until the controller's first refresh completes; distinguishes "no
+    // active khatam" from "still loading" so the tracker doesn't bounce a valid
+    // khatam back to Today before its state has loaded.
+    val khatamLoaded by khatamController.loaded.collectAsState()
     val exercisesController = remember { app.alkahf.ui.exercises.ExercisesController(repository) }
     // The "log it complete" sheet shown over the tracker; not a back-stack entry.
     var showKhatamLog by remember { mutableStateOf(false) }
@@ -343,8 +347,11 @@ fun AlkahfApp(
         Screen.KhatamTracker -> {
             val state = khatamState
             if (state == null) {
-                // Khatam was cancelled (or never existed) — fall back to Today.
-                LaunchedEffect(Unit) { back() }
+                // Only fall back once the first load has finished; until then the
+                // refresh triggered on entry is still resolving (a null here is
+                // "loading", not "no khatam"). Bouncing early closed the tracker
+                // immediately after opening it.
+                if (khatamLoaded) LaunchedEffect(Unit) { back() }
             } else {
                 app.alkahf.ui.khatam.KhatamTrackerScreen(
                     state = state,
@@ -388,7 +395,8 @@ fun AlkahfApp(
         Screen.KhatamPortion -> {
             val state = khatamState
             if (state == null) {
-                LaunchedEffect(Unit) { back() }
+                // Wait for the first load before bailing (see KhatamTracker).
+                if (khatamLoaded) LaunchedEffect(Unit) { back() }
             } else {
                 app.alkahf.ui.khatam.KhatamPortionScreen(
                     state = state,
