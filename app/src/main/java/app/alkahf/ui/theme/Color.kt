@@ -208,10 +208,12 @@ val LightPalette = Palette(
     ExerciseSelectedCard = Color(0xFFECF3F0),
     ArabicAnswerInk = Color(0xFF234E45),
     ExerciseSegmentedTrack = Color(0xFFEFE8D9),
-    // Quranic keyboard
-    KeyboardTray = Color(0xFFE4DAC8),
-    KeyboardLetterKey = Color(0xFFFFFFFF),
-    KeyboardSpecialKey = Color(0xFFCDC2AC),
+    // Quranic keyboard — tuned to the app's warm paper/surface language (not a
+    // stark white native keyboard): the tray is a warm shelf, keys are soft
+    // surface cards bordered with the app's hairline, function keys a touch deeper.
+    KeyboardTray = Color(0xFFEDE6D6),
+    KeyboardLetterKey = Color(0xFFFCFAF4),
+    KeyboardSpecialKey = Color(0xFFE4DBC8),
     KeyboardHarakatBg = Color(0xFFF1E4C6),
     KeyboardHarakatKey = Color(0xFFFBF5E4),
     KeyboardHarakatBorder = Color(0xFFE8D7AC),
