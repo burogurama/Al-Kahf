@@ -519,4 +519,96 @@
     <string name="tawqit_hint_nudge_then_save">عدّل الإزاحة لتصحيح تأخّر الاستجابة، ثم احفظ</string>
     <string name="tawqit_hint_tap_when_ayah_finishes">انقر عند انتهاء الآية %1$d</string>
     <string name="tawqit_nudge_all">تعديل الكل</string>
+
+    <!-- التمارين (اختبار الحفظ) -->
+    <!-- بطاقة اليوم -->
+    <string name="ex_today_kicker">المراجعة · تمارين</string>
+    <string name="ex_today_headline">اختبر حفظك</string>
+    <string name="ex_today_description">تمارين قصيرة على ما حفظته — تذكّر السور، وأكمل الآيات، ورتّبها.</string>
+    <string name="ex_today_readiness">%1$s · %2$s جاهزة للاختبار</string>
+    <string name="ex_today_readiness_empty">احفظ بضع آيات لتفتح أول اختبار لك.</string>
+    <string name="ex_today_start">ابدأ اختبارًا</string>
+    <string name="ex_today_last_test">آخر اختبار</string>
+    <string name="ex_today_last_detail">%1$s · %2$d للمراجعة</string>
+    <string name="ex_today_review">مراجعة ›</string>
+    <string name="ex_today_when_today">اليوم</string>
+    <string name="ex_today_when_yesterday">أمس</string>
+    <string name="ex_today_when_days_ago">قبل %1$d أيام</string>
+    <!-- مدخل من تبويب المراجعة -->
+    <string name="ex_review_action">اختبر نفسك</string>
+    <!-- الإعداد -->
+    <string name="ex_setup_title">اختبر نفسك</string>
+    <string name="ex_setup_subtitle">المراجعة</string>
+    <string name="ex_setup_what_to_test">ما الذي تختبره</string>
+    <string name="ex_setup_all_memorized">كل المحفوظ</string>
+    <string name="ex_setup_pick_surahs">اختر سورًا</string>
+    <string name="ex_setup_surah_number">سورة %1$d</string>
+    <string name="ex_setup_selection_footer">تم اختيار %1$s</string>
+    <string name="ex_setup_pick_one_type">اختر نوع تمرين واحدًا على الأقل.</string>
+    <string name="ex_setup_exercise_types">أنواع التمارين</string>
+    <string name="ex_setup_length">العدد</string>
+    <string name="ex_setup_generate">أنشئ %1$d تمارين</string>
+    <!-- أسماء أنواع التمارين وأوصافها -->
+    <string name="ex_type_guess_name">خمّن السورة</string>
+    <string name="ex_type_guess_desc">سمِّ السورة التي تنتمي إليها الآية</string>
+    <string name="ex_type_finish_name">أكمل الآية</string>
+    <string name="ex_type_finish_desc">أكمل الآية من بدايتها</string>
+    <string name="ex_type_order_name">رتّب الآيات</string>
+    <string name="ex_type_order_desc">رتّب الآيات المبعثرة بالتسلسل</string>
+    <!-- هيكل التمرين -->
+    <string name="ex_run_counter">%1$d / %2$d</string>
+    <string name="ex_run_previous">السابق</string>
+    <string name="ex_run_check">تحقق من الإجابة</string>
+    <string name="ex_run_next">التالي →</string>
+    <string name="ex_run_see_results">عرض النتائج →</string>
+    <string name="ex_run_correct">صحيح — ما شاء الله</string>
+    <string name="ex_run_not_quite">ليس تمامًا</string>
+    <string name="ex_run_answer_was">إنها %1$s</string>
+    <string name="ex_run_finish_note">التكملة الصحيحة معروضة أعلاه.</string>
+    <string name="ex_run_order_note">الترتيب الصحيح معروض أعلاه.</string>
+    <string name="ex_reference">%1$s · %2$d</string>
+    <string name="ex_reference_range">%1$s · %2$d–%3$d</string>
+    <!-- خمّن السورة -->
+    <string name="ex_guess_heading">من أي سورة هذه الآية؟</string>
+    <string name="ex_guess_type_name">اكتب اسم السورة</string>
+    <string name="ex_guess_field_hint">اكتب اسم سورة…</string>
+    <string name="ex_guess_matches">%1$d نتائج</string>
+    <string name="ex_guess_match_number">· %1$d</string>
+    <!-- أكمل الآية -->
+    <string name="ex_finish_heading">اكتب بقية الآية</string>
+    <string name="ex_finish_your_answer">إجابتك · مكتوبة من الذاكرة</string>
+    <string name="ex_finish_matches_note">مطابقة للآية — تُقبل فروق التشكيل اليسيرة</string>
+    <string name="ex_finish_correct_continuation">التكملة الصحيحة</string>
+    <!-- رتّب الآيات -->
+    <string name="ex_order_heading">رتّب هذه الآيات</string>
+    <string name="ex_order_your_order">ترتيبك</string>
+    <string name="ex_order_correct_order">الترتيب الصحيح</string>
+    <!-- النتائج -->
+    <string name="ex_result_title">اكتمل الاختبار</string>
+    <string name="ex_result_correct_label">صحيحة</string>
+    <string name="ex_result_dua">بَارَكَ ٱللَّهُ فِيك</string>
+    <string name="ex_result_session_strong">جلسة قوية</string>
+    <string name="ex_result_session_solid">جلسة جيدة</string>
+    <string name="ex_result_session_keep_going">واصل التقدم</string>
+    <string name="ex_result_encourage">راجع الأخطاء ما دامت في الذاكرة.</string>
+    <string name="ex_result_by_type">حسب نوع التمرين</string>
+    <string name="ex_result_to_revisit">للمراجعة · %1$d</string>
+    <string name="ex_result_review_missed">راجع الـ %1$d</string>
+    <string name="ex_result_new_test">اختبار جديد</string>
+    <plurals name="ex_surah_count">
+        <item quantity="zero">%1$d سورة</item>
+        <item quantity="one">سورة واحدة</item>
+        <item quantity="two">سورتان</item>
+        <item quantity="few">%1$d سور</item>
+        <item quantity="many">%1$d سورة</item>
+        <item quantity="other">%1$d سورة</item>
+    </plurals>
+    <plurals name="ex_ayah_count">
+        <item quantity="zero">%1$d آية</item>
+        <item quantity="one">آية واحدة</item>
+        <item quantity="two">آيتان</item>
+        <item quantity="few">%1$d آيات</item>
+        <item quantity="many">%1$d آية</item>
+        <item quantity="other">%1$d آية</item>
+    </plurals>
 </resources>

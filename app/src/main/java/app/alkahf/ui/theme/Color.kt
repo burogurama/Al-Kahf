@@ -90,6 +90,32 @@ data class Palette(
     val KhatamRingTrack: Color,
     val KhatamUpcoming: Color,
     val ModalScrim: Color,
+    // Feedback — "Clay" (warm terracotta for "not quite"; never red)
+    val ClayText: Color,
+    val ClayTextSoft: Color,
+    val ClayBg: Color,
+    val ClayBorder: Color,
+    val ClayChip: Color,
+    // Exercise UI accents
+    val ExerciseSelectedCard: Color,
+    val ArabicAnswerInk: Color,
+    val ExerciseSegmentedTrack: Color,
+    // Quranic keyboard
+    val KeyboardTray: Color,
+    val KeyboardLetterKey: Color,
+    val KeyboardSpecialKey: Color,
+    val KeyboardHarakatBg: Color,
+    val KeyboardHarakatKey: Color,
+    val KeyboardHarakatBorder: Color,
+    val KeyboardHarakatGlyph: Color,
+    val KeyboardUthmaniBg: Color,
+    val KeyboardUthmaniKey: Color,
+    val KeyboardUthmaniBorder: Color,
+    val KeyboardUthmaniGlyph: Color,
+    val KeyboardWaqfRing: Color,
+    val KeyboardWaqfBg: Color,
+    val KeyboardPopoverBg: Color,
+    val KeyboardPopoverKey: Color,
 )
 
 val LightPalette = Palette(
@@ -172,6 +198,32 @@ val LightPalette = Palette(
     KhatamRingTrack = Color(0xFFEEE2C6),
     KhatamUpcoming = Color(0xFFEBE3D2),
     ModalScrim = Color(0x6B1C1810),
+    // Feedback — "Clay" (warm terracotta for "not quite"; never red)
+    ClayText = Color(0xFFB25E3E),
+    ClayTextSoft = Color(0xFF9A6A54),
+    ClayBg = Color(0xFFF7E8DF),
+    ClayBorder = Color(0xFFECD6C8),
+    ClayChip = Color(0xFFF3D9CC),
+    // Exercise UI accents
+    ExerciseSelectedCard = Color(0xFFECF3F0),
+    ArabicAnswerInk = Color(0xFF234E45),
+    ExerciseSegmentedTrack = Color(0xFFEFE8D9),
+    // Quranic keyboard
+    KeyboardTray = Color(0xFFE4DAC8),
+    KeyboardLetterKey = Color(0xFFFFFFFF),
+    KeyboardSpecialKey = Color(0xFFCDC2AC),
+    KeyboardHarakatBg = Color(0xFFF1E4C6),
+    KeyboardHarakatKey = Color(0xFFFBF5E4),
+    KeyboardHarakatBorder = Color(0xFFE8D7AC),
+    KeyboardHarakatGlyph = Color(0xFF6E5320),
+    KeyboardUthmaniBg = Color(0xFFDCE5DF),
+    KeyboardUthmaniKey = Color(0xFFF1F5F1),
+    KeyboardUthmaniBorder = Color(0xFFC7D6CC),
+    KeyboardUthmaniGlyph = Color(0xFF2F5249),
+    KeyboardWaqfRing = Color(0xFF8FB3A6),
+    KeyboardWaqfBg = Color(0xFFE4EFE9),
+    KeyboardPopoverBg = Color(0xFF2A2620),
+    KeyboardPopoverKey = Color(0xFF3A352B),
 )
 
 val DarkPalette = Palette(
@@ -254,6 +306,32 @@ val DarkPalette = Palette(
     KhatamRingTrack = Color(0xFF332E22),
     KhatamUpcoming = Color(0xFF38331F),
     ModalScrim = Color(0x99000000),
+    // Feedback — "Clay" (warm terracotta for "not quite"; never red)
+    ClayText = Color(0xFFD99A7C),
+    ClayTextSoft = Color(0xFFC0937E),
+    ClayBg = Color(0xFF2E211B),
+    ClayBorder = Color(0xFF513A30),
+    ClayChip = Color(0xFF3A271F),
+    // Exercise UI accents
+    ExerciseSelectedCard = Color(0xFF223A33),
+    ArabicAnswerInk = Color(0xFF8FC3B4),
+    ExerciseSegmentedTrack = Color(0xFF2A251A),
+    // Quranic keyboard
+    KeyboardTray = Color(0xFF1B1810),
+    KeyboardLetterKey = Color(0xFF34302A),
+    KeyboardSpecialKey = Color(0xFF26221B),
+    KeyboardHarakatBg = Color(0xFF2E2716),
+    KeyboardHarakatKey = Color(0xFF38311E),
+    KeyboardHarakatBorder = Color(0xFF4A3F24),
+    KeyboardHarakatGlyph = Color(0xFFE2CC8E),
+    KeyboardUthmaniBg = Color(0xFF1E2E28),
+    KeyboardUthmaniKey = Color(0xFF263A33),
+    KeyboardUthmaniBorder = Color(0xFF35493F),
+    KeyboardUthmaniGlyph = Color(0xFF9CC4B6),
+    KeyboardWaqfRing = Color(0xFF6FA395),
+    KeyboardWaqfBg = Color(0xFF1F342D),
+    KeyboardPopoverBg = Color(0xFF221E18),
+    KeyboardPopoverKey = Color(0xFF2E2A22),
 )
 
 object AlkahfColors {
@@ -343,4 +421,33 @@ object AlkahfColors {
     val KhatamRingTrack get() = palette.value.KhatamRingTrack
     val KhatamUpcoming get() = palette.value.KhatamUpcoming
     val ModalScrim get() = palette.value.ModalScrim
+    val ClayText get() = palette.value.ClayText
+    val ClayTextSoft get() = palette.value.ClayTextSoft
+    val ClayBg get() = palette.value.ClayBg
+    val ClayBorder get() = palette.value.ClayBorder
+    val ClayChip get() = palette.value.ClayChip
+    val ExerciseSelectedCard get() = palette.value.ExerciseSelectedCard
+    val ArabicAnswerInk get() = palette.value.ArabicAnswerInk
+    val ExerciseSegmentedTrack get() = palette.value.ExerciseSegmentedTrack
+    val KeyboardTray get() = palette.value.KeyboardTray
+    val KeyboardLetterKey get() = palette.value.KeyboardLetterKey
+    val KeyboardSpecialKey get() = palette.value.KeyboardSpecialKey
+    val KeyboardHarakatBg get() = palette.value.KeyboardHarakatBg
+    val KeyboardHarakatKey get() = palette.value.KeyboardHarakatKey
+    val KeyboardHarakatBorder get() = palette.value.KeyboardHarakatBorder
+    val KeyboardHarakatGlyph get() = palette.value.KeyboardHarakatGlyph
+    val KeyboardUthmaniBg get() = palette.value.KeyboardUthmaniBg
+    val KeyboardUthmaniKey get() = palette.value.KeyboardUthmaniKey
+    val KeyboardUthmaniBorder get() = palette.value.KeyboardUthmaniBorder
+    val KeyboardUthmaniGlyph get() = palette.value.KeyboardUthmaniGlyph
+    val KeyboardWaqfRing get() = palette.value.KeyboardWaqfRing
+    val KeyboardWaqfBg get() = palette.value.KeyboardWaqfBg
+    val KeyboardPopoverBg get() = palette.value.KeyboardPopoverBg
+    val KeyboardPopoverKey get() = palette.value.KeyboardPopoverKey
+    // Reused existing tokens (exact-hex equivalents in the light palette):
+    //   KeyboardHamzaBg        -> KhatamCardTint  (#FBF3DF)
+    //   KeyboardHamzaRing      -> KhatamGoldBorder (#C99A45)
+    //   KeyboardHamzaGlyph     -> KhatamGoldDeep  (#9A732F)
+    //   KeyboardPopoverHighlight -> Accent        (#3E7D6E)
+    //   KeyboardKeyInk         -> Ink             (#2A2620)
 }

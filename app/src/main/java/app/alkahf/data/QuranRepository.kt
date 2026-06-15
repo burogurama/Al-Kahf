@@ -300,6 +300,7 @@ class QuranRepository(context: Context) {
     private val reciters = ReciterLibrary(AudioStore(context), userDao, quranText, settings, context.filesDir)
     private val presets = LoopPresetStore(userDao, quranText, reciters, settings)
     private val khatam = KhatamStore(userDao, quranText, settings)
+    private val exercises = ExerciseStore(quranText, memorization, review, settings)
 
     /** Last page open in the Mushaf, so reading resumes where the user left off. */
     var lastMushafPage: Int?
@@ -790,6 +791,61 @@ class QuranRepository(context: Context) {
     /** Today's khatam portion for the reminder notification, or null when none/complete. */
     suspend fun khatamPortionReminderRef(arabic: Boolean): KhatamPortionRef? =
         khatam.khatamPortionReminderRef(arabic)
+
+    // --- Exercises (memorization self-testing; ephemeral, no Room table) ---
+
+    /**
+     * Builds a session of up to [length] questions over [scope] from the enabled
+     * [types], each carrying its own answer key. Returns fewer (or empty) when the
+     * eligible pool is too small.
+     */
+    suspend fun buildExerciseSession(
+        scope: app.alkahf.data.exercises.ExerciseScope,
+        types: Set<app.alkahf.data.exercises.ExerciseType>,
+        length: Int,
+    ): List<app.alkahf.data.exercises.ExerciseQuestion> =
+        exercises.buildSession(scope, types, length)
+
+    /** All 114 sūrahs for the Guess-the-Sūrah type-ahead. */
+    suspend fun exerciseSurahChoices(): List<app.alkahf.data.exercises.SurahChoice> =
+        exercises.surahChoices()
+
+    /** True when [input] reproduces the āyah's continuation on the rasm level. */
+    fun checkExerciseFinish(
+        input: String,
+        q: app.alkahf.data.exercises.ExerciseQuestion.FinishAyah,
+    ): Boolean = exercises.checkFinish(input, q)
+
+    /** True when the picked sūrah is the one the āyah belongs to. */
+    fun checkExerciseGuess(
+        pickedSurah: Int,
+        q: app.alkahf.data.exercises.ExerciseQuestion.GuessSurah,
+    ): Boolean = exercises.checkGuess(pickedSurah, q)
+
+    /** True when [userOrder] (āyah ids) equals the correct sequence. */
+    fun checkExerciseOrder(
+        userOrder: List<Int>,
+        q: app.alkahf.data.exercises.ExerciseQuestion.OrderAyat,
+    ): Boolean = exercises.checkOrder(userOrder, q)
+
+    /** Per-position correctness of the user's Order answer. */
+    fun exerciseOrderPositions(
+        userOrder: List<Int>,
+        q: app.alkahf.data.exercises.ExerciseQuestion.OrderAyat,
+    ): List<Boolean> = exercises.orderPositionsCorrect(userOrder, q)
+
+    /**
+     * Records a finished session: persists the summary for the Today card and
+     * logs a practice event so it counts toward the streak and weekly time.
+     */
+    suspend fun recordExerciseResult(correct: Int, total: Int, toRevisit: Int, durationMs: Long) =
+        exercises.recordResult(correct, total, toRevisit, durationMs)
+
+    /** The last completed Exercises session for the Today card, or null when none. */
+    fun lastExerciseResult(): ExerciseResult? = exercises.lastResult()
+
+    /** How many memorized āyāt are ready to test and how many sūrahs they span. */
+    suspend fun exerciseReadiness(): ExerciseReadiness = exercises.readiness()
 
     companion object {
         const val PAGE_COUNT = 604

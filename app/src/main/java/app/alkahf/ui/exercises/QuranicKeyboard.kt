@@ -1,0 +1,700 @@
+package app.alkahf.ui.exercises
+
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.scale as drawScale
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.foundation.Canvas
+import androidx.compose.material3.Text
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupPositionProvider
+import androidx.compose.ui.window.PopupProperties
+import androidx.compose.ui.platform.LocalLayoutDirection
+import app.alkahf.ui.theme.AlkahfColors
+
+/**
+ * A self-contained on-screen Quranic Arabic keyboard for the "Finish the Āyah"
+ * exercise. Stateless about the answer text: every key reports through one of the
+ * callbacks and the host screen owns the answer string.
+ *
+ * The keyboard is inherently right-to-left for its glyph rows; this composable
+ * forces [LayoutDirection.Rtl] for the strips and letter rows regardless of the
+ * ambient direction.
+ *
+ * Glyphs are rendered with the device default Arabic (Naskh) font on purpose —
+ * no custom [androidx.compose.ui.text.font.FontFamily] is set, so the combining
+ * marks render correctly on the dotted-circle (◌, U+25CC) base. The bundled
+ * Amiri font is too calligraphic for keycaps.
+ */
+@Composable
+fun QuranicKeyboard(
+    onKey: (String) -> Unit,
+    onBackspace: () -> Unit,
+    onSpace: () -> Unit,
+    onCheck: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            // The tray fills to the very bottom edge (drawn before the inset padding
+            // below), so it reads as a native keyboard; the keys are padded above
+            // the gesture bar by navigationBarsPadding.
+            .background(AlkahfColors.KeyboardTray)
+            .navigationBarsPadding()
+            .padding(start = 5.dp, end = 5.dp, top = 7.dp, bottom = 9.dp),
+        verticalArrangement = Arrangement.spacedBy(7.dp),
+    ) {
+        CaptionRow(left = "Tap a letter, then a ḥarakah", right = "التشكيل", ink = AlkahfColors.KeyboardHarakatGlyph)
+        HarakatStrip(onKey)
+        CaptionRow(
+            left = "ʿUthmānī marks · waṣla · madd · sukūn · waqf",
+            right = "علامات",
+            ink = AlkahfColors.KeyboardUthmaniGlyph,
+        )
+        UthmaniStrip(onKey)
+        LetterRow(LETTER_ROW_1, onKey)
+        LetterRow(LETTER_ROW_2, onKey, padding = 16.dp)
+        LetterRow3(onKey, onBackspace)
+        FunctionRow(onSpace, onCheck)
+    }
+}
+
+// ── Data: keys driven from lists of specs ──────────────────────────────────
+
+/** Ḥarakāt: (combining mark to insert) → (keycap glyph on the ◌ base). */
+private val HARAKAT = listOf(
+    "َ" to "◌َ", // fatḥa
+    "ِ" to "◌ِ", // kasra
+    "ُ" to "◌ُ", // ḍamma
+    "ْ" to "◌ْ", // sukūn
+    "ّ" to "◌ّ", // shadda
+    "ً" to "◌ً", // fatḥatān
+    "ٍ" to "◌ٍ", // kasratān
+    "ٌ" to "◌ٌ", // ḍammatān
+)
+
+/** ʿUthmānī marks: (string to insert) → (keycap glyph). The last entry is the waqf key. */
+private val UTHMANI = listOf(
+    "ٱ" to "ٱ",   // hamzat waṣl (full letter)
+    "ٰ" to "◌ٰ",  // dagger / superscript alif
+    "ٓ" to "◌ٓ",  // maddah
+    "ۡ" to "◌ۡ",  // round ʿUthmānī sukūn
+    "ۢ" to "◌ۢ",  // iqlāb small mīm
+    "۟" to "◌۟",  // silent "zero"
+)
+
+/** Default waqf glyph shown on the waqf key. */
+private const val WAQF_KEY_GLYPH = "ۚ" // ۚ
+
+/** Pause signs offered in the waqf long-press drawer. */
+private val WAQF_SIGNS = listOf(
+    "ۖ", "ۗ", "ۘ", "ۙ", "ۚ", "ۛ",
+)
+
+private val LETTER_ROW_1 = listOf("ض", "ص", "ث", "ق", "ف", "غ", "ع", "ه", "خ", "ح", "ج")
+private val LETTER_ROW_2 = listOf("ش", "س", "ي", "ب", "ل", "ا", "ت", "ن", "م", "ك", "ط")
+private val LETTER_ROW_3 = listOf("ظ", "ط", "ذ", "د", "ز", "ر", "و", "ة")
+
+/**
+ * Long-press variants for letters that carry hamza / ʿUthmānī alternates, shown
+ * in a popover (iOS-style). The base letter stays the tap action; long-press
+ * offers the family. The first entry is the base letter itself.
+ */
+private val LETTER_VARIANTS = mapOf(
+    "ا" to listOf("ا", "أ", "إ", "آ", "ٱ"),
+    "و" to listOf("و", "ؤ"),
+    "ي" to listOf("ي", "ئ", "ى"),
+    "ه" to listOf("ه", "ة"),
+    "ة" to listOf("ة", "ه"),
+)
+
+private const val HAMZA_GLYPH = "ء"
+private val HAMZA_FAMILY = listOf("ء", "أ", "إ", "آ", "ؤ", "ئ")
+
+/** The example highlighted in the hamza popover (ؤ = wāw + hamza). */
+private const val HAMZA_HIGHLIGHT = "ؤ"
+
+private val KEY_HEIGHT = 44.dp
+private val KEY_GAP = 5.dp
+
+// ── Rows ───────────────────────────────────────────────────────────────────
+
+@Composable
+private fun CaptionRow(left: String, right: String, ink: Color) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = left,
+            color = AlkahfColors.InkMuted,
+            fontSize = 10.5.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
+        // Force RTL so the Arabic caption sits on the trailing (right) edge.
+        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+            Text(text = right, color = AlkahfColors.InkMuted, fontSize = 12.sp)
+        }
+    }
+}
+
+@Composable
+private fun HarakatStrip(onKey: (String) -> Unit) {
+    Rtl {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(11.dp))
+                .background(AlkahfColors.KeyboardHarakatBg)
+                .padding(6.dp),
+            horizontalArrangement = Arrangement.spacedBy(KEY_GAP),
+        ) {
+            HARAKAT.forEach { (insert, cap) ->
+                Key(
+                    modifier = Modifier.weight(1f),
+                    glyph = cap,
+                    glyphColor = AlkahfColors.KeyboardHarakatGlyph,
+                    background = AlkahfColors.KeyboardHarakatKey,
+                    borderColor = AlkahfColors.KeyboardHarakatBorder,
+                    shape = RoundedCornerShape(8.dp),
+                    glyphSize = 22.sp,
+                    onClick = { onKey(insert) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun UthmaniStrip(onKey: (String) -> Unit) {
+    Rtl {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(11.dp))
+                .background(AlkahfColors.KeyboardUthmaniBg)
+                .padding(6.dp),
+            horizontalArrangement = Arrangement.spacedBy(KEY_GAP),
+        ) {
+            UTHMANI.forEach { (insert, cap) ->
+                Key(
+                    modifier = Modifier.weight(1f),
+                    glyph = cap,
+                    glyphColor = AlkahfColors.KeyboardUthmaniGlyph,
+                    background = AlkahfColors.KeyboardUthmaniKey,
+                    borderColor = AlkahfColors.KeyboardUthmaniBorder,
+                    shape = RoundedCornerShape(8.dp),
+                    glyphSize = 22.sp,
+                    onClick = { onKey(insert) },
+                )
+            }
+            WaqfKey(modifier = Modifier.weight(1f), onKey = onKey)
+        }
+    }
+}
+
+@Composable
+private fun LetterRow(letters: List<String>, onKey: (String) -> Unit, padding: Dp = 0.dp) {
+    Rtl {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = padding),
+            horizontalArrangement = Arrangement.spacedBy(KEY_GAP),
+        ) {
+            letters.forEach { letter ->
+                Key(
+                    modifier = Modifier.weight(1f),
+                    glyph = letter,
+                    glyphColor = AlkahfColors.Ink,
+                    background = AlkahfColors.KeyboardLetterKey,
+                    shape = RoundedCornerShape(7.dp),
+                    glyphSize = 20.sp,
+                    variants = LETTER_VARIANTS[letter],
+                    onVariant = onKey,
+                    onClick = { onKey(letter) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun LetterRow3(onKey: (String) -> Unit, onBackspace: () -> Unit) {
+    Rtl {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(KEY_GAP),
+        ) {
+            // v1: layer switching deferred — shift is inert for now.
+            SpecialKey(modifier = Modifier.weight(1.5f), onClick = {}) { ShiftIcon() }
+            LETTER_ROW_3.forEach { letter ->
+                Key(
+                    modifier = Modifier.weight(1f),
+                    glyph = letter,
+                    glyphColor = AlkahfColors.Ink,
+                    background = AlkahfColors.KeyboardLetterKey,
+                    shape = RoundedCornerShape(7.dp),
+                    glyphSize = 20.sp,
+                    variants = LETTER_VARIANTS[letter],
+                    onVariant = onKey,
+                    onClick = { onKey(letter) },
+                )
+            }
+            HamzaKey(modifier = Modifier.weight(1f), onKey = onKey)
+            SpecialKey(modifier = Modifier.weight(1.5f), onClick = onBackspace) { BackspaceIcon() }
+        }
+    }
+}
+
+@Composable
+private fun FunctionRow(onSpace: () -> Unit, onCheck: () -> Unit) {
+    Rtl {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(KEY_GAP),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            // v1: layer switching deferred — 123 is inert for now.
+            SpecialKey(modifier = Modifier.weight(1.4f), height = 46.dp, onClick = {}) {
+                Text("١٢٣", color = AlkahfColors.InkSecondaryDark, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            }
+            // v1: layer switching deferred — globe is inert for now.
+            SpecialKey(modifier = Modifier.size(46.dp), height = 46.dp, onClick = {}) { GlobeIcon() }
+            Key(
+                modifier = Modifier.weight(5f),
+                glyph = "مسافة",
+                glyphColor = AlkahfColors.InkMuted,
+                background = AlkahfColors.KeyboardLetterKey,
+                shape = RoundedCornerShape(7.dp),
+                glyphSize = 14.sp,
+                glyphWeight = FontWeight.SemiBold,
+                height = 46.dp,
+                onClick = onSpace,
+            )
+            CheckKey(modifier = Modifier.weight(2f), onClick = onCheck)
+        }
+    }
+}
+
+// ── Keys ───────────────────────────────────────────────────────────────────
+
+/**
+ * A keycap: a centered glyph on a rounded fill, optionally bordered. When
+ * [variants] is non-null the key shows a long-press indicator and opens a
+ * popover of those alternates ([onVariant] inserts the chosen one).
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun Key(
+    glyph: String,
+    glyphColor: Color,
+    background: Color,
+    modifier: Modifier = Modifier,
+    borderColor: Color? = null,
+    borderWidth: Dp = 1.dp,
+    shape: RoundedCornerShape = RoundedCornerShape(7.dp),
+    glyphSize: androidx.compose.ui.unit.TextUnit = 20.sp,
+    glyphWeight: FontWeight = FontWeight.Normal,
+    height: Dp = KEY_HEIGHT,
+    variants: List<String>? = null,
+    onVariant: (String) -> Unit = {},
+    onClick: () -> Unit,
+) {
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    var showPopover by remember { mutableStateOf(false) }
+    Box(
+        modifier = modifier
+            .height(height)
+            .scale(if (pressed) 0.96f else 1f)
+            .clip(shape)
+            .background(background)
+            .then(if (borderColor != null) Modifier.border(borderWidth, borderColor, shape) else Modifier)
+            .then(
+                if (variants != null) {
+                    Modifier.combinedClickable(
+                        interactionSource = interaction,
+                        indication = null,
+                        onClick = onClick,
+                        onLongClick = { showPopover = true },
+                    )
+                } else {
+                    Modifier.clickableKey(interaction, onClick)
+                },
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        // Glyphs render with the device default (Naskh) font — no custom family.
+        Text(
+            text = glyph,
+            color = glyphColor,
+            fontSize = glyphSize,
+            fontWeight = glyphWeight,
+            textAlign = TextAlign.Center,
+        )
+        if (variants != null) {
+            LongPressDots(
+                color = glyphColor.copy(alpha = 0.3f),
+                modifier = Modifier.align(Alignment.BottomEnd).padding(end = 4.dp, bottom = 3.dp),
+            )
+            if (showPopover) {
+                GlyphPopover(
+                    glyphs = variants,
+                    highlight = null,
+                    onPick = { onVariant(it); showPopover = false },
+                    onDismiss = { showPopover = false },
+                )
+            }
+        }
+    }
+}
+
+/** A special (function) key: a darker fill hosting custom icon content. */
+@Composable
+private fun SpecialKey(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    height: Dp = KEY_HEIGHT,
+    content: @Composable () -> Unit,
+) {
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    Box(
+        modifier = modifier
+            .height(height)
+            .scale(if (pressed) 0.96f else 1f)
+            .clip(RoundedCornerShape(7.dp))
+            .background(AlkahfColors.KeyboardSpecialKey)
+            .clickableKey(interaction, onClick),
+        contentAlignment = Alignment.Center,
+    ) { content() }
+}
+
+/** The green Check return key (Accent fill, white check + label). */
+@Composable
+private fun CheckKey(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    Row(
+        modifier = modifier
+            .height(46.dp)
+            .scale(if (pressed) 0.96f else 1f)
+            .clip(RoundedCornerShape(7.dp))
+            .background(AlkahfColors.Accent)
+            .clickableKey(interaction, onClick),
+        horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        CheckIcon()
+        Text("Check", color = AlkahfColors.OnAccent, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+    }
+}
+
+/**
+ * The hamza key (gold accent). Tap inserts ء; long-press opens a dark popover
+ * with the hamza family (ء أ إ آ ؤ ئ), ؤ highlighted as the example.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun HamzaKey(onKey: (String) -> Unit, modifier: Modifier = Modifier) {
+    var showPopover by remember { mutableStateOf(false) }
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val shape = RoundedCornerShape(7.dp)
+    Box(
+        modifier = modifier
+            .height(KEY_HEIGHT)
+            .scale(if (pressed) 0.96f else 1f)
+            .clip(shape)
+            .background(AlkahfColors.KhatamCardTint)
+            .border(1.5.dp, AlkahfColors.KhatamGoldBorder, shape)
+            .combinedClickable(
+                interactionSource = interaction,
+                indication = null,
+                onClick = { onKey(HAMZA_GLYPH) },
+                onLongClick = { showPopover = true },
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(HAMZA_GLYPH, color = AlkahfColors.KhatamGoldDeep, fontSize = 20.sp)
+        LongPressDots(
+            color = AlkahfColors.KhatamGoldBorder,
+            modifier = Modifier.align(Alignment.BottomStart).padding(start = 4.dp, bottom = 3.dp),
+        )
+        if (showPopover) {
+            GlyphPopover(
+                glyphs = HAMZA_FAMILY,
+                highlight = HAMZA_HIGHLIGHT,
+                onPick = { onKey(it); showPopover = false },
+                onDismiss = { showPopover = false },
+            )
+        }
+    }
+}
+
+/**
+ * The waqf key (sage accent). Tap inserts the default pause sign (ۚ);
+ * long-press opens a drawer of pause signs (ۖ ۗ ۘ ۙ ۚ ۛ).
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun WaqfKey(onKey: (String) -> Unit, modifier: Modifier = Modifier) {
+    var showDrawer by remember { mutableStateOf(false) }
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val shape = RoundedCornerShape(8.dp)
+    Box(
+        modifier = modifier
+            .height(KEY_HEIGHT)
+            .scale(if (pressed) 0.96f else 1f)
+            .clip(shape)
+            .background(AlkahfColors.KeyboardWaqfBg)
+            .border(1.5.dp, AlkahfColors.KeyboardWaqfRing, shape)
+            .combinedClickable(
+                interactionSource = interaction,
+                indication = null,
+                onClick = { onKey(WAQF_KEY_GLYPH) },
+                onLongClick = { showDrawer = true },
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(WAQF_KEY_GLYPH, color = AlkahfColors.KeyboardUthmaniGlyph, fontSize = 22.sp)
+        LongPressDots(
+            color = AlkahfColors.KeyboardWaqfRing,
+            modifier = Modifier.align(Alignment.BottomStart).padding(start = 4.dp, bottom = 3.dp),
+        )
+        if (showDrawer) {
+            GlyphPopover(
+                glyphs = WAQF_SIGNS,
+                highlight = null,
+                onPick = { onKey(it); showDrawer = false },
+                onDismiss = { showDrawer = false },
+            )
+        }
+    }
+}
+
+// ── Popover / drawer ────────────────────────────────────────────────────────
+
+/**
+ * A dark popover anchored above its parent key. Tapping a glyph inserts it and
+ * dismisses; tapping outside dismisses without inserting.
+ */
+@Composable
+private fun GlyphPopover(
+    glyphs: List<String>,
+    highlight: String?,
+    onPick: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val density = LocalDensity.current
+    val positionProvider = remember {
+        object : PopupPositionProvider {
+            override fun calculatePosition(
+                anchorBounds: androidx.compose.ui.unit.IntRect,
+                windowSize: androidx.compose.ui.unit.IntSize,
+                layoutDirection: LayoutDirection,
+                popupContentSize: androidx.compose.ui.unit.IntSize,
+            ): IntOffset {
+                val gap = with(density) { 8.dp.roundToPx() }
+                val x = anchorBounds.left + (anchorBounds.width - popupContentSize.width) / 2
+                val y = anchorBounds.top - popupContentSize.height - gap
+                return IntOffset(
+                    x.coerceIn(0, (windowSize.width - popupContentSize.width).coerceAtLeast(0)),
+                    y.coerceAtLeast(0),
+                )
+            }
+        }
+    }
+    Popup(
+        popupPositionProvider = positionProvider,
+        onDismissRequest = onDismiss,
+        properties = PopupProperties(focusable = true),
+    ) {
+        Row(
+            modifier = Modifier
+                .wrapContentSize()
+                .clip(RoundedCornerShape(14.dp))
+                .background(AlkahfColors.KeyboardPopoverBg)
+                .padding(start = 8.dp, end = 8.dp, top = 8.dp, bottom = 7.dp),
+            horizontalArrangement = Arrangement.spacedBy(5.dp),
+        ) {
+            glyphs.forEach { g ->
+                val isHighlight = g == highlight
+                val interaction = remember { MutableInteractionSource() }
+                val pressed by interaction.collectIsPressedAsState()
+                Box(
+                    modifier = Modifier
+                        .size(width = 38.dp, height = 46.dp)
+                        .scale(if (pressed) 0.94f else 1f)
+                        .clip(RoundedCornerShape(9.dp))
+                        .background(if (isHighlight) AlkahfColors.Accent else AlkahfColors.KeyboardPopoverKey)
+                        .clickableKey(interaction) { onPick(g) },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = g,
+                        color = if (isHighlight) AlkahfColors.OnAccent else AlkahfColors.Paper,
+                        fontSize = 23.sp,
+                    )
+                }
+            }
+        }
+    }
+}
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
+
+/** Forces a right-to-left layout for its content (the glyph rows are RTL). */
+@Composable
+private fun Rtl(content: @Composable () -> Unit) {
+    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl, content = content)
+}
+
+/** A no-ripple clickable wired to a shared [interaction] source for the pressed scale. */
+private fun Modifier.clickableKey(
+    interaction: MutableInteractionSource,
+    onClick: () -> Unit,
+): Modifier = this.then(
+    Modifier.combinedClickableNoIndication(interaction, onClick),
+)
+
+@OptIn(ExperimentalFoundationApi::class)
+private fun Modifier.combinedClickableNoIndication(
+    interaction: MutableInteractionSource,
+    onClick: () -> Unit,
+): Modifier = combinedClickable(
+    interactionSource = interaction,
+    indication = null,
+    onClick = onClick,
+)
+
+/** The three-dot "long-press available" indicator. */
+@Composable
+private fun LongPressDots(color: Color, modifier: Modifier = Modifier) {
+    Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(1.5.dp)) {
+        repeat(3) {
+            Box(Modifier.size(3.dp).clip(RoundedCornerShape(50)).background(color))
+        }
+    }
+}
+
+// ── Icons (drawn to match the design's inline SVGs) ──────────────────────────
+
+@Composable
+private fun ShiftIcon() {
+    val stroke = AlkahfColors.InkSecondaryDark
+    Canvas(Modifier.size(20.dp)) {
+        scaled(24f) {
+            val s = Stroke(width = 2f, cap = StrokeCap.Round, join = StrokeJoin.Round)
+            val p = androidx.compose.ui.graphics.Path().apply {
+                moveTo(12f, 4f); lineTo(5f, 11f); lineTo(9f, 11f)
+                lineTo(9f, 17f); lineTo(15f, 17f); lineTo(15f, 11f)
+                lineTo(19f, 11f); close()
+            }
+            drawPath(p, color = stroke, style = s)
+        }
+    }
+}
+
+@Composable
+private fun BackspaceIcon() {
+    val stroke = AlkahfColors.InkSecondaryDark
+    Canvas(Modifier.size(22.dp)) {
+        scaled(24f) {
+            val s = Stroke(width = 2f, cap = StrokeCap.Round, join = StrokeJoin.Round)
+            val body = androidx.compose.ui.graphics.Path().apply {
+                moveTo(20f, 6f); lineTo(9.5f, 6f)
+                cubicTo(8.9f, 6f, 8.3f, 6.25f, 8f, 6.7f)
+                lineTo(3f, 12f); lineTo(8f, 17.3f)
+                cubicTo(8.3f, 17.75f, 8.9f, 18f, 9.5f, 18f)
+                lineTo(20f, 18f)
+                cubicTo(20.55f, 18f, 21f, 17.55f, 21f, 17f)
+                lineTo(21f, 7f)
+                cubicTo(21f, 6.45f, 20.55f, 6f, 20f, 6f); close()
+            }
+            drawPath(body, color = stroke, style = s)
+            drawLine(stroke, Offset(16f, 9.5f), Offset(12f, 14.5f), strokeWidth = 2f, cap = StrokeCap.Round)
+            drawLine(stroke, Offset(12f, 9.5f), Offset(16f, 14.5f), strokeWidth = 2f, cap = StrokeCap.Round)
+        }
+    }
+}
+
+@Composable
+private fun GlobeIcon() {
+    val stroke = AlkahfColors.InkSecondaryDark
+    Canvas(Modifier.size(21.dp)) {
+        scaled(24f) {
+            val w = 1.8f
+            drawCircle(stroke, radius = 9f, center = Offset(12f, 12f), style = Stroke(width = w))
+            drawLine(stroke, Offset(3f, 12f), Offset(21f, 12f), strokeWidth = w)
+            val left = androidx.compose.ui.graphics.Path().apply {
+                moveTo(12f, 3f); cubicTo(14.5f, 5.5f, 14.5f, 18.5f, 12f, 21f)
+            }
+            val right = androidx.compose.ui.graphics.Path().apply {
+                moveTo(12f, 3f); cubicTo(9.5f, 5.5f, 9.5f, 18.5f, 12f, 21f)
+            }
+            drawPath(left, color = stroke, style = Stroke(width = w))
+            drawPath(right, color = stroke, style = Stroke(width = w))
+        }
+    }
+}
+
+@Composable
+private fun CheckIcon() {
+    val stroke = AlkahfColors.OnAccent
+    Canvas(Modifier.size(17.dp)) {
+        scaled(24f) {
+            val s = Stroke(width = 2.6f, cap = StrokeCap.Round, join = StrokeJoin.Round)
+            val p = androidx.compose.ui.graphics.Path().apply {
+                moveTo(20f, 6f); lineTo(9f, 17f); lineTo(4f, 12f)
+            }
+            drawPath(p, color = stroke, style = s)
+        }
+    }
+}
+
+/** Runs [block] with the canvas scaled so a [viewBox]×[viewBox] coordinate space fills the drawing area. */
+private fun DrawScope.scaled(viewBox: Float, block: DrawScope.() -> Unit) {
+    val k = size.minDimension / viewBox
+    drawScale(k, k, pivot = Offset.Zero) { block() }
+}

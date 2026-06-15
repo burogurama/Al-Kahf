@@ -82,7 +82,7 @@ import kotlinx.coroutines.launch
 private const val MINUTES_PER_PORTION = 1.6f
 
 @Composable
-fun ReviewScreen(onBack: () -> Unit = {}) {
+fun ReviewScreen(onBack: () -> Unit = {}, onOpenExercises: () -> Unit = {}) {
     val context = LocalContext.current
     val controller = remember {
         ReviewController((context.applicationContext as AlkahfApplication).repository)
@@ -125,6 +125,7 @@ fun ReviewScreen(onBack: () -> Unit = {}) {
                 )
             },
             onBack = onBack,
+            onOpenExercises = onOpenExercises,
         )
         if (queue.isEmpty() || completed) {
             CompletedBody(gradedCount = queue.size, onDone = onBack)
@@ -196,7 +197,7 @@ private fun minutesValue(remainingPortions: Int): Int =
     (remainingPortions * MINUTES_PER_PORTION + 0.5f).toInt().coerceAtLeast(1)
 
 @Composable
-private fun ReviewTopBar(subtitle: String, onBack: () -> Unit) {
+private fun ReviewTopBar(subtitle: String, onBack: () -> Unit, onOpenExercises: () -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth().height(54.dp).padding(horizontal = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -226,7 +227,22 @@ private fun ReviewTopBar(subtitle: String, onBack: () -> Unit) {
                 color = AlkahfColors.InkFaint,
             )
         }
-        Spacer(Modifier.width(40.dp))
+        // Additive entry into the Exercises flow; the daily istiḥḍār flow below is
+        // untouched.
+        Surface(
+            onClick = onOpenExercises,
+            shape = CircleShape,
+            color = AlkahfColors.AccentTint2,
+            modifier = Modifier.padding(end = 2.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.ex_review_action),
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = AlkahfColors.AccentDeep,
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+            )
+        }
     }
 }
 

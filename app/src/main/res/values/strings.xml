@@ -455,4 +455,88 @@
     <string name="tawqit_hint_nudge_then_save">Nudge to fix reaction lag, then Save</string>
     <string name="tawqit_hint_tap_when_ayah_finishes">Tap when āyah %1$d finishes</string>
     <string name="tawqit_nudge_all">NUDGE ALL</string>
+
+    <!-- Exercises (memorization self-testing) -->
+    <!-- Today entry card -->
+    <string name="ex_today_kicker">REVIEW · EXERCISES</string>
+    <string name="ex_today_headline">Test your memorization</string>
+    <string name="ex_today_description">Short exercises on what you’ve memorized — recall sūrahs, complete āyāt, and put them in order.</string>
+    <string name="ex_today_readiness">%1$s · %2$s ready to test</string>
+    <string name="ex_today_readiness_empty">Memorize a few āyāt to unlock your first test.</string>
+    <string name="ex_today_start">Start a test</string>
+    <string name="ex_today_last_test">Last test</string>
+    <string name="ex_today_last_detail">%1$s · %2$d to revisit</string>
+    <string name="ex_today_review">Review ›</string>
+    <string name="ex_today_when_today">Today</string>
+    <string name="ex_today_when_yesterday">Yesterday</string>
+    <string name="ex_today_when_days_ago">%1$d days ago</string>
+    <!-- Review-tab entry -->
+    <string name="ex_review_action">Test yourself</string>
+    <!-- Setup -->
+    <string name="ex_setup_title">Test yourself</string>
+    <string name="ex_setup_subtitle">Review</string>
+    <string name="ex_setup_what_to_test">WHAT TO TEST</string>
+    <string name="ex_setup_all_memorized">All memorized</string>
+    <string name="ex_setup_pick_surahs">Pick sūrahs</string>
+    <string name="ex_setup_surah_number">Sūrah %1$d</string>
+    <string name="ex_setup_selection_footer">%1$s selected</string>
+    <string name="ex_setup_pick_one_type">Choose at least one exercise type.</string>
+    <string name="ex_setup_exercise_types">EXERCISE TYPES</string>
+    <string name="ex_setup_length">LENGTH</string>
+    <string name="ex_setup_generate">Generate %1$d exercises</string>
+    <!-- Exercise type names + descriptions -->
+    <string name="ex_type_guess_name">Guess the Sūrah</string>
+    <string name="ex_type_guess_desc">Name the sūrah an āyah belongs to</string>
+    <string name="ex_type_finish_name">Finish the Āyah</string>
+    <string name="ex_type_finish_desc">Complete the āyah from its opening</string>
+    <string name="ex_type_order_name">Order the Āyāt</string>
+    <string name="ex_type_order_desc">Arrange shuffled āyāt in sequence</string>
+    <!-- Runner shell -->
+    <string name="ex_run_counter">%1$d / %2$d</string>
+    <string name="ex_run_previous">Previous</string>
+    <string name="ex_run_check">Check answer</string>
+    <string name="ex_run_next">Next →</string>
+    <string name="ex_run_see_results">See results →</string>
+    <string name="ex_run_correct">Correct — māshāʾAllāh</string>
+    <string name="ex_run_not_quite">Not quite</string>
+    <string name="ex_run_answer_was">It’s %1$s</string>
+    <string name="ex_run_finish_note">The correct continuation is shown above.</string>
+    <string name="ex_run_order_note">The correct order is shown above.</string>
+    <string name="ex_reference">%1$s · %2$d</string>
+    <string name="ex_reference_range">%1$s · %2$d–%3$d</string>
+    <!-- Guess the Sūrah -->
+    <string name="ex_guess_heading">Which sūrah is this āyah from?</string>
+    <string name="ex_guess_type_name">TYPE THE SŪRAH NAME</string>
+    <string name="ex_guess_field_hint">Type a sūrah name…</string>
+    <string name="ex_guess_matches">%1$d matches</string>
+    <string name="ex_guess_match_number">· %1$d</string>
+    <!-- Finish the Āyah -->
+    <string name="ex_finish_heading">Write the rest of the āyah</string>
+    <string name="ex_finish_your_answer">YOUR ANSWER · written from memory</string>
+    <string name="ex_finish_matches_note">Matches the āyah — minor tashkīl differences are accepted</string>
+    <string name="ex_finish_correct_continuation">CORRECT CONTINUATION</string>
+    <!-- Order the Āyāt -->
+    <string name="ex_order_heading">Put these āyāt in order</string>
+    <string name="ex_order_your_order">YOUR ORDER</string>
+    <string name="ex_order_correct_order">CORRECT ORDER</string>
+    <!-- Results -->
+    <string name="ex_result_title">Test complete</string>
+    <string name="ex_result_correct_label">correct</string>
+    <string name="ex_result_dua">بَارَكَ ٱللَّهُ فِيك</string>
+    <string name="ex_result_session_strong">Strong session</string>
+    <string name="ex_result_session_solid">Solid session</string>
+    <string name="ex_result_session_keep_going">Keep going</string>
+    <string name="ex_result_encourage">Revisit the misses while they’re fresh.</string>
+    <string name="ex_result_by_type">BY EXERCISE TYPE</string>
+    <string name="ex_result_to_revisit">TO REVISIT · %1$d</string>
+    <string name="ex_result_review_missed">Review the %1$d</string>
+    <string name="ex_result_new_test">New test</string>
+    <plurals name="ex_surah_count">
+        <item quantity="one">%1$d sūrah</item>
+        <item quantity="other">%1$d sūrahs</item>
+    </plurals>
+    <plurals name="ex_ayah_count">
+        <item quantity="one">%1$d āyah</item>
+        <item quantity="other">%1$d āyāt</item>
+    </plurals>
 </resources>

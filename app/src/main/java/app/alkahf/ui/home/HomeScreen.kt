@@ -27,6 +27,7 @@ import androidx.compose.material.icons.automirrored.outlined.MenuBook
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -78,6 +79,7 @@ fun HomeScreen(
     onOpenSettings: () -> Unit = {},
     onBeginKhatam: () -> Unit = {},
     onOpenKhatam: () -> Unit = {},
+    onStartExercises: () -> Unit = {},
 ) {
     Scaffold(
         containerColor = AlkahfColors.Paper,
@@ -105,6 +107,7 @@ fun HomeScreen(
             KhatamCard(state, onBeginKhatam, onOpenKhatam)
             SabaqCard(state, onOpenSabaq, onMarkSabaq)
             MurajaahCard(state, onOpenReview)
+            ExercisesCard(state, onStartExercises)
             if (state.hasDrill) {
                 ResumeDrillCard(state, onOpenLoop)
             }
@@ -578,6 +581,152 @@ private fun ReviewChip(
             color = textColor,
             modifier = Modifier.padding(horizontal = 11.dp, vertical = 6.dp),
         )
+    }
+}
+
+@Composable
+private fun ExercisesCard(state: HomeUiState, onStartTest: () -> Unit) {
+    Surface(
+        shape = RoundedCornerShape(24.dp),
+        color = AlkahfColors.Surface,
+        border = BorderStroke(1.dp, AlkahfColors.CardBorderHero),
+    ) {
+        Column(Modifier.padding(20.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Outlined.Refresh,
+                    contentDescription = null,
+                    tint = AlkahfColors.AccentDeep,
+                    modifier = Modifier.size(16.dp),
+                )
+                Text(
+                    text = stringResource(R.string.ex_today_kicker),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.4.sp,
+                    color = AlkahfColors.AccentDeep,
+                    modifier = Modifier.padding(start = 8.dp),
+                )
+            }
+            Text(
+                text = stringResource(R.string.ex_today_headline),
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                color = AlkahfColors.Ink,
+                modifier = Modifier.padding(top = 12.dp),
+            )
+            Text(
+                text = stringResource(R.string.ex_today_description),
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium,
+                color = AlkahfColors.InkSecondary,
+                modifier = Modifier.padding(top = 5.dp),
+            )
+            Row(
+                modifier = Modifier.padding(top = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Outlined.MenuBook,
+                    contentDescription = null,
+                    tint = AlkahfColors.InkFaint,
+                    modifier = Modifier.size(15.dp),
+                )
+                Text(
+                    text = state.exerciseReadinessLine,
+                    fontSize = 12.5.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = AlkahfColors.InkSecondary,
+                    modifier = Modifier.padding(start = 7.dp),
+                )
+            }
+            Button(
+                onClick = onStartTest,
+                enabled = state.exerciseReady,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 14.dp)
+                    .height(50.dp)
+                    .shadow(
+                        elevation = if (state.exerciseReady) 4.dp else 0.dp,
+                        shape = RoundedCornerShape(14.dp),
+                        ambientColor = AlkahfColors.Accent.copy(alpha = 0.26f),
+                        spotColor = AlkahfColors.Accent.copy(alpha = 0.26f),
+                    ),
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = AlkahfColors.Accent,
+                    contentColor = AlkahfColors.OnAccent,
+                    disabledContainerColor = AlkahfColors.NotStarted,
+                    disabledContentColor = AlkahfColors.InkFaint,
+                ),
+            ) {
+                Text(
+                    text = stringResource(R.string.ex_today_start),
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+            if (state.exerciseHasLastResult) {
+                LastResultRow(state, onStartTest)
+            }
+        }
+    }
+}
+
+@Composable
+private fun LastResultRow(state: HomeUiState, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(14.dp),
+        color = AlkahfColors.PageSurface,
+        border = BorderStroke(1.dp, AlkahfColors.CardBorder),
+        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 11.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Surface(shape = CircleShape, color = AlkahfColors.AccentTint2, modifier = Modifier.size(40.dp)) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text(
+                        text = state.exerciseLastScore,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = AlkahfColors.AccentDeep,
+                    )
+                }
+            }
+            Column(Modifier.weight(1f).padding(start = 12.dp)) {
+                Text(
+                    text = stringResource(R.string.ex_today_last_test),
+                    fontSize = 13.5.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = AlkahfColors.Ink,
+                )
+                Text(
+                    text = if (state.exerciseLastToRevisit > 0) {
+                        stringResource(
+                            R.string.ex_today_last_detail,
+                            state.exerciseLastWhen,
+                            state.exerciseLastToRevisit,
+                        )
+                    } else {
+                        state.exerciseLastWhen
+                    },
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = AlkahfColors.InkFaint,
+                    modifier = Modifier.padding(top = 1.dp),
+                )
+            }
+            Text(
+                text = stringResource(R.string.ex_today_review),
+                fontSize = 12.5.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = AlkahfColors.Accent,
+            )
+        }
     }
 }
 

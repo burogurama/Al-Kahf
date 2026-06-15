@@ -37,6 +37,15 @@ data class HomeUiState(
     val khatamRingFraction: Float = 0f,
     val khatamTodayReference: String = "",
     val khatamTodayJuz: Int = 0,
+    // Exercises (memorization self-testing) entry card. [exerciseReady] gates
+    // whether enough is memorized to test; [exerciseHasLastResult] toggles the
+    // returning-user last-result row (omitted on first run).
+    val exerciseReadinessLine: String = "",
+    val exerciseReady: Boolean = false,
+    val exerciseHasLastResult: Boolean = false,
+    val exerciseLastScore: String = "",
+    val exerciseLastWhen: String = "",
+    val exerciseLastToRevisit: Int = 0,
 ) {
     val memorizedInSabaq: Int
         get() = sabaqAyahStates.count {

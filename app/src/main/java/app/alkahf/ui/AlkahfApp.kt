@@ -53,6 +53,9 @@ private sealed interface Screen {
     object KhatamProgram : Screen
     object KhatamTracker : Screen
     object KhatamPortion : Screen
+    object ExercisesSetup : Screen
+    object ExercisesRun : Screen
+    object ExercisesResult : Screen
 }
 
 private fun buildHomeUiState(
@@ -60,6 +63,8 @@ private fun buildHomeUiState(
     data: HomeData,
     surahName: (Int) -> String,
     khatam: app.alkahf.data.KhatamState?,
+    exerciseReadiness: app.alkahf.data.ExerciseReadiness,
+    lastExercise: app.alkahf.data.ExerciseResult?,
 ): HomeUiState {
     val names = data.review.names
     val sabaq = data.sabaq
@@ -118,7 +123,39 @@ private fun buildHomeUiState(
                 surahName(it.surahTo), it.ayahTo,
             )
         } ?: "",
+        exerciseReadinessLine = if (exerciseReadiness.ayahCount > 0) {
+            res.getString(
+                R.string.ex_today_readiness,
+                res.getQuantityString(
+                    R.plurals.ex_surah_count,
+                    exerciseReadiness.surahCount,
+                    exerciseReadiness.surahCount,
+                ),
+                res.getQuantityString(
+                    R.plurals.ex_ayah_count,
+                    exerciseReadiness.ayahCount,
+                    exerciseReadiness.ayahCount,
+                ),
+            )
+        } else {
+            res.getString(R.string.ex_today_readiness_empty)
+        },
+        exerciseReady = exerciseReadiness.ayahCount > 0,
+        exerciseHasLastResult = lastExercise != null,
+        exerciseLastScore = lastExercise?.let { "${it.correct}/${it.total}" } ?: "",
+        exerciseLastWhen = lastExercise?.let { relativeDayLabel(res, it.epochDay) } ?: "",
+        exerciseLastToRevisit = lastExercise?.toRevisit ?: 0,
     )
+}
+
+/** A relative-day label ("today" / "yesterday" / "N days ago") for the Today card. */
+private fun relativeDayLabel(res: Resources, epochDay: Long): String {
+    val days = (java.time.LocalDate.now().toEpochDay() - epochDay).toInt().coerceAtLeast(0)
+    return when (days) {
+        0 -> res.getString(R.string.ex_today_when_today)
+        1 -> res.getString(R.string.ex_today_when_yesterday)
+        else -> res.getString(R.string.ex_today_when_days_ago, days)
+    }
 }
 
 private fun MemorizationState.toHomeState(): AyahMemorizationState = when (this) {
@@ -173,6 +210,7 @@ fun AlkahfApp(
     val surahName = rememberSurahNamer()
     val khatamController = remember { app.alkahf.ui.khatam.KhatamController(repository) }
     val khatamState by khatamController.state.collectAsState()
+    val exercisesController = remember { app.alkahf.ui.exercises.ExercisesController(repository) }
     // The "log it complete" sheet shown over the tracker; not a back-stack entry.
     var showKhatamLog by remember { mutableStateOf(false) }
     // Bumped to reload the Home dashboard after an in-place change (e.g. marking
@@ -185,6 +223,8 @@ fun AlkahfApp(
                 repository.homeData(),
                 surahName,
                 repository.activeKhatam(),
+                repository.exerciseReadiness(),
+                repository.lastExerciseResult(),
             )
         }
     }
@@ -237,6 +277,7 @@ fun AlkahfApp(
             onOpenSettings = { navigate(Screen.Settings) },
             onBeginKhatam = { navigate(Screen.KhatamProgram) },
             onOpenKhatam = { navigate(Screen.KhatamTracker) },
+            onStartExercises = { navigate(Screen.ExercisesSetup) },
         )
         is Screen.Mushaf -> MushafScreen(
             startSurah = screen.startSurah,
@@ -250,7 +291,10 @@ fun AlkahfApp(
             newPreset = screen.newPreset,
             onBack = { back() },
         )
-        Screen.Review -> ReviewScreen(onBack = { back() })
+        Screen.Review -> ReviewScreen(
+            onBack = { back() },
+            onOpenExercises = { navigate(Screen.ExercisesSetup) },
+        )
         Screen.Progress -> ProgressScreen(
             onOpenPage = { page -> navigate(Screen.Mushaf(null, page, null)) },
             onSelectTab = ::onTab,
@@ -358,5 +402,47 @@ fun AlkahfApp(
                 )
             }
         }
+        Screen.ExercisesSetup -> app.alkahf.ui.exercises.ExercisesSetupScreen(
+            controller = exercisesController,
+            onClose = { back() },
+            onGenerate = { scopeArg, types, length ->
+                scope.launch {
+                    exercisesController.generate(scopeArg, types, length)
+                    navigate(Screen.ExercisesRun)
+                }
+            },
+        )
+        Screen.ExercisesRun -> app.alkahf.ui.exercises.ExercisesRunnerScreen(
+            controller = exercisesController,
+            onClose = { back() },
+            // The runner advances to the result. Pop the runner; if a result is
+            // already on the stack (the user came from "Review the n"), return to
+            // it, otherwise push a fresh one. Either way system back from the
+            // result skips the answered runner.
+            onFinished = {
+                back()
+                if (backStack.last() != Screen.ExercisesResult) navigate(Screen.ExercisesResult)
+            },
+        )
+        Screen.ExercisesResult -> app.alkahf.ui.exercises.ExercisesResultScreen(
+            controller = exercisesController,
+            // Closing the result pops the whole pushed flow (Result + Setup) back
+            // to wherever it was opened (Today / Review), refreshing Today.
+            onClose = {
+                back()
+                back()
+                homeRefresh++
+            },
+            // "Review the n" re-opens the session at the missed question.
+            onReviewMissed = { index ->
+                exercisesController.goTo(index)
+                navigate(Screen.ExercisesRun)
+            },
+            // "New test" pops back to a fresh Setup and refreshes Today.
+            onNewTest = {
+                back()
+                homeRefresh++
+            },
+        )
     }
 }

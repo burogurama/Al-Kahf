@@ -111,6 +111,32 @@ class UserPreferences(context: Context) {
             .apply()
     }
 
+    /**
+     * The last completed Exercises session result, for the Today card's
+     * returning-user state, or null when none has been recorded. Exercises are
+     * otherwise ephemeral (no Room table), so only this summary is kept.
+     */
+    val lastExerciseResult: ExerciseResult?
+        get() {
+            val total = prefs.getInt(KEY_EX_TOTAL, 0)
+            if (total <= 0) return null
+            return ExerciseResult(
+                correct = prefs.getInt(KEY_EX_CORRECT, 0),
+                total = total,
+                toRevisit = prefs.getInt(KEY_EX_REVISIT, 0),
+                epochDay = prefs.getLong(KEY_EX_EPOCH_DAY, 0),
+            )
+        }
+
+    fun recordExerciseResult(correct: Int, total: Int, toRevisit: Int, epochDay: Long) {
+        prefs.edit()
+            .putInt(KEY_EX_CORRECT, correct)
+            .putInt(KEY_EX_TOTAL, total)
+            .putInt(KEY_EX_REVISIT, toRevisit)
+            .putLong(KEY_EX_EPOCH_DAY, epochDay)
+            .apply()
+    }
+
     fun settings(): SettingsData = SettingsData(
         themeMode = themeMode,
         appLanguage = appLanguage,
@@ -168,5 +194,9 @@ class UserPreferences(context: Context) {
         private const val KEY_KHATAM_REMINDER_MINUTE = "khatam_reminder_minute"
         // Default khatam nudge after Fajr (05:10 = 310 minutes).
         private const val DEFAULT_KHATAM_REMINDER_MINUTE = 310
+        private const val KEY_EX_CORRECT = "exercise_last_correct"
+        private const val KEY_EX_TOTAL = "exercise_last_total"
+        private const val KEY_EX_REVISIT = "exercise_last_revisit"
+        private const val KEY_EX_EPOCH_DAY = "exercise_last_epoch_day"
     }
 }
