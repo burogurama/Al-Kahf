@@ -114,8 +114,6 @@ data class Palette(
     val KeyboardUthmaniGlyph: Color,
     val KeyboardWaqfRing: Color,
     val KeyboardWaqfBg: Color,
-    val KeyboardPopoverBg: Color,
-    val KeyboardPopoverKey: Color,
 )
 
 val LightPalette = Palette(
@@ -224,8 +222,6 @@ val LightPalette = Palette(
     KeyboardUthmaniGlyph = Color(0xFF2F5249),
     KeyboardWaqfRing = Color(0xFF8FB3A6),
     KeyboardWaqfBg = Color(0xFFE4EFE9),
-    KeyboardPopoverBg = Color(0xFF2A2620),
-    KeyboardPopoverKey = Color(0xFF3A352B),
 )
 
 val DarkPalette = Palette(
@@ -332,8 +328,6 @@ val DarkPalette = Palette(
     KeyboardUthmaniGlyph = Color(0xFF9CC4B6),
     KeyboardWaqfRing = Color(0xFF6FA395),
     KeyboardWaqfBg = Color(0xFF1F342D),
-    KeyboardPopoverBg = Color(0xFF221E18),
-    KeyboardPopoverKey = Color(0xFF2E2A22),
 )
 
 object AlkahfColors {
@@ -444,12 +438,4 @@ object AlkahfColors {
     val KeyboardUthmaniGlyph get() = palette.value.KeyboardUthmaniGlyph
     val KeyboardWaqfRing get() = palette.value.KeyboardWaqfRing
     val KeyboardWaqfBg get() = palette.value.KeyboardWaqfBg
-    val KeyboardPopoverBg get() = palette.value.KeyboardPopoverBg
-    val KeyboardPopoverKey get() = palette.value.KeyboardPopoverKey
-    // Reused existing tokens (exact-hex equivalents in the light palette):
-    //   KeyboardHamzaBg        -> KhatamCardTint  (#FBF3DF)
-    //   KeyboardHamzaRing      -> KhatamGoldBorder (#C99A45)
-    //   KeyboardHamzaGlyph     -> KhatamGoldDeep  (#9A732F)
-    //   KeyboardPopoverHighlight -> Accent        (#3E7D6E)
-    //   KeyboardKeyInk         -> Ink             (#2A2620)
 }

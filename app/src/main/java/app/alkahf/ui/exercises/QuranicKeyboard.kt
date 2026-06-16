@@ -26,6 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
@@ -48,6 +49,8 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.res.stringResource
+import app.alkahf.R
 import app.alkahf.ui.theme.AlkahfColors
 
 /**
@@ -72,29 +75,39 @@ fun QuranicKeyboard(
     onCheck: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            // The tray fills to the very bottom edge (drawn before the inset padding
-            // below), so it reads as a native keyboard; the keys are padded above
-            // the gesture bar by navigationBarsPadding.
-            .background(AlkahfColors.KeyboardTray)
-            .navigationBarsPadding()
-            .padding(start = 5.dp, end = 5.dp, top = 7.dp, bottom = 9.dp),
-        verticalArrangement = Arrangement.spacedBy(7.dp),
-    ) {
-        CaptionRow(left = "Tap a letter, then a ḥarakah", right = "التشكيل", ink = AlkahfColors.KeyboardHarakatGlyph)
-        HarakatStrip(onKey)
-        CaptionRow(
-            left = "ʿUthmānī marks · waṣla · madd · sukūn · waqf",
-            right = "علامات",
-            ink = AlkahfColors.KeyboardUthmaniGlyph,
-        )
-        UthmaniStrip(onKey)
-        LetterRow(LETTER_ROW_1, onKey)
-        LetterRow(LETTER_ROW_2, onKey, padding = 16.dp)
-        LetterRow3(onKey, onBackspace)
-        FunctionRow(onSpace, onCheck)
+    // The keyboard mirrors a physical Arabic keyboard, whose keys are laid out
+    // left-to-right regardless of the UI language. Force LTR so the layout never
+    // flips when the app language is Arabic (RTL ambient direction) — ض must stay
+    // top-left, backspace bottom-right, in every language.
+    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+        Column(
+            modifier = modifier
+                .fillMaxWidth()
+                // The tray fills to the very bottom edge (drawn before the inset
+                // padding below), so it reads as a native keyboard; the keys are
+                // padded above the gesture bar by navigationBarsPadding.
+                .background(AlkahfColors.KeyboardTray)
+                .navigationBarsPadding()
+                .padding(start = 5.dp, end = 5.dp, top = 7.dp, bottom = 9.dp),
+            verticalArrangement = Arrangement.spacedBy(7.dp),
+        ) {
+            CaptionRow(
+                left = stringResource(R.string.ex_kbd_harakat_hint),
+                right = stringResource(R.string.ex_kbd_harakat_term),
+                ink = AlkahfColors.KeyboardHarakatGlyph,
+            )
+            HarakatStrip(onKey)
+            CaptionRow(
+                left = stringResource(R.string.ex_kbd_marks_hint),
+                right = stringResource(R.string.ex_kbd_marks_term),
+                ink = AlkahfColors.KeyboardUthmaniGlyph,
+            )
+            UthmaniStrip(onKey)
+            LetterRow(LETTER_ROW_1, onKey)
+            LetterRow(LETTER_ROW_2, onKey, padding = 16.dp)
+            LetterRow3(onKey, onBackspace)
+            FunctionRow(onSpace, onCheck)
+        }
     }
 }
 
@@ -259,19 +272,37 @@ private fun FunctionRow(onSpace: () -> Unit, onCheck: () -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(KEY_GAP),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Key(
-            modifier = Modifier.weight(5f),
-            glyph = "مسافة",
-            glyphColor = AlkahfColors.InkMuted,
-            background = AlkahfColors.KeyboardLetterKey,
-            borderColor = AlkahfColors.CardBorder,
-            shape = RoundedCornerShape(7.dp),
-            glyphSize = 14.sp,
-            glyphWeight = FontWeight.SemiBold,
-            height = 46.dp,
-            onClick = onSpace,
-        )
+        SpaceKey(modifier = Modifier.weight(5f), onClick = onSpace)
         CheckKey(modifier = Modifier.weight(2f), onClick = onCheck)
+    }
+}
+
+/**
+ * The space bar. Shows a language-neutral underscore mark (no text) so it reads
+ * the same regardless of the app's language.
+ */
+@Composable
+private fun SpaceKey(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val shape = RoundedCornerShape(7.dp)
+    Box(
+        modifier = modifier
+            .height(46.dp)
+            .scale(if (pressed) 0.96f else 1f)
+            .clip(shape)
+            .background(AlkahfColors.KeyboardLetterKey)
+            .border(1.dp, AlkahfColors.CardBorder, shape)
+            .clickableKey(interaction, onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            Modifier
+                .fillMaxWidth(0.28f)
+                .height(2.dp)
+                .clip(RoundedCornerShape(50))
+                .background(AlkahfColors.InkFaint),
+        )
     }
 }
 
@@ -307,10 +338,8 @@ private fun Key(
     background: Color,
     modifier: Modifier = Modifier,
     borderColor: Color? = null,
-    borderWidth: Dp = 1.dp,
     shape: RoundedCornerShape = RoundedCornerShape(7.dp),
     glyphSize: androidx.compose.ui.unit.TextUnit = 20.sp,
-    glyphWeight: FontWeight = FontWeight.Normal,
     height: Dp = KEY_HEIGHT,
     variants: List<String>? = null,
     onVariant: (String) -> Unit = {},
@@ -325,7 +354,7 @@ private fun Key(
             .scale(if (pressed) 0.96f else 1f)
             .clip(shape)
             .background(background)
-            .then(if (borderColor != null) Modifier.border(borderWidth, borderColor, shape) else Modifier)
+            .then(if (borderColor != null) Modifier.border(1.dp, borderColor, shape) else Modifier)
             .then(
                 if (variants != null) {
                     Modifier.combinedClickable(
@@ -345,7 +374,6 @@ private fun Key(
             text = glyph,
             color = glyphColor,
             fontSize = glyphSize,
-            fontWeight = glyphWeight,
             textAlign = TextAlign.Center,
         )
         if (variants != null) {
@@ -356,7 +384,6 @@ private fun Key(
             if (showPopover) {
                 GlyphPopover(
                     glyphs = variants,
-                    highlight = null,
                     onPick = { onVariant(it); showPopover = false },
                     onDismiss = { showPopover = false },
                 )
@@ -404,7 +431,12 @@ private fun CheckKey(onClick: () -> Unit, modifier: Modifier = Modifier) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         CheckIcon()
-        Text("Check", color = AlkahfColors.OnAccent, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+        Text(
+            stringResource(R.string.ex_kbd_check),
+            color = AlkahfColors.OnAccent,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold,
+        )
     }
 }
 
@@ -434,7 +466,9 @@ private fun WaqfKey(onKey: (String) -> Unit, modifier: Modifier = Modifier) {
             ),
         contentAlignment = Alignment.Center,
     ) {
-        Text(WAQF_KEY_GLYPH, color = AlkahfColors.KeyboardUthmaniGlyph, fontSize = 22.sp)
+        // Waqf marks are combining signs: render on the dotted-circle base (◌) so
+        // they're visible (a bare mark shows as nothing / tofu).
+        Text(dotted(WAQF_KEY_GLYPH), color = AlkahfColors.KeyboardUthmaniGlyph, fontSize = 22.sp)
         LongPressDots(
             color = AlkahfColors.KeyboardWaqfRing,
             modifier = Modifier.align(Alignment.BottomStart).padding(start = 4.dp, bottom = 3.dp),
@@ -442,7 +476,7 @@ private fun WaqfKey(onKey: (String) -> Unit, modifier: Modifier = Modifier) {
         if (showDrawer) {
             GlyphPopover(
                 glyphs = WAQF_SIGNS,
-                highlight = null,
+                cap = ::dotted,
                 onPick = { onKey(it); showDrawer = false },
                 onDismiss = { showDrawer = false },
             )
@@ -450,18 +484,25 @@ private fun WaqfKey(onKey: (String) -> Unit, modifier: Modifier = Modifier) {
     }
 }
 
+/** The dotted-circle base (U+25CC) plus a combining [mark], so the mark shows. */
+private fun dotted(mark: String): String = "◌$mark"
+
 // ── Popover / drawer ────────────────────────────────────────────────────────
 
 /**
- * A dark popover anchored above its parent key. Tapping a glyph inserts it and
- * dismisses; tapping outside dismisses without inserting.
+ * A light, elevated popover anchored above its parent key, styled to match the
+ * app's surfaces (dark ink on a soft surface for strong contrast). Tapping a
+ * glyph inserts it and dismisses; tapping outside dismisses without inserting.
+ *
+ * [glyphs] are the values inserted on pick; [cap] maps each to the glyph shown
+ * on its key (identity for letters; the dotted-circle form for combining marks).
  */
 @Composable
 private fun GlyphPopover(
     glyphs: List<String>,
-    highlight: String?,
     onPick: (String) -> Unit,
     onDismiss: () -> Unit,
+    cap: (String) -> String = { it },
 ) {
     val density = LocalDensity.current
     val positionProvider = remember {
@@ -487,31 +528,34 @@ private fun GlyphPopover(
         onDismissRequest = onDismiss,
         properties = PopupProperties(focusable = true),
     ) {
+        val shape = RoundedCornerShape(16.dp)
         Row(
             modifier = Modifier
                 .wrapContentSize()
-                .clip(RoundedCornerShape(14.dp))
-                .background(AlkahfColors.KeyboardPopoverBg)
-                .padding(start = 8.dp, end = 8.dp, top = 8.dp, bottom = 7.dp),
+                .shadow(10.dp, shape)
+                .background(AlkahfColors.Surface, shape)
+                .border(1.dp, AlkahfColors.HeaderRule, shape)
+                .padding(7.dp),
             horizontalArrangement = Arrangement.spacedBy(5.dp),
         ) {
+            val keyShape = RoundedCornerShape(10.dp)
             glyphs.forEach { g ->
-                val isHighlight = g == highlight
                 val interaction = remember { MutableInteractionSource() }
                 val pressed by interaction.collectIsPressedAsState()
                 Box(
                     modifier = Modifier
-                        .size(width = 38.dp, height = 46.dp)
+                        .size(width = 42.dp, height = 50.dp)
                         .scale(if (pressed) 0.94f else 1f)
-                        .clip(RoundedCornerShape(9.dp))
-                        .background(if (isHighlight) AlkahfColors.Accent else AlkahfColors.KeyboardPopoverKey)
+                        .clip(keyShape)
+                        .background(AlkahfColors.Paper)
+                        .border(1.dp, AlkahfColors.CardBorder, keyShape)
                         .clickableKey(interaction) { onPick(g) },
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
-                        text = g,
-                        color = if (isHighlight) AlkahfColors.OnAccent else AlkahfColors.Paper,
-                        fontSize = 23.sp,
+                        text = cap(g),
+                        color = AlkahfColors.Ink,
+                        fontSize = 26.sp,
                     )
                 }
             }

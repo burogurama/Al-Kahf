@@ -519,6 +519,12 @@
     <string name="ex_finish_your_answer">YOUR ANSWER · written from memory</string>
     <string name="ex_finish_matches_note">Matches the āyah — minor tashkīl differences are accepted</string>
     <string name="ex_finish_correct_continuation">CORRECT CONTINUATION</string>
+    <!-- Quranic keyboard (Finish the Āyah) -->
+    <string name="ex_kbd_harakat_hint">Tap a letter, then a ḥarakah</string>
+    <string name="ex_kbd_harakat_term">التشكيل</string>
+    <string name="ex_kbd_marks_hint">ʿUthmānī marks · waṣla · madd · sukūn · waqf</string>
+    <string name="ex_kbd_marks_term">علامات</string>
+    <string name="ex_kbd_check">Check</string>
     <!-- Order the Āyāt -->
     <string name="ex_order_heading">Put these āyāt in order</string>
     <string name="ex_order_your_order">YOUR ORDER</string>

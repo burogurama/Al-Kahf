@@ -583,6 +583,12 @@
     <string name="ex_finish_your_answer">إجابتك · مكتوبة من الذاكرة</string>
     <string name="ex_finish_matches_note">مطابقة للآية — تُقبل فروق التشكيل اليسيرة</string>
     <string name="ex_finish_correct_continuation">التكملة الصحيحة</string>
+    <!-- لوحة المفاتيح القرآنية (أكمل الآية) -->
+    <string name="ex_kbd_harakat_hint">اضغط حرفًا ثم اختر حركة</string>
+    <string name="ex_kbd_harakat_term">التشكيل</string>
+    <string name="ex_kbd_marks_hint">علامات عثمانية · وصلة · مدّ · سكون · وقف</string>
+    <string name="ex_kbd_marks_term">علامات</string>
+    <string name="ex_kbd_check">تحقّق</string>
     <!-- رتّب الآيات -->
     <string name="ex_order_heading">رتّب هذه الآيات</string>
     <string name="ex_order_your_order">ترتيبك</string>
