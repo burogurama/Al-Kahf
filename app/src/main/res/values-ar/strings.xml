@@ -154,6 +154,7 @@
     <string name="settings_theme_light">فاتح</string>
     <string name="settings_theme_dark">داكن</string>
     <string name="settings_theme_system">النظام</string>
+    <string name="settings_theme_rose">وردي</string>
     <string name="settings_arabic_text_size">حجم النص العربي</string>
     <string name="settings_pt_value">%1$d نقطة</string>
     <string name="settings_script">الرسم</string>

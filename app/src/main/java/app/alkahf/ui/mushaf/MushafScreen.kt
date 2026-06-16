@@ -106,6 +106,7 @@ import androidx.compose.ui.window.PopupProperties
 import app.alkahf.AlkahfApplication
 import app.alkahf.R
 import app.alkahf.data.AyahRange
+import app.alkahf.data.WirdMarks
 import app.alkahf.data.MushafPage
 import app.alkahf.data.PageAyah
 import app.alkahf.data.PageGroup
@@ -182,6 +183,8 @@ fun MushafScreen(
     startSurah: Int? = null,
     startPage: Int? = null,
     highlightRange: AyahRange? = null,
+    wird: WirdMarks? = null,
+    onPageRead: (Int) -> Unit = {},
     onBack: () -> Unit = {},
     onImportReciter: (ReciterStatus) -> Unit = {},
 ) {
@@ -198,10 +201,12 @@ fun MushafScreen(
             onDispose { view.keepScreenOn = false }
         }
     }
-    // Opening the sabaq lands in reading mode (text shown); otherwise reopen
-    // in whichever mode the Mushaf was last left in.
+    // Opening the sabaq or a khatam reading session lands in reading mode (text
+    // shown); otherwise reopen in whichever mode the Mushaf was last left in.
     var hideMode by remember {
-        mutableStateOf(if (highlightRange != null) false else mushaf.lastMushafHideMode)
+        mutableStateOf(
+            if (highlightRange != null || wird != null) false else mushaf.lastMushafHideMode,
+        )
     }
     // Sabaq focus mode: opening for the sabaq (a highlight range) locks the
     // reader to it — only its āyāt can be read, revealed, selected, or listened
@@ -265,7 +270,13 @@ fun MushafScreen(
 
     LaunchedEffect(pagerState) {
         snapshotFlow { pagerState.currentPage }.collect { page ->
-            if (!sabaqMode) mushaf.lastMushafPage = page + windowStart
+            if (!sabaqMode) {
+                val pageNumber = page + windowStart
+                mushaf.lastMushafPage = pageNumber
+                // In a khatam reading session, also remember the page so "continue
+                // reading" resumes here next time.
+                if (wird != null) onPageRead(pageNumber)
+            }
         }
     }
 
@@ -520,6 +531,7 @@ fun MushafScreen(
                             // own āyāt whose ids fall in the range, so it spans pages.
                             selectedIds = selectedIds,
                             scrollToAyahId = scrollToAyahId,
+                            wird = wird,
                         )
                     }
                 }
@@ -866,6 +878,7 @@ private fun MushafPageView(
     contextIds: Set<Int>,
     selectedIds: Set<Int>,
     scrollToAyahId: Int?,
+    wird: WirdMarks?,
 ) {
     LaunchedEffect(pageNumber, riwayah) {
         if (session == null) {
@@ -925,6 +938,7 @@ private fun MushafPageView(
                             sabaqIds = sabaqIds,
                             contextIds = contextIds,
                             selectedIds = selectedIds,
+                            wird = wird,
                         )
                     }
                 }
@@ -947,6 +961,7 @@ private fun PageGroupView(
     sabaqIds: Set<Int>,
     contextIds: Set<Int>,
     selectedIds: Set<Int>,
+    wird: WirdMarks?,
 ) {
     if (group.showSurahHeader) {
         SurahHeaderBand(
@@ -967,7 +982,7 @@ private fun PageGroupView(
                 .padding(top = 12.dp, bottom = 10.dp),
         )
     }
-    AyatBody(group, hideMode, session, playingAyahId, onAudioTap, onSelectAyah, onAyahLongPress, sabaqIds, contextIds, selectedIds)
+    AyatBody(group, hideMode, session, playingAyahId, onAudioTap, onSelectAyah, onAyahLongPress, sabaqIds, contextIds, selectedIds, wird)
 }
 
 @Composable
@@ -1067,6 +1082,7 @@ private fun AyatBody(
     sabaqIds: Set<Int>,
     contextIds: Set<Int>,
     selectedIds: Set<Int>,
+    wird: WirdMarks?,
 ) {
     val revealedByAyah = group.ayahs.associate { it.id to session.revealedOf(it) }
     val memByAyah = group.ayahs.associate { it.id to (session.memStates[it.id] ?: MemorizationState.NOT_STARTED) }
@@ -1088,6 +1104,8 @@ private fun AyatBody(
     // selection (which shares the green fill).
     val selectionFill = AlkahfColors.AyahHighlightFill
     val nowPlayingFill = AlkahfColors.NowPlayingFill
+    val wirdFill = AlkahfColors.WirdMarkFill
+    val wirdEdge = AlkahfColors.WirdMarkEdge
 
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
         Text(
@@ -1108,6 +1126,55 @@ private fun AyatBody(
                     val padH = 6.dp.toPx()
                     val padV = 3.dp.toPx()
                     val radius = androidx.compose.ui.geometry.CornerRadius(8.dp.toPx())
+                    // Today's wird boundary marks: a faint tint behind the first and
+                    // last āyah of the portion, plus a gold edge bar marking exactly
+                    // where reading enters it (start) and leaves it (end). In RTL the
+                    // entry edge is the right of the first line; the exit edge is the
+                    // left of the last line. Drawn before the selection/now-playing
+                    // fills so those win on a boundary āyah that is also lit.
+                    wird?.let { w ->
+                        listOf(w.startAyahId to true, w.endAyahId to false).forEach { (ayahId, isStart) ->
+                            val ayahSpans = groupText.spans.filter { it.ayahId == ayahId }
+                            if (ayahSpans.isEmpty()) return@forEach
+                            val start = ayahSpans.minOf { it.start }
+                            val end = ayahSpans.maxOf { it.end }
+                            val firstLine = layout.getLineForOffset(start)
+                            val lastLine = layout.getLineForOffset((end - 1).coerceAtLeast(start))
+                            var entryX = 0f; var entryTop = 0f; var entryBottom = 0f
+                            var exitX = 0f; var exitTop = 0f; var exitBottom = 0f
+                            for (line in firstLine..lastLine) {
+                                val lineStart = layout.getLineStart(line)
+                                val lineEnd = layout.getLineEnd(line, visibleEnd = true)
+                                val ls = maxOf(start, lineStart)
+                                val le = minOf(end, lineEnd)
+                                if (le <= ls) continue
+                                val b = layout.getPathForRange(ls, le).getBounds()
+                                val left = if (end >= lineEnd) layout.getLineLeft(line) else b.left
+                                val right = if (start <= lineStart) layout.getLineRight(line) else b.right
+                                drawRoundRect(
+                                    color = wirdFill,
+                                    topLeft = Offset(left - padH, b.top - padV),
+                                    size = androidx.compose.ui.geometry.Size(
+                                        (right - left) + padH * 2,
+                                        b.height + padV * 2,
+                                    ),
+                                    cornerRadius = radius,
+                                )
+                                if (line == firstLine) { entryX = right; entryTop = b.top; entryBottom = b.bottom }
+                                if (line == lastLine) { exitX = left; exitTop = b.top; exitBottom = b.bottom }
+                            }
+                            val barW = 3.dp.toPx()
+                            val barX = if (isStart) entryX else exitX
+                            val barTop = if (isStart) entryTop else exitTop
+                            val barBottom = if (isStart) entryBottom else exitBottom
+                            drawRoundRect(
+                                color = wirdEdge,
+                                topLeft = Offset(barX - barW / 2, barTop - padV),
+                                size = androidx.compose.ui.geometry.Size(barW, (barBottom - barTop) + padV * 2),
+                                cornerRadius = androidx.compose.ui.geometry.CornerRadius(barW / 2),
+                            )
+                        }
+                    }
                     litIds.forEach { ayahId ->
                         val ayahSpans = groupText.spans.filter { it.ayahId == ayahId }
                         if (ayahSpans.isEmpty()) return@forEach

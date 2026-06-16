@@ -170,6 +170,13 @@ data class AyahRange(val surah: Int, val from: Int, val to: Int) {
     val ayahIds: Set<Int> get() = (from..to).map { surah * 1000 + it }.toSet()
 }
 
+/**
+ * The first and last āyah of a khatam's daily wird (encoded as surah*1000+āyah),
+ * used to mark where today's portion begins and ends in the muṣḥaf. The two may
+ * be in different sūrahs (a juzʼ can span a sūrah boundary).
+ */
+data class WirdMarks(val startAyahId: Int, val endAyahId: Int)
+
 /** The sabaq summarised for a reminder notification. */
 data class SabaqReference(val surahName: String, val from: Int, val to: Int)
 
@@ -272,6 +279,13 @@ data class KhatamState(
     val currentDay: Int,
     val todaysPortionJuz: Int,
     val todaysPortion: KhatamPortion?,
+    /**
+     * The muṣḥaf page to resume on when "continue reading": the last page read in
+     * this khatam if it falls within today's portion, otherwise today's portion's
+     * first page. Equals today's portion's first page when no page was read yet or
+     * the khatam is complete.
+     */
+    val resumePage: Int,
     val finishEpochDay: Long,
     val paceStatus: app.alkahf.data.khatam.PaceStatus,
     val streakDays: Int,
@@ -474,7 +488,7 @@ class QuranRepository(context: Context) {
 
     fun setActiveReciter(path: String) = reciters.setActiveReciter(path)
 
-    /** "light" | "dark" | "system" (default). */
+    /** "light" | "dark" | "system" (default) | "rose" (Rose & Blush light reskin). */
     var themeMode: String
         get() = settings.themeMode
         set(value) { settings.themeMode = value }
@@ -771,6 +785,9 @@ class QuranRepository(context: Context) {
 
     /** Logs today's khatam portion (advances a juzʼ, updates streak/pages). */
     suspend fun logTodayKhatamPortion(): KhatamState? = khatam.logTodayPortion()
+
+    /** Records the muṣḥaf page being read in the active khatam (for resume). */
+    suspend fun setKhatamReadPage(page: Int) = khatam.setKhatamReadPage(page)
 
     /** Removes the active khatam. */
     suspend fun cancelKhatam() = khatam.cancelKhatam()

@@ -42,7 +42,12 @@ import kotlinx.coroutines.launch
  */
 private sealed interface Screen {
     object Home : Screen
-    data class Mushaf(val startSurah: Int?, val startPage: Int?, val highlight: AyahRange?) : Screen
+    data class Mushaf(
+        val startSurah: Int?,
+        val startPage: Int?,
+        val highlight: AyahRange?,
+        val wird: app.alkahf.data.WirdMarks? = null,
+    ) : Screen
     data class Loop(val presetId: Long?, val newPreset: Boolean) : Screen
     object Review : Screen
     object Progress : Screen
@@ -169,7 +174,7 @@ private fun MemorizationState.toHomeState(): AyahMemorizationState = when (this)
 fun AlkahfApp(
     playDrillSignal: Int = 0,
     openKhatamSignal: Int = 0,
-    onThemeModeChange: (app.alkahf.ui.theme.ThemeMode) -> Unit = {},
+    onThemeChange: (app.alkahf.ui.theme.ThemeChoice) -> Unit = {},
     onLanguageChange: (String) -> Unit = {},
 ) {
     // The navigation back stack; the last entry is the visible screen. Each entry
@@ -185,6 +190,25 @@ fun AlkahfApp(
     }
     fun back() {
         if (backStack.size > 1) backStack.removeAt(backStack.lastIndex)
+    }
+    // Opens the muṣḥaf for a khatam reading session: resumes at the last-read page
+    // (or today's portion's start) and carries the wird's start/end āyāt so the
+    // muṣḥaf can mark where today's portion begins and ends.
+    fun startKhatamReading(state: app.alkahf.data.KhatamState) {
+        val portion = state.todaysPortion
+        navigate(
+            Screen.Mushaf(
+                startSurah = null,
+                startPage = state.resumePage,
+                highlight = null,
+                wird = portion?.let {
+                    app.alkahf.data.WirdMarks(
+                        startAyahId = it.surahFrom * 1000 + it.ayahFrom,
+                        endAyahId = it.surahTo * 1000 + it.ayahTo,
+                    )
+                },
+            ),
+        )
     }
     // Bottom-nav tab: jump back to the tab if it's already in the stack, else open
     // it — so tab switching never stacks duplicates or strands a forward history.
@@ -287,6 +311,11 @@ fun AlkahfApp(
             startSurah = screen.startSurah,
             startPage = screen.startPage,
             highlightRange = screen.highlight,
+            wird = screen.wird,
+            onPageRead = { page ->
+                // Persist the read position only for a khatam reading session.
+                if (screen.wird != null) scope.launch { repository.setKhatamReadPage(page) }
+            },
             onBack = { back() },
             onImportReciter = { reciter -> navigate(Screen.ReciterDownloads(reciter)) },
         )
@@ -311,7 +340,7 @@ fun AlkahfApp(
         )
         Screen.Settings -> app.alkahf.ui.settings.SettingsScreen(
             onBack = { back() },
-            onThemeModeChange = onThemeModeChange,
+            onThemeChange = onThemeChange,
             onLanguageChange = onLanguageChange,
         )
         is Screen.TawqitTagging -> TawqitTaggingScreen(
@@ -357,7 +386,7 @@ fun AlkahfApp(
                     state = state,
                     onBack = { back() },
                     onOpenPortion = { navigate(Screen.KhatamPortion) },
-                    onStartReading = { page -> navigate(Screen.Mushaf(null, page, null)) },
+                    onStartReading = { startKhatamReading(state) },
                     onReminderChange = { enabled, minute ->
                         scope.launch {
                             khatamController.setReminder(enabled, minute)
@@ -401,7 +430,7 @@ fun AlkahfApp(
                 app.alkahf.ui.khatam.KhatamPortionScreen(
                     state = state,
                     onBack = { back() },
-                    onStartReading = { page -> navigate(Screen.Mushaf(null, page, null)) },
+                    onStartReading = { startKhatamReading(state) },
                     onMarkComplete = {
                         // The log sheet lives on the tracker; pop to it and show it.
                         back()

@@ -145,6 +145,8 @@ data class KhatamEntity(
     @ColumnInfo(name = "reminder_time") val reminderTime: Int? = null,
     val riwayah: String = "hafs",
     val active: Boolean = true,
+    /** Last muṣḥaf page the user read in this khatam (0 = never opened). */
+    @ColumnInfo(name = "last_read_page") val lastReadPage: Int = 0,
 )
 
 @Dao
@@ -289,6 +291,9 @@ interface UserDao {
 
     @Query("DELETE FROM khatam WHERE active = 1")
     suspend fun deleteActiveKhatam()
+
+    @Query("UPDATE khatam SET last_read_page = :page WHERE active = 1")
+    suspend fun setKhatamReadPage(page: Int)
 }
 
 @Database(
@@ -304,7 +309,7 @@ interface UserDao {
         ImportedSurahEntity::class,
         KhatamEntity::class,
     ],
-    version = 9,
+    version = 10,
     exportSchema = false,
 )
 abstract class UserDatabase : RoomDatabase() {
@@ -340,9 +345,16 @@ abstract class UserDatabase : RoomDatabase() {
             }
         }
 
+        // v10: adds last_read_page to khatam (resume the muṣḥaf where reading left off).
+        private val MIGRATION_9_10 = object : androidx.room.migration.Migration(9, 10) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE khatam ADD COLUMN last_read_page INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
         fun open(context: Context): UserDatabase =
             Room.databaseBuilder(context, UserDatabase::class.java, "user.db")
-                .addMigrations(MIGRATION_7_8, MIGRATION_8_9)
+                .addMigrations(MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
                 // Pre-7 schemas have no migration path and may be recreated; from 7
                 // on, a missing migration must fail loudly rather than wipe data.
                 .fallbackToDestructiveMigrationFrom(1, 2, 3, 4, 5, 6)

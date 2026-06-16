@@ -50,6 +50,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.alkahf.AlkahfApplication
@@ -58,14 +59,14 @@ import app.alkahf.data.ReviewPacing
 import app.alkahf.data.SettingsData
 import app.alkahf.ui.theme.AlkahfColors
 import app.alkahf.ui.theme.AmiriQuran
-import app.alkahf.ui.theme.ThemeMode
+import app.alkahf.ui.theme.ThemeChoice
 
 private const val SAMPLE_BASMALA = "بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ"
 
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
-    onThemeModeChange: (ThemeMode) -> Unit,
+    onThemeChange: (ThemeChoice) -> Unit,
     onLanguageChange: (String) -> Unit = {},
 ) {
     val context = LocalContext.current
@@ -203,14 +204,15 @@ fun SettingsScreen(
                     RowLabel(stringResource(R.string.settings_theme))
                     Segmented(
                         options = listOf(
-                            ThemeMode.LIGHT to stringResource(R.string.settings_theme_light),
-                            ThemeMode.DARK to stringResource(R.string.settings_theme_dark),
-                            ThemeMode.SYSTEM to stringResource(R.string.settings_theme_system),
+                            ThemeChoice.LIGHT to stringResource(R.string.settings_theme_light),
+                            ThemeChoice.ROSE to stringResource(R.string.settings_theme_rose),
+                            ThemeChoice.DARK to stringResource(R.string.settings_theme_dark),
+                            ThemeChoice.SYSTEM to stringResource(R.string.settings_theme_system),
                         ),
-                        selected = settings.themeMode.toMode(),
-                        onSelect = { mode ->
-                            apply(settings.copy(themeMode = mode.name.lowercase()))
-                            onThemeModeChange(mode)
+                        selected = settings.themeMode.toThemeChoice(),
+                        onSelect = { choice ->
+                            apply(settings.copy(themeMode = choice.name.lowercase()))
+                            onThemeChange(choice)
                         },
                     )
                     Divider()
@@ -390,10 +392,11 @@ fun SettingsScreen(
     }
 }
 
-private fun String.toMode(): ThemeMode = when (this) {
-    "light" -> ThemeMode.LIGHT
-    "dark" -> ThemeMode.DARK
-    else -> ThemeMode.SYSTEM
+private fun String.toThemeChoice(): ThemeChoice = when (this) {
+    "light" -> ThemeChoice.LIGHT
+    "dark" -> ThemeChoice.DARK
+    "rose" -> ThemeChoice.ROSE
+    else -> ThemeChoice.SYSTEM
 }
 
 private fun notificationsAllowed(context: Context): Boolean =
@@ -518,6 +521,8 @@ private fun <T> Segmented(options: List<Pair<T, String>>, selected: T, onSelect:
                     fontSize = 12.5.sp,
                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
                     color = if (isSelected) AlkahfColors.AccentDeep else AlkahfColors.InkMuted,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }

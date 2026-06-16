@@ -18,7 +18,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import app.alkahf.ui.AlkahfApp
 import app.alkahf.ui.theme.AlkahfTheme
 import app.alkahf.ui.theme.LocalQuranFont
-import app.alkahf.ui.theme.ThemeMode
+import app.alkahf.ui.theme.ThemeChoice
 import app.alkahf.ui.theme.quranFontFor
 
 class MainActivity : ComponentActivity() {
@@ -45,15 +45,15 @@ class MainActivity : ComponentActivity() {
 
         val repository = (application as AlkahfApplication).repository
         setContent {
-            var themeMode by remember { mutableStateOf(toThemeMode(repository.themeMode)) }
-            AlkahfTheme(mode = themeMode) {
+            var themeChoice by remember { mutableStateOf(toThemeChoice(repository.themeMode)) }
+            AlkahfTheme(choice = themeChoice) {
                 CompositionLocalProvider(LocalQuranFont provides quranFontFor(repository.riwayah)) {
                     AlkahfApp(
                         playDrillSignal = playDrillSignal.intValue,
                         openKhatamSignal = openKhatamSignal.intValue,
-                        onThemeModeChange = { mode ->
-                            themeMode = mode
-                            repository.themeMode = mode.name.lowercase()
+                        onThemeChange = { choice ->
+                            themeChoice = choice
+                            repository.themeMode = choice.name.lowercase()
                         },
                         onLanguageChange = { language ->
                             repository.appLanguage = language
@@ -72,10 +72,11 @@ class MainActivity : ComponentActivity() {
         if (intent.getBooleanExtra(EXTRA_OPEN_KHATAM, false)) openKhatamSignal.intValue++
     }
 
-    private fun toThemeMode(value: String): ThemeMode = when (value) {
-        "light" -> ThemeMode.LIGHT
-        "dark" -> ThemeMode.DARK
-        else -> ThemeMode.SYSTEM
+    private fun toThemeChoice(value: String): ThemeChoice = when (value) {
+        "light" -> ThemeChoice.LIGHT
+        "dark" -> ThemeChoice.DARK
+        "rose" -> ThemeChoice.ROSE
+        else -> ThemeChoice.SYSTEM
     }
 
     companion object {

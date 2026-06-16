@@ -60,7 +60,7 @@ import app.alkahf.ui.theme.AmiriQuran
 fun KhatamPortionScreen(
     state: KhatamState,
     onBack: () -> Unit,
-    onStartReading: (page: Int) -> Unit,
+    onStartReading: () -> Unit,
     onMarkComplete: () -> Unit,
 ) {
     val surahName = rememberSurahNamer()
@@ -100,7 +100,7 @@ fun KhatamPortionScreen(
             Spacer(Modifier.height(3.dp))
         }
         PortionDock(
-            onStartReading = { portion?.let { onStartReading(it.pageFrom) } },
+            onStartReading = { portion?.let { onStartReading() } },
             onMarkComplete = onMarkComplete,
         )
     }

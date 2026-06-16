@@ -292,12 +292,12 @@ private fun RunnerDock(
 @Composable
 private fun FeedbackBanner(status: AnswerStatus, correctAnswerLabel: String, reference: String) {
     val correct = status == AnswerStatus.CORRECT
-    val bg = if (correct) AlkahfColors.AccentTint2 else AlkahfColors.ClayBg
-    val ink = if (correct) AlkahfColors.AccentDeep else AlkahfColors.ClayText
+    val bg = if (correct) AlkahfColors.CorrectTint else AlkahfColors.ClayBg
+    val ink = if (correct) AlkahfColors.CorrectDeep else AlkahfColors.ClayText
     Surface(
         shape = RoundedCornerShape(14.dp),
         color = bg,
-        border = BorderStroke(1.dp, if (correct) AlkahfColors.CardBorderHero else AlkahfColors.ClayBorder),
+        border = BorderStroke(1.dp, if (correct) AlkahfColors.CorrectBorder else AlkahfColors.ClayBorder),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 11.dp),
@@ -329,7 +329,7 @@ private fun FeedbackBanner(status: AnswerStatus, correctAnswerLabel: String, ref
                     text = reference,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color = if (correct) AlkahfColors.AccentDeep else AlkahfColors.ClayTextSoft,
+                    color = if (correct) AlkahfColors.CorrectDeep else AlkahfColors.ClayTextSoft,
                 )
             }
         }

@@ -7,7 +7,12 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 
-enum class ThemeMode { LIGHT, DARK, SYSTEM }
+/**
+ * The user-selectable theme. [LIGHT]/[DARK]/[SYSTEM] use the default (green)
+ * palette; [ROSE] is the "Rose & Blush" light reskin (always light — there is no
+ * rose dark palette).
+ */
+enum class ThemeChoice { LIGHT, DARK, SYSTEM, ROSE }
 
 private fun materialScheme(dark: Boolean) = if (dark) {
     darkColorScheme(
@@ -43,16 +48,17 @@ private fun materialScheme(dark: Boolean) = if (dark) {
 
 @Composable
 fun AlkahfTheme(
-    mode: ThemeMode = ThemeMode.SYSTEM,
+    choice: ThemeChoice = ThemeChoice.SYSTEM,
     content: @Composable () -> Unit,
 ) {
-    val dark = when (mode) {
-        ThemeMode.LIGHT -> false
-        ThemeMode.DARK -> true
-        ThemeMode.SYSTEM -> isSystemInDarkTheme()
+    val dark = when (choice) {
+        ThemeChoice.LIGHT, ThemeChoice.ROSE -> false
+        ThemeChoice.DARK -> true
+        ThemeChoice.SYSTEM -> isSystemInDarkTheme()
     }
+    val rose = choice == ThemeChoice.ROSE
     // Swap the token palette before content reads it this composition.
-    remember(dark) { AlkahfColors.setDark(dark); dark }
+    remember(dark, rose) { AlkahfColors.select(dark, rose); dark }
     MaterialTheme(
         colorScheme = materialScheme(dark),
         typography = AlkahfTypography,

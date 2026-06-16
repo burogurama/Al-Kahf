@@ -277,12 +277,12 @@ fun FinishAyahBody(
     // turns green (correct) or clay (not quite, with the right continuation below).
     val boxBorder = when {
         !answered -> AlkahfColors.CardBorder
-        correct -> AlkahfColors.Accent
+        correct -> AlkahfColors.Correct
         else -> AlkahfColors.ClayBorder
     }
     val boxBg = when {
         !answered -> AlkahfColors.Surface
-        correct -> AlkahfColors.ExerciseSelectedCard
+        correct -> AlkahfColors.CorrectTint
         else -> AlkahfColors.ClayBg
     }
     Surface(
@@ -320,7 +320,7 @@ fun FinishAyahBody(
             Icon(
                 imageVector = Icons.Outlined.Check,
                 contentDescription = null,
-                tint = AlkahfColors.Accent,
+                tint = AlkahfColors.Correct,
                 modifier = Modifier.size(15.dp),
             )
             Text(
@@ -432,12 +432,12 @@ private fun OrderRow(
 ) {
     // Badge colour: neutral while ordering; green/clay once checked per position.
     val badgeBg = when (positionCorrect) {
-        true -> AlkahfColors.Accent
+        true -> AlkahfColors.Correct
         false -> AlkahfColors.ClayChip
         null -> AlkahfColors.ChipBg
     }
     val badgeInk = when (positionCorrect) {
-        true -> AlkahfColors.OnAccent
+        true -> AlkahfColors.OnCorrect
         false -> AlkahfColors.ClayText
         null -> AlkahfColors.InkSecondaryDark
     }
@@ -511,8 +511,8 @@ private fun MoveButton(
 private fun CorrectOrderRow(position: Int, item: AyatItem) {
     Surface(
         shape = RoundedCornerShape(14.dp),
-        color = AlkahfColors.AccentTint2,
-        border = BorderStroke(1.dp, AlkahfColors.CardBorderHero),
+        color = AlkahfColors.CorrectTint,
+        border = BorderStroke(1.dp, AlkahfColors.CorrectBorder),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(
@@ -520,7 +520,7 @@ private fun CorrectOrderRow(position: Int, item: AyatItem) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
-                Modifier.size(26.dp).background(AlkahfColors.Accent, RoundedCornerShape(8.dp)),
+                Modifier.size(26.dp).background(AlkahfColors.Correct, RoundedCornerShape(8.dp)),
                 contentAlignment = Alignment.Center,
             ) {
                 // Eastern Arabic-Indic ordinal — muṣḥaf context.
@@ -528,7 +528,7 @@ private fun CorrectOrderRow(position: Int, item: AyatItem) {
                     text = toEasternArabicDigits(position),
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
-                    color = AlkahfColors.OnAccent,
+                    color = AlkahfColors.OnCorrect,
                 )
             }
             CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
@@ -537,7 +537,7 @@ private fun CorrectOrderRow(position: Int, item: AyatItem) {
                     fontFamily = AmiriQuran,
                     fontSize = 20.sp,
                     lineHeight = 36.sp,
-                    color = AlkahfColors.AccentDeep,
+                    color = AlkahfColors.CorrectDeep,
                     modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
                 )
             }

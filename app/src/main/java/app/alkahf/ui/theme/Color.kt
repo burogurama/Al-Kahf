@@ -77,6 +77,9 @@ data class Palette(
     val TaggedText: Color,
     val NowPlayingFill: Color,
     val AyahHighlightFill: Color,
+    // Khatam wird boundary marks in the muṣḥaf (faint tint + a gold edge bar).
+    val WirdMarkFill: Color,
+    val WirdMarkEdge: Color,
     val PlayTile: Color,
     val PlayTileInk: Color,
     val KhatamGoldDeep: Color,
@@ -100,6 +103,14 @@ data class Palette(
     val ExerciseSelectedCard: Color,
     val ArabicAnswerInk: Color,
     val ExerciseSegmentedTrack: Color,
+    // Exercise "correct" feedback. Mirrors the accent in the default/dark
+    // palettes; the Rose palette overrides it to a muted sage so success stays
+    // visually separate from the rose primary/selected states.
+    val Correct: Color,
+    val CorrectDeep: Color,
+    val CorrectTint: Color,
+    val CorrectBorder: Color,
+    val OnCorrect: Color,
     // Quranic keyboard
     val KeyboardTray: Color,
     val KeyboardLetterKey: Color,
@@ -183,6 +194,8 @@ val LightPalette = Palette(
     TaggedText = Color(0xFF9A917F),
     NowPlayingFill = Color(0xFFF1E1B4),
     AyahHighlightFill = Color(0xFFD6E8DF),
+    WirdMarkFill = Color(0xFFF6EAC9),
+    WirdMarkEdge = Color(0xFFC18A2E),
     PlayTile = Color(0xFF2A2620),
     PlayTileInk = Color(0xFFF5F0E6),
     KhatamGoldDeep = Color(0xFF9A732F),
@@ -206,6 +219,12 @@ val LightPalette = Palette(
     ExerciseSelectedCard = Color(0xFFECF3F0),
     ArabicAnswerInk = Color(0xFF234E45),
     ExerciseSegmentedTrack = Color(0xFFEFE8D9),
+    // "Correct" — mirrors the accent here (no visual change to this palette).
+    Correct = Color(0xFF3E7D6E),
+    CorrectDeep = Color(0xFF2F6055),
+    CorrectTint = Color(0xFFE2EDE8),
+    CorrectBorder = Color(0xFFD6E4DC),
+    OnCorrect = Color(0xFFFBFAF5),
     // Quranic keyboard — tuned to the app's warm paper/surface language (not a
     // stark white native keyboard): the tray is a warm shelf, keys are soft
     // surface cards bordered with the app's hairline, function keys a touch deeper.
@@ -291,6 +310,8 @@ val DarkPalette = Palette(
     TaggedText = Color(0xFF6E6655),
     NowPlayingFill = Color(0xFF3E351C),
     AyahHighlightFill = Color(0xFF23362F),
+    WirdMarkFill = Color(0xFF3A3016),
+    WirdMarkEdge = Color(0xFFC9A552),
     PlayTile = Color(0xFF2E2A20),
     PlayTileInk = Color(0xFFEDE5D2),
     KhatamGoldDeep = Color(0xFFD9A45C),
@@ -314,6 +335,12 @@ val DarkPalette = Palette(
     ExerciseSelectedCard = Color(0xFF223A33),
     ArabicAnswerInk = Color(0xFF8FC3B4),
     ExerciseSegmentedTrack = Color(0xFF2A251A),
+    // "Correct" — mirrors the accent here (no visual change to this palette).
+    Correct = Color(0xFF3E7D6E),
+    CorrectDeep = Color(0xFF74BBA4),
+    CorrectTint = Color(0xFF1E342D),
+    CorrectBorder = Color(0xFF294339),
+    OnCorrect = Color(0xFFFBFAF5),
     // Quranic keyboard
     KeyboardTray = Color(0xFF1B1810),
     KeyboardLetterKey = Color(0xFF34302A),
@@ -330,11 +357,145 @@ val DarkPalette = Palette(
     KeyboardWaqfBg = Color(0xFF1F342D),
 )
 
+/**
+ * "Rose & Blush" — a soft, romantic light reskin. Per the design handoff this is
+ * a palette swap only: structure, layout, radii, type, and the reverent Amiri
+ * Arabic are unchanged. The deep-green primary becomes rose, warm paper becomes
+ * pink-cream, and gold becomes rose-gold. The Qurʾān ink stays a dignified plum
+ * (never pink), and "correct" feedback uses a muted sage so success never
+ * depends on pink alone. There is no rose dark palette; dark mode keeps the
+ * existing [DarkPalette].
+ */
+val RosePalette = Palette(
+    Paper = Color(0xFFFDF5F7),
+    Surface = Color(0xFFFFFFFF),
+    SurfaceHero = Color(0xFFFBE7EE),
+    NavSurface = Color(0xFFFCEEF2),
+    CardBorder = Color(0xFFF1DBE3),
+    CardBorderHero = Color(0xFFF3D7E1),
+    ChipBg = Color(0xFFF6E6ED),
+    Ink = Color(0xFF4A2B39),
+    InkSecondary = Color(0xFF846068),
+    InkSecondaryDark = Color(0xFF6E4F5C),
+    InkMuted = Color(0xFF9B7C88),
+    InkFaint = Color(0xFFA98B96),
+    InkFainter = Color(0xFFB79AA4),
+    Accent = Color(0xFFC04D7C),
+    AccentDeep = Color(0xFFA53E68),
+    AccentTint = Color(0xFFFBDDE8),
+    AccentTint2 = Color(0xFFFBE4EC),
+    AccentLight = Color(0xFFD98BAD),
+    OnAccent = Color(0xFFFFF8FB),
+    Learning = Color(0xFFC98B6E),
+    NotStarted = Color(0xFFEFD9E2),
+    GoldText = Color(0xFFA8694C),
+    GoldBg = Color(0xFFF8E8E0),
+    SecondaryButtonBorder = Color(0xFFE7C9D6),
+    Chevron = Color(0xFFC7B0B5),
+    PageSurface = Color(0xFFFCEFF3),
+    Hairline = Color(0xFFF4E2E9),
+    DockBorder = Color(0xFFF1DBE3),
+    HeaderRule = Color(0xFFEBCFDB),
+    InkChrome = Color(0xFF6E4F5C),
+    InkFooter = Color(0xFFB79AA4),
+    ConcealedInk = Color(0xFFB79AA4),
+    ConcealedMedallion = Color(0xFFC7B0B5),
+    StumbleAmber = Color(0xFFC98B6E),
+    StumbleBorder = Color(0xFFE8CDBF),
+    StumbleBg = Color(0xFFFBEEE7),
+    StumbleBgPressed = Color(0xFFF5E2D8),
+    StumbleInk = Color(0xFFA8694C),
+    SessionBg = Color(0xFFFBE9F0),
+    LoopCardBorder = Color(0xFFF3D7E1),
+    ControlBorder = Color(0xFFEFD6E0),
+    ControlPressed = Color(0xFFF8E5EE),
+    SegmentedTrack = Color(0xFFF3DEE7),
+    SegmentedSelected = Color(0xFFFFFFFF),
+    TransportGlyph = Color(0xFF4A2B39),
+    WordHighlightBg = Color(0xFFF7D7E3),
+    WordHighlightInk = Color(0xFF8A2F57),
+    UpcomingWord = Color(0xFFC7B0B5),
+    DashedNode = Color(0xFFD6BCC7),
+    DashedLink = Color(0xFFE3CAD5),
+    QueuedNumeral = Color(0xFFC0A2AE),
+    ProgressTrack = Color(0xFFF2D9E2),
+    ForgotInk = Color(0xFFA85542),
+    ForgotHint = Color(0xFFC99A8E),
+    ForgotBorder = Color(0xFFECCFC7),
+    ForgotBg = Color(0xFFF8E2DC),
+    HesitantHint = Color(0xFFC98B6E),
+    PerfectHint = Color(0xFFB7DBC9),
+    MapEmpty = Color(0xFFF0DCE4),
+    WaveformBg = Color(0xFFFAE9F0),
+    WaveformPlayed = Color(0xFFC04D7C),
+    WaveformUnplayed = Color(0xFFECD3DE),
+    TawqitCurrentInk = Color(0xFF8A2F57),
+    TaggedText = Color(0xFF9B7C88),
+    NowPlayingFill = Color(0xFFF6E2D2),
+    AyahHighlightFill = Color(0xFFFBDDE8),
+    WirdMarkFill = Color(0xFFF8E2D2),
+    WirdMarkEdge = Color(0xFFC98B6E),
+    PlayTile = Color(0xFF3A2230),
+    PlayTileInk = Color(0xFFFDF5F7),
+    KhatamGoldDeep = Color(0xFFA8694C),
+    KhatamGoldBorder = Color(0xFFC98B6E),
+    KhatamProgressFill = Color(0xFFC98B6E),
+    KhatamToday = Color(0xFFDBA890),
+    KhatamCardTint = Color(0xFFF8E8E0),
+    KhatamInsetTint = Color(0xFFF3DDD0),
+    KhatamCardBorder = Color(0xFFEAD3C4),
+    KhatamBorderSoft = Color(0xFFE3CCBD),
+    KhatamRingTrack = Color(0xFFF2D9E2),
+    KhatamUpcoming = Color(0xFFF0DCE4),
+    ModalScrim = Color(0x6B2A1923),
+    // Feedback — "Clay" (warm terracotta for "not quite"; never red)
+    ClayText = Color(0xFFA85542),
+    ClayTextSoft = Color(0xFFA8745F),
+    ClayBg = Color(0xFFF8E2DC),
+    ClayBorder = Color(0xFFECD3CC),
+    ClayChip = Color(0xFFF4DACF),
+    // Exercise UI accents
+    ExerciseSelectedCard = Color(0xFFFBE4EC),
+    ArabicAnswerInk = Color(0xFF4A2B39),
+    ExerciseSegmentedTrack = Color(0xFFF3DEE7),
+    // "Correct" — muted sage, kept distinct from the rose primary/selected states.
+    // Slightly deeper than the handoff's #5E9E86 so the white check-glyph on the
+    // correct-position badges clears the ~3:1 contrast bar (~3.7:1, up from 2.98:1).
+    Correct = Color(0xFF4F8D76),
+    CorrectDeep = Color(0xFF2F6B58),
+    CorrectTint = Color(0xFFDCEFE7),
+    CorrectBorder = Color(0xFFBFE0D2),
+    OnCorrect = Color(0xFFF4FBF7),
+    // Quranic keyboard — dusty rose-cream trays; rose-gold ḥarakāt, mauve marks.
+    KeyboardTray = Color(0xFFF3E3E8),
+    KeyboardLetterKey = Color(0xFFFFFFFF),
+    KeyboardSpecialKey = Color(0xFFE7CDD8),
+    KeyboardHarakatBg = Color(0xFFFBEEE7),
+    KeyboardHarakatKey = Color(0xFFFEF6F0),
+    KeyboardHarakatBorder = Color(0xFFE8CFBF),
+    KeyboardHarakatGlyph = Color(0xFFC98B6E),
+    KeyboardUthmaniBg = Color(0xFFF0E3EA),
+    KeyboardUthmaniKey = Color(0xFFF8F1F5),
+    KeyboardUthmaniBorder = Color(0xFFDCC6D2),
+    KeyboardUthmaniGlyph = Color(0xFF9B6A86),
+    KeyboardWaqfRing = Color(0xFFC76A92),
+    KeyboardWaqfBg = Color(0xFFF8E2EC),
+)
+
 object AlkahfColors {
     private val palette = mutableStateOf(LightPalette)
 
-    fun setDark(dark: Boolean) {
-        val target = if (dark) DarkPalette else LightPalette
+    /**
+     * Selects the active palette. Dark mode keeps the existing dark palette
+     * regardless of [rose] (the Rose & Blush reskin is a light-theme palette
+     * only); in light mode [rose] swaps the green/paper tokens for Rose & Blush.
+     */
+    fun select(dark: Boolean, rose: Boolean) {
+        val target = when {
+            dark -> DarkPalette
+            rose -> RosePalette
+            else -> LightPalette
+        }
         if (palette.value != target) palette.value = target
     }
 
@@ -404,6 +565,8 @@ object AlkahfColors {
     val TaggedText get() = palette.value.TaggedText
     val NowPlayingFill get() = palette.value.NowPlayingFill
     val AyahHighlightFill get() = palette.value.AyahHighlightFill
+    val WirdMarkFill get() = palette.value.WirdMarkFill
+    val WirdMarkEdge get() = palette.value.WirdMarkEdge
     val PlayTile get() = palette.value.PlayTile
     val PlayTileInk get() = palette.value.PlayTileInk
     val KhatamGoldDeep get() = palette.value.KhatamGoldDeep
@@ -425,6 +588,11 @@ object AlkahfColors {
     val ExerciseSelectedCard get() = palette.value.ExerciseSelectedCard
     val ArabicAnswerInk get() = palette.value.ArabicAnswerInk
     val ExerciseSegmentedTrack get() = palette.value.ExerciseSegmentedTrack
+    val Correct get() = palette.value.Correct
+    val CorrectDeep get() = palette.value.CorrectDeep
+    val CorrectTint get() = palette.value.CorrectTint
+    val CorrectBorder get() = palette.value.CorrectBorder
+    val OnCorrect get() = palette.value.OnCorrect
     val KeyboardTray get() = palette.value.KeyboardTray
     val KeyboardLetterKey get() = palette.value.KeyboardLetterKey
     val KeyboardSpecialKey get() = palette.value.KeyboardSpecialKey

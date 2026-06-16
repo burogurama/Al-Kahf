@@ -59,7 +59,7 @@ class UserPreferences(context: Context) {
         prefs.edit().putString(KEY_ACTIVE_RECITER, path).apply()
     }
 
-    /** "light" | "dark" | "system" (default). */
+    /** "light" | "dark" | "system" (default) | "rose" (Rose & Blush light reskin). */
     var themeMode: String
         get() = prefs.getString(KEY_THEME_MODE, "system") ?: "system"
         set(value) {

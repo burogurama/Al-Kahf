@@ -62,7 +62,7 @@ fun KhatamTrackerScreen(
     state: KhatamState,
     onBack: () -> Unit,
     onOpenPortion: () -> Unit,
-    onStartReading: (page: Int) -> Unit,
+    onStartReading: () -> Unit,
     onReminderChange: (enabled: Boolean, minute: Int) -> Unit,
     onCancel: () -> Unit,
 ) {
@@ -409,7 +409,7 @@ private fun TodayPortionCard(
     state: KhatamState,
     surahName: (Int) -> String,
     onOpenPortion: () -> Unit,
-    onStartReading: (page: Int) -> Unit,
+    onStartReading: () -> Unit,
 ) {
     val portion = state.todaysPortion
     Surface(
@@ -463,7 +463,7 @@ private fun TodayPortionCard(
                 )
             }
             Button(
-                onClick = { portion?.let { onStartReading(it.pageFrom) } },
+                onClick = { portion?.let { onStartReading() } },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 14.dp)

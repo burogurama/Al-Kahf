@@ -125,6 +125,14 @@ class KhatamStore(
         return updated.toState()
     }
 
+    /**
+     * Records the muṣḥaf [page] the user is currently reading in the active khatam,
+     * so "continue reading" can resume there. A no-op when no khatam is active.
+     */
+    suspend fun setKhatamReadPage(page: Int) {
+        userDao.setKhatamReadPage(page)
+    }
+
     /** Removes the active khatam (cancel / delete) and clears its reminder mirror. Idempotent. */
     suspend fun cancelKhatam() {
         userDao.deleteActiveKhatam()
@@ -155,6 +163,12 @@ class KhatamStore(
         val todaysJuz = KhatamMath.todaysPortionJuz(unitsCompleted)
         val isComplete = unitsCompleted >= KhatamMath.TOTAL_UNITS
         val khatamRiwayah = Riwayah.fromKey(riwayah)
+        val portion = if (isComplete) null else quranText.khatamPortion(todaysJuz, khatamRiwayah)
+        // Resume where reading left off, but only within today's portion; a page
+        // outside it (a new day's juzʼ, or never read) falls back to its start.
+        val resumePage = portion?.let {
+            if (lastReadPage in it.pageFrom..it.pageTo) lastReadPage else it.pageFrom
+        } ?: 1
         return KhatamState(
             pace = pace,
             startEpochDay = startDate,
@@ -162,7 +176,8 @@ class KhatamStore(
             totalUnits = KhatamMath.TOTAL_UNITS,
             currentDay = currentDay,
             todaysPortionJuz = todaysJuz,
-            todaysPortion = if (isComplete) null else quranText.khatamPortion(todaysJuz, khatamRiwayah),
+            todaysPortion = portion,
+            resumePage = resumePage,
             finishEpochDay = KhatamMath.derivedFinishDate(startDate, pace),
             paceStatus = KhatamMath.paceStatus(unitsCompleted, currentDay, pace),
             streakDays = streakDays,
