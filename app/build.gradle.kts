@@ -13,8 +13,8 @@ android {
         applicationId = "app.alkahf"
         minSdk = 26
         targetSdk = 35
-        versionCode = 181
-        versionName = "1.8.1"
+        versionCode = 190
+        versionName = "1.9.0"
     }
 
     buildTypes {
