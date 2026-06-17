@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Download
@@ -35,6 +36,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.PathEffect
@@ -63,6 +65,7 @@ fun LibraryScreen(
     onOpenPreset: (Long) -> Unit = {},
     onNewPreset: () -> Unit = {},
     onManageReciter: (ReciterStatus) -> Unit = {},
+    onOpenBookmarks: () -> Unit = {},
     onSelectTab: (AlkahfTab) -> Unit = {},
 ) {
     val context = LocalContext.current
@@ -96,6 +99,7 @@ fun LibraryScreen(
         ) {
             LibraryHeader()
             storage?.let { StorageMeter(it) }
+            BookmarksEntry(onClick = onOpenBookmarks)
             SectionCaption(stringResource(R.string.library_section_reciters))
             reciters.forEach { reciter ->
                 ReciterRow(
@@ -147,6 +151,42 @@ fun LibraryScreen(
                 }
             },
         )
+    }
+}
+
+@Composable
+private fun BookmarksEntry(onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(18.dp),
+        color = AlkahfColors.Surface,
+        border = BorderStroke(1.dp, AlkahfColors.CardBorder),
+        modifier = Modifier.fillMaxWidth().padding(top = 14.dp),
+    ) {
+        Row(
+            Modifier.padding(horizontal = 14.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                Modifier.size(38.dp).clip(RoundedCornerShape(11.dp)).background(AlkahfColors.KhatamCardTint),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(Icons.Filled.Bookmark, null, tint = AlkahfColors.BookmarkRibbon, modifier = Modifier.size(19.dp))
+            }
+            Text(
+                text = stringResource(R.string.bookmarks_title),
+                fontSize = 15.5.sp,
+                fontWeight = FontWeight.Bold,
+                color = AlkahfColors.Ink,
+                modifier = Modifier.weight(1f).padding(start = 13.dp),
+            )
+            Icon(
+                Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                null,
+                tint = AlkahfColors.Chevron,
+                modifier = Modifier.size(22.dp),
+            )
+        }
     }
 }
 

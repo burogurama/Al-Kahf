@@ -142,5 +142,7 @@ class AlkahfApplication : Application() {
             repository.reconcileKhatamReminder()
             ReminderScheduler.reschedule(this@AlkahfApplication)
         }
+        // Drop finished Exercises sessions older than a day (the auto-delete rule).
+        CoroutineScope(SupervisorJob()).launch { repository.pruneExerciseSessions() }
     }
 }

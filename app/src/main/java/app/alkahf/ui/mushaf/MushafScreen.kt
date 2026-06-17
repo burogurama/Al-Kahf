@@ -13,6 +13,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.relocation.BringIntoViewRequester
@@ -77,6 +78,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
@@ -326,6 +328,17 @@ fun MushafScreen(
     // boundaries. Within a sūrah every id between the ends is a real āyah, and the
     // tap-to-extend logic only grows by ±1, so a selection never crosses sūrahs.
     var selection by remember { mutableStateOf<IntRange?>(null) }
+    // A selection pending a bookmark: holds the id range while the note dialog is open.
+    var bookmarkDraft by remember { mutableStateOf<IntRange?>(null) }
+    // Every āyah id covered by a saved bookmark, so the reader can mark the ranges.
+    // Reloaded after a new bookmark is saved (bump [bookmarkReload]).
+    var bookmarkReload by remember { mutableStateOf(0) }
+    var bookmarkedIds by remember { mutableStateOf<Set<Int>>(emptySet()) }
+    LaunchedEffect(bookmarkReload) {
+        bookmarkedIds = repository.bookmarks()
+            .flatMap { bm -> (bm.from..bm.to).map { bm.surah * 1000 + it } }
+            .toSet()
+    }
     // Floating action menu for the selection: anchored at the long-press point
     // in window coordinates (null = closed).
     var menuAnchor by remember { mutableStateOf<IntOffset?>(null) }
@@ -532,6 +545,7 @@ fun MushafScreen(
                             selectedIds = selectedIds,
                             scrollToAyahId = scrollToAyahId,
                             wird = wird,
+                            bookmarkedIds = bookmarkedIds,
                         )
                     }
                 }
@@ -614,6 +628,11 @@ fun MushafScreen(
                     selection = null
                     menuAnchor = null
                 },
+                onBookmark = {
+                    // Keep the selection visible behind the note dialog; clear on save.
+                    bookmarkDraft = selection
+                    menuAnchor = null
+                },
                 onSetState = { state ->
                     val ids = selectedIds.toList()
                     // Reflect the change on every loaded page, not just the current
@@ -628,6 +647,24 @@ fun MushafScreen(
                     menuAnchor = null
                 },
                 onDismiss = { menuAnchor = null },
+            )
+        }
+
+        bookmarkDraft?.let { draft ->
+            val bmSurah = draft.first / 1000
+            app.alkahf.ui.bookmarks.BookmarkSheet(
+                surah = bmSurah,
+                from = draft.first % 1000,
+                to = draft.last % 1000,
+                onSave = { note, label ->
+                    scope.launch {
+                        repository.addBookmark(bmSurah, draft.first % 1000, draft.last % 1000, note, label)
+                        bookmarkReload++
+                    }
+                    bookmarkDraft = null
+                    selection = null
+                },
+                onDismiss = { bookmarkDraft = null },
             )
         }
 
@@ -879,6 +916,7 @@ private fun MushafPageView(
     selectedIds: Set<Int>,
     scrollToAyahId: Int?,
     wird: WirdMarks?,
+    bookmarkedIds: Set<Int>,
 ) {
     LaunchedEffect(pageNumber, riwayah) {
         if (session == null) {
@@ -939,6 +977,7 @@ private fun MushafPageView(
                             contextIds = contextIds,
                             selectedIds = selectedIds,
                             wird = wird,
+                            bookmarkedIds = bookmarkedIds,
                         )
                     }
                 }
@@ -962,6 +1001,7 @@ private fun PageGroupView(
     contextIds: Set<Int>,
     selectedIds: Set<Int>,
     wird: WirdMarks?,
+    bookmarkedIds: Set<Int>,
 ) {
     if (group.showSurahHeader) {
         SurahHeaderBand(
@@ -982,7 +1022,7 @@ private fun PageGroupView(
                 .padding(top = 12.dp, bottom = 10.dp),
         )
     }
-    AyatBody(group, hideMode, session, playingAyahId, onAudioTap, onSelectAyah, onAyahLongPress, sabaqIds, contextIds, selectedIds, wird)
+    AyatBody(group, hideMode, session, playingAyahId, onAudioTap, onSelectAyah, onAyahLongPress, sabaqIds, contextIds, selectedIds, wird, bookmarkedIds)
 }
 
 @Composable
@@ -1083,6 +1123,7 @@ private fun AyatBody(
     contextIds: Set<Int>,
     selectedIds: Set<Int>,
     wird: WirdMarks?,
+    bookmarkedIds: Set<Int>,
 ) {
     val revealedByAyah = group.ayahs.associate { it.id to session.revealedOf(it) }
     val memByAyah = group.ayahs.associate { it.id to (session.memStates[it.id] ?: MemorizationState.NOT_STARTED) }
@@ -1106,6 +1147,8 @@ private fun AyatBody(
     val nowPlayingFill = AlkahfColors.NowPlayingFill
     val wirdFill = AlkahfColors.WirdMarkFill
     val wirdEdge = AlkahfColors.WirdMarkEdge
+    val bookmarkFill = AlkahfColors.BookmarkHighlight
+    val bookmarkEdge = AlkahfColors.BookmarkRibbon
 
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
         Text(
@@ -1175,6 +1218,47 @@ private fun AyatBody(
                             )
                         }
                     }
+                    // Saved bookmarks: a faint gold wash behind any bookmarked āyah,
+                    // with a ribbon edge bar at its start. Drawn beneath the selection
+                    // / now-playing fills so an active selection still wins on top.
+                    groupText.spans.map { it.ayahId }.distinct()
+                        .filter { it in bookmarkedIds }
+                        .forEach { ayahId ->
+                            val ayahSpans = groupText.spans.filter { it.ayahId == ayahId }
+                            if (ayahSpans.isEmpty()) return@forEach
+                            val start = ayahSpans.minOf { it.start }
+                            val end = ayahSpans.maxOf { it.end }
+                            val firstLine = layout.getLineForOffset(start)
+                            val lastLine = layout.getLineForOffset((end - 1).coerceAtLeast(start))
+                            var entryX = 0f; var entryTop = 0f; var entryBottom = 0f
+                            for (line in firstLine..lastLine) {
+                                val lineStart = layout.getLineStart(line)
+                                val lineEnd = layout.getLineEnd(line, visibleEnd = true)
+                                val ls = maxOf(start, lineStart)
+                                val le = minOf(end, lineEnd)
+                                if (le <= ls) continue
+                                val bnds = layout.getPathForRange(ls, le).getBounds()
+                                val left = if (end >= lineEnd) layout.getLineLeft(line) else bnds.left
+                                val right = if (start <= lineStart) layout.getLineRight(line) else bnds.right
+                                drawRoundRect(
+                                    color = bookmarkFill,
+                                    topLeft = Offset(left - padH, bnds.top - padV),
+                                    size = androidx.compose.ui.geometry.Size(
+                                        (right - left) + padH * 2,
+                                        bnds.height + padV * 2,
+                                    ),
+                                    cornerRadius = radius,
+                                )
+                                if (line == firstLine) { entryX = right; entryTop = bnds.top; entryBottom = bnds.bottom }
+                            }
+                            val barW = 3.dp.toPx()
+                            drawRoundRect(
+                                color = bookmarkEdge,
+                                topLeft = Offset(entryX - barW / 2, entryTop - padV),
+                                size = androidx.compose.ui.geometry.Size(barW, (entryBottom - entryTop) + padV * 2),
+                                cornerRadius = androidx.compose.ui.geometry.CornerRadius(barW / 2),
+                            )
+                        }
                     litIds.forEach { ayahId ->
                         val ayahSpans = groupText.spans.filter { it.ayahId == ayahId }
                         if (ayahSpans.isEmpty()) return@forEach
@@ -1465,6 +1549,7 @@ private fun SelectionContextMenu(
     currentState: MemorizationState?,
     onListen: () -> Unit,
     onSetSabaq: () -> Unit,
+    onBookmark: () -> Unit,
     onSetState: (MemorizationState) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -1484,6 +1569,7 @@ private fun SelectionContextMenu(
             Column(Modifier.padding(vertical = 6.dp)) {
                 MenuItem(label = stringResource(R.string.mushaf_menu_listen), onClick = onListen)
                 MenuItem(label = stringResource(R.string.mushaf_menu_set_sabaq), onClick = onSetSabaq)
+                MenuItem(label = stringResource(R.string.mushaf_menu_bookmark), onClick = onBookmark)
                 HorizontalDivider(
                     thickness = 1.dp,
                     color = AlkahfColors.Hairline,

@@ -1,13 +1,18 @@
 package app.alkahf.ui.exercises
 
+import app.alkahf.data.ExerciseSession
 import app.alkahf.data.QuranRepository
 import app.alkahf.data.exercises.ExerciseQuestion
 import app.alkahf.data.exercises.ExerciseScope
 import app.alkahf.data.exercises.ExerciseType
 import app.alkahf.data.exercises.SurahChoice
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 
 /** The grading status of a single answered question. */
 enum class AnswerStatus { UNANSWERED, CORRECT, NOT_QUITE }
@@ -66,8 +71,20 @@ class ExercisesController(private val repository: QuranRepository) {
     private val _state = MutableStateFlow(ExercisesUiState())
     val state: StateFlow<ExercisesUiState> = _state.asStateFlow()
 
+    /** Persisted sessions for the setup screen's "Recent" list. */
+    private val _savedSessions = MutableStateFlow<List<ExerciseSession>>(emptyList())
+    val savedSessions: StateFlow<List<ExerciseSession>> = _savedSessions.asStateFlow()
+
     private var sessionStartMs: Long = 0L
     private var resultRecorded = false
+
+    // The active session's persistence identity + config, so edits can be saved
+    // and the session re-encoded as the user works through it.
+    private var sessionId: Long? = null
+    private var sessionScope: ExerciseScope = ExerciseScope.AllMemorized
+    private var sessionTypes: Set<ExerciseType> = emptySet()
+    private var sessionLength: Int = 0
+    private val persistScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     /** Loads the sūrah type-ahead choices once, for the setup screen and runner. */
     suspend fun loadChoices() {
@@ -75,23 +92,76 @@ class ExercisesController(private val repository: QuranRepository) {
         _state.value = _state.value.copy(surahChoices = repository.exerciseSurahChoices())
     }
 
-    /** Builds a fresh session and enters it at the first question. */
+    /** Builds a fresh session, persists it, and enters it at the first question. */
     suspend fun generate(scope: ExerciseScope, types: Set<ExerciseType>, length: Int) {
         val questions = repository.buildExerciseSession(scope, types, length)
         val choices = _state.value.surahChoices.ifEmpty { repository.exerciseSurahChoices() }
         sessionStartMs = System.currentTimeMillis()
         resultRecorded = false
+        sessionScope = scope
+        sessionTypes = types
+        sessionLength = length
+        val answers = questions.map { q ->
+            QuestionState(order = (q as? ExerciseQuestion.OrderAyat)?.shuffledOrder?.map { it.id })
+        }
         _state.value = ExercisesUiState(
             questions = questions,
-            answers = questions.map { q ->
-                QuestionState(
-                    order = (q as? ExerciseQuestion.OrderAyat)?.shuffledOrder?.map { it.id },
-                )
-            },
+            answers = answers,
             currentIndex = 0,
             surahChoices = choices,
             ready = true,
         )
+        sessionId = if (questions.isEmpty()) {
+            null
+        } else {
+            val payload = ExerciseSessionCodec.encode(scope, types, length, questions, answers, 0, 0L)
+            repository.saveExerciseSession(payload, types, questions.size)
+        }
+    }
+
+    /** Loads the persisted sessions (pruning finished ones older than a day). */
+    suspend fun loadSavedSessions() {
+        repository.pruneExerciseSessions()
+        _savedSessions.value = repository.exerciseSessions()
+    }
+
+    /**
+     * Opens a saved session for resume (in-progress) or review (finished). Returns
+     * true when the session is already finished. Resume lands on the first
+     * unanswered question.
+     */
+    suspend fun open(id: Long): Boolean {
+        val session = repository.exerciseSession(id) ?: return false
+        val decoded = ExerciseSessionCodec.decode(session.payload)
+        val choices = _state.value.surahChoices.ifEmpty { repository.exerciseSurahChoices() }
+        sessionId = id
+        sessionScope = decoded.scope
+        sessionTypes = decoded.types
+        sessionLength = decoded.length
+        resultRecorded = session.isFinished
+        sessionStartMs = System.currentTimeMillis() - decoded.durationMs
+        val firstUnanswered = decoded.answers.indexOfFirst { it.status == AnswerStatus.UNANSWERED }
+        val index = when {
+            session.isFinished -> 0
+            firstUnanswered >= 0 -> firstUnanswered
+            else -> decoded.currentIndex
+        }.coerceIn(0, (decoded.questions.size - 1).coerceAtLeast(0))
+        _state.value = ExercisesUiState(
+            questions = decoded.questions,
+            answers = decoded.answers,
+            currentIndex = index,
+            surahChoices = choices,
+            durationMs = decoded.durationMs,
+            ready = true,
+        )
+        return session.isFinished
+    }
+
+    /** Deletes a persisted session and refreshes the list. */
+    suspend fun deleteSession(id: Long) {
+        repository.deleteExerciseSession(id)
+        if (sessionId == id) sessionId = null
+        loadSavedSessions()
     }
 
     fun goTo(index: Int) {
@@ -148,6 +218,20 @@ class ExercisesController(private val repository: QuranRepository) {
         updateCurrent {
             it.copy(status = if (correct) AnswerStatus.CORRECT else AnswerStatus.NOT_QUITE)
         }
+        persistProgress()
+    }
+
+    /** Saves the current answers to the persisted session (fire-and-forget). */
+    private fun persistProgress() {
+        val id = sessionId ?: return
+        val s = _state.value
+        val duration = (System.currentTimeMillis() - sessionStartMs).coerceAtLeast(0L)
+        val payload = ExerciseSessionCodec.encode(
+            sessionScope, sessionTypes, sessionLength, s.questions, s.answers, s.currentIndex, duration,
+        )
+        val correct = s.correctCount
+        val answered = s.answeredCount
+        persistScope.launch { repository.updateExerciseSession(id, payload, correct, answered) }
     }
 
     /** Per-position correctness of the current Order answer (for the marked rows). */
@@ -171,6 +255,12 @@ class ExercisesController(private val repository: QuranRepository) {
             toRevisit = s.toRevisitCount,
             durationMs = duration,
         )
+        sessionId?.let { id ->
+            val payload = ExerciseSessionCodec.encode(
+                sessionScope, sessionTypes, sessionLength, s.questions, s.answers, s.currentIndex, duration,
+            )
+            repository.finishExerciseSession(id, payload, s.correctCount, s.answeredCount)
+        }
     }
 
     private inline fun updateCurrent(transform: (QuestionState) -> QuestionState) {

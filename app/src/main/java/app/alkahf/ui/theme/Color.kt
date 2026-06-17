@@ -111,6 +111,17 @@ data class Palette(
     val CorrectTint: Color,
     val CorrectBorder: Color,
     val OnCorrect: Color,
+    // Bookmarks — gold "ribbon" signature + the selected/saved range wash.
+    val BookmarkRibbon: Color,
+    val BookmarkHighlight: Color,
+    val BookmarkHighlightEdge: Color,
+    // Bookmark label colors (Reflection reuses the accent; Tafsīr the gold tokens).
+    val LabelViolet: Color,
+    val LabelVioletBg: Color,
+    val LabelVioletText: Color,
+    val LabelTerracotta: Color,
+    val LabelTerracottaBg: Color,
+    val LabelTerracottaText: Color,
     // Quranic keyboard
     val KeyboardTray: Color,
     val KeyboardLetterKey: Color,
@@ -225,6 +236,15 @@ val LightPalette = Palette(
     CorrectTint = Color(0xFFE2EDE8),
     CorrectBorder = Color(0xFFD6E4DC),
     OnCorrect = Color(0xFFFBFAF5),
+    BookmarkRibbon = Color(0xFFC9A24A),
+    BookmarkHighlight = Color(0xFFF2E4BE),
+    BookmarkHighlightEdge = Color(0xFFE3CE94),
+    LabelViolet = Color(0xFF9B6FB0),
+    LabelVioletBg = Color(0xFFEFE6F4),
+    LabelVioletText = Color(0xFF6A4C82),
+    LabelTerracotta = Color(0xFFC77B6B),
+    LabelTerracottaBg = Color(0xFFF7E6E1),
+    LabelTerracottaText = Color(0xFFA65343),
     // Quranic keyboard — tuned to the app's warm paper/surface language (not a
     // stark white native keyboard): the tray is a warm shelf, keys are soft
     // surface cards bordered with the app's hairline, function keys a touch deeper.
@@ -341,6 +361,15 @@ val DarkPalette = Palette(
     CorrectTint = Color(0xFF1E342D),
     CorrectBorder = Color(0xFF294339),
     OnCorrect = Color(0xFFFBFAF5),
+    BookmarkRibbon = Color(0xFFD9A45C),
+    BookmarkHighlight = Color(0xFF3E351C),
+    BookmarkHighlightEdge = Color(0xFFC9A552),
+    LabelViolet = Color(0xFFB98FD0),
+    LabelVioletBg = Color(0xFF2E2536),
+    LabelVioletText = Color(0xFFC9A9DE),
+    LabelTerracotta = Color(0xFFD99A85),
+    LabelTerracottaBg = Color(0xFF36231D),
+    LabelTerracottaText = Color(0xFFE0A892),
     // Quranic keyboard
     KeyboardTray = Color(0xFF1B1810),
     KeyboardLetterKey = Color(0xFF34302A),
@@ -466,6 +495,15 @@ val RosePalette = Palette(
     CorrectTint = Color(0xFFDCEFE7),
     CorrectBorder = Color(0xFFBFE0D2),
     OnCorrect = Color(0xFFF4FBF7),
+    BookmarkRibbon = Color(0xFFC98B6E),
+    BookmarkHighlight = Color(0xFFF6E2D2),
+    BookmarkHighlightEdge = Color(0xFFE3CCBD),
+    LabelViolet = Color(0xFF9B6FB0),
+    LabelVioletBg = Color(0xFFF0E6F4),
+    LabelVioletText = Color(0xFF6A4C82),
+    LabelTerracotta = Color(0xFFC77B6B),
+    LabelTerracottaBg = Color(0xFFF7E6E1),
+    LabelTerracottaText = Color(0xFFA65343),
     // Quranic keyboard — dusty rose-cream trays; rose-gold ḥarakāt, mauve marks.
     KeyboardTray = Color(0xFFF3E3E8),
     KeyboardLetterKey = Color(0xFFFFFFFF),
@@ -593,6 +631,15 @@ object AlkahfColors {
     val CorrectTint get() = palette.value.CorrectTint
     val CorrectBorder get() = palette.value.CorrectBorder
     val OnCorrect get() = palette.value.OnCorrect
+    val BookmarkRibbon get() = palette.value.BookmarkRibbon
+    val BookmarkHighlight get() = palette.value.BookmarkHighlight
+    val BookmarkHighlightEdge get() = palette.value.BookmarkHighlightEdge
+    val LabelViolet get() = palette.value.LabelViolet
+    val LabelVioletBg get() = palette.value.LabelVioletBg
+    val LabelVioletText get() = palette.value.LabelVioletText
+    val LabelTerracotta get() = palette.value.LabelTerracotta
+    val LabelTerracottaBg get() = palette.value.LabelTerracottaBg
+    val LabelTerracottaText get() = palette.value.LabelTerracottaText
     val KeyboardTray get() = palette.value.KeyboardTray
     val KeyboardLetterKey get() = palette.value.KeyboardLetterKey
     val KeyboardSpecialKey get() = palette.value.KeyboardSpecialKey

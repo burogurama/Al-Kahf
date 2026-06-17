@@ -55,6 +55,9 @@ private sealed interface Screen {
     data class ReciterDownloads(val reciter: ReciterStatus) : Screen
     data class TawqitTagging(val draft: TawqitTrack) : Screen
     object Settings : Screen
+    object Bookmarks : Screen
+    data class BookmarkDetail(val id: Long) : Screen
+    object ExercisesList : Screen
     object KhatamProgram : Screen
     object KhatamTracker : Screen
     object KhatamPortion : Screen
@@ -191,6 +194,26 @@ fun AlkahfApp(
     fun back() {
         if (backStack.size > 1) backStack.removeAt(backStack.lastIndex)
     }
+    // Pops entries until [target] is on top (or the stack bottom is reached).
+    fun popUntil(target: Screen) {
+        while (backStack.size > 1 && backStack.last() != target) {
+            backStack.removeAt(backStack.lastIndex)
+        }
+    }
+    // Opens Exercises: straight to the create form when no saved tests exist,
+    // otherwise to the tests list. Prunes expired sessions first so a stale
+    // finished test doesn't keep the list alive.
+    fun openExercises() {
+        scope.launch {
+            repository.pruneExerciseSessions()
+            val target = if (repository.exerciseSessions().isEmpty()) {
+                Screen.ExercisesSetup
+            } else {
+                Screen.ExercisesList
+            }
+            navigate(target)
+        }
+    }
     // Opens the muṣḥaf for a khatam reading session: resumes at the last-read page
     // (or today's portion's start) and carries the wird's start/end āyāt so the
     // muṣḥaf can mark where today's portion begins and ends.
@@ -305,7 +328,7 @@ fun AlkahfApp(
             onOpenSettings = { navigate(Screen.Settings) },
             onBeginKhatam = { navigate(Screen.KhatamProgram) },
             onOpenKhatam = { navigate(Screen.KhatamTracker) },
-            onStartExercises = { navigate(Screen.ExercisesSetup) },
+            onStartExercises = { openExercises() },
         )
         is Screen.Mushaf -> MushafScreen(
             startSurah = screen.startSurah,
@@ -319,6 +342,21 @@ fun AlkahfApp(
             onBack = { back() },
             onImportReciter = { reciter -> navigate(Screen.ReciterDownloads(reciter)) },
         )
+        Screen.Bookmarks -> app.alkahf.ui.bookmarks.BookmarksScreen(
+            onBack = { back() },
+            onOpen = { id -> navigate(Screen.BookmarkDetail(id)) },
+            onSelectTab = ::onTab,
+        )
+        is Screen.BookmarkDetail -> app.alkahf.ui.bookmarks.BookmarkDetailScreen(
+            bookmarkId = screen.id,
+            onBack = { back() },
+            onOpenMushaf = { surah, from ->
+                scope.launch {
+                    val page = repository.pageOfAyah(surah, from)
+                    navigate(Screen.Mushaf(startSurah = null, startPage = page, highlight = null))
+                }
+            },
+        )
         is Screen.Loop -> LoopPlayerScreen(
             presetId = screen.presetId,
             newPreset = screen.newPreset,
@@ -326,7 +364,7 @@ fun AlkahfApp(
         )
         Screen.Review -> ReviewScreen(
             onBack = { back() },
-            onOpenExercises = { navigate(Screen.ExercisesSetup) },
+            onOpenExercises = { openExercises() },
         )
         Screen.Progress -> ProgressScreen(
             onOpenPage = { page -> navigate(Screen.Mushaf(null, page, null)) },
@@ -336,6 +374,7 @@ fun AlkahfApp(
             onOpenPreset = { id -> navigate(Screen.Loop(presetId = id, newPreset = false)) },
             onNewPreset = { navigate(Screen.Loop(presetId = null, newPreset = true)) },
             onManageReciter = { reciter -> navigate(Screen.ReciterDownloads(reciter)) },
+            onOpenBookmarks = { navigate(Screen.Bookmarks) },
             onSelectTab = ::onTab,
         )
         Screen.Settings -> app.alkahf.ui.settings.SettingsScreen(
@@ -439,6 +478,19 @@ fun AlkahfApp(
                 )
             }
         }
+        Screen.ExercisesList -> app.alkahf.ui.exercises.ExercisesListScreen(
+            controller = exercisesController,
+            onClose = { back() },
+            onNewTest = { navigate(Screen.ExercisesSetup) },
+            // Resume an in-progress session into the runner; open a finished one
+            // straight to its result.
+            onOpenSession = { id ->
+                scope.launch {
+                    val finished = exercisesController.open(id)
+                    navigate(if (finished) Screen.ExercisesResult else Screen.ExercisesRun)
+                }
+            },
+        )
         Screen.ExercisesSetup -> app.alkahf.ui.exercises.ExercisesSetupScreen(
             controller = exercisesController,
             onClose = { back() },
@@ -463,11 +515,10 @@ fun AlkahfApp(
         )
         Screen.ExercisesResult -> app.alkahf.ui.exercises.ExercisesResultScreen(
             controller = exercisesController,
-            // Closing the result pops the whole pushed flow (Result + Setup) back
-            // to wherever it was opened (Today / Review), refreshing Today.
+            // Closing the result returns to the tests list (popping the runner /
+            // setup that led here), refreshing Today.
             onClose = {
-                back()
-                back()
+                popUntil(Screen.ExercisesList)
                 homeRefresh++
             },
             // "Review the n" re-opens the session at the missed question.
@@ -475,9 +526,10 @@ fun AlkahfApp(
                 exercisesController.goTo(index)
                 navigate(Screen.ExercisesRun)
             },
-            // "New test" pops back to a fresh Setup and refreshes Today.
+            // "New test" returns to the list and opens a fresh create screen.
             onNewTest = {
-                back()
+                popUntil(Screen.ExercisesList)
+                navigate(Screen.ExercisesSetup)
                 homeRefresh++
             },
         )

@@ -315,6 +315,8 @@ class QuranRepository(context: Context) {
     private val presets = LoopPresetStore(userDao, quranText, reciters, settings)
     private val khatam = KhatamStore(userDao, quranText, settings)
     private val exercises = ExerciseStore(quranText, memorization, review, settings)
+    private val bookmarkStore = BookmarkStore(userDao, quranText)
+    private val exerciseSessionStore = ExerciseSessionStore(userDao)
 
     /** Last page open in the Mushaf, so reading resumes where the user left off. */
     var lastMushafPage: Int?
@@ -418,6 +420,19 @@ class QuranRepository(context: Context) {
     }
 
     suspend fun pageOfAyah(surah: Int, ayah: Int): Int = quranText.pageOfAyah(surah, ayah)
+
+    // ── Bookmarks ────────────────────────────────────────────────────────────
+    suspend fun addBookmark(surah: Int, from: Int, to: Int, note: String, label: BookmarkLabel): Long =
+        bookmarkStore.add(surah, from, to, note, label, System.currentTimeMillis())
+
+    suspend fun updateBookmark(id: Long, note: String, label: BookmarkLabel) =
+        bookmarkStore.update(id, note, label, System.currentTimeMillis())
+
+    suspend fun bookmarks(): List<Bookmark> = bookmarkStore.all()
+
+    suspend fun bookmark(id: Long): Bookmark? = bookmarkStore.get(id)
+
+    suspend fun deleteBookmark(id: Long) = bookmarkStore.delete(id)
 
     suspend fun surahAyahCount(surah: Int): Int = quranText.surahAyahCount(surah)
 
@@ -863,6 +878,28 @@ class QuranRepository(context: Context) {
 
     /** How many memorized āyāt are ready to test and how many sūrahs they span. */
     suspend fun exerciseReadiness(): ExerciseReadiness = exercises.readiness()
+
+    // ── Persisted Exercises sessions ─────────────────────────────────────────
+    suspend fun saveExerciseSession(
+        payload: String,
+        types: Set<app.alkahf.data.exercises.ExerciseType>,
+        total: Int,
+    ): Long = exerciseSessionStore.save(payload, types, total, System.currentTimeMillis())
+
+    suspend fun updateExerciseSession(id: Long, payload: String, correct: Int, answered: Int) =
+        exerciseSessionStore.updateAnswers(id, payload, correct, answered)
+
+    suspend fun finishExerciseSession(id: Long, payload: String, correct: Int, answered: Int) =
+        exerciseSessionStore.finish(id, payload, correct, answered, System.currentTimeMillis())
+
+    suspend fun exerciseSessions(): List<ExerciseSession> = exerciseSessionStore.all()
+
+    suspend fun exerciseSession(id: Long): ExerciseSession? = exerciseSessionStore.get(id)
+
+    suspend fun deleteExerciseSession(id: Long) = exerciseSessionStore.delete(id)
+
+    /** Removes sessions finished more than a day ago. */
+    suspend fun pruneExerciseSessions() = exerciseSessionStore.prune(System.currentTimeMillis())
 
     companion object {
         const val PAGE_COUNT = 604

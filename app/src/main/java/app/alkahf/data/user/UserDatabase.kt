@@ -149,6 +149,38 @@ data class KhatamEntity(
     @ColumnInfo(name = "last_read_page") val lastReadPage: Int = 0,
 )
 
+/**
+ * A persisted Exercises session — the full set of questions and the user's
+ * answers, kept so a session can be resumed or reviewed. [finishedAt] is null
+ * while in progress; finished sessions are pruned one day after [finishedAt].
+ * [payload] is the JSON-encoded session (scope, types, questions, answers).
+ */
+@Entity(tableName = "exercise_sessions")
+data class ExerciseSessionEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    @ColumnInfo(name = "created_at") val createdAt: Long,
+    @ColumnInfo(name = "finished_at") val finishedAt: Long? = null,
+    @ColumnInfo(name = "types_csv") val typesCsv: String,
+    val total: Int,
+    val correct: Int,
+    val answered: Int,
+    val payload: String,
+)
+
+/** A user-saved āyah range with an optional note and a label. */
+@Entity(tableName = "bookmarks")
+data class BookmarkEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val surah: Int,
+    @ColumnInfo(name = "ayah_from") val ayahFrom: Int,
+    @ColumnInfo(name = "ayah_to") val ayahTo: Int,
+    val note: String = "",
+    /** "reflection" | "tafsir" | "memorize" | "dua" | "none" (default). */
+    val label: String = "none",
+    @ColumnInfo(name = "created_at") val createdAt: Long,
+    @ColumnInfo(name = "updated_at") val updatedAt: Long,
+)
+
 @Dao
 interface UserDao {
     @Insert
@@ -294,6 +326,43 @@ interface UserDao {
 
     @Query("UPDATE khatam SET last_read_page = :page WHERE active = 1")
     suspend fun setKhatamReadPage(page: Int)
+
+    @Insert
+    suspend fun insertBookmark(bookmark: BookmarkEntity): Long
+
+    @Query("SELECT * FROM bookmarks ORDER BY updated_at DESC")
+    suspend fun allBookmarks(): List<BookmarkEntity>
+
+    @Query("SELECT * FROM bookmarks WHERE id = :id LIMIT 1")
+    suspend fun bookmark(id: Long): BookmarkEntity?
+
+    @Query("UPDATE bookmarks SET note = :note, label = :label, updated_at = :updatedAt WHERE id = :id")
+    suspend fun updateBookmark(id: Long, note: String, label: String, updatedAt: Long)
+
+    @Query("DELETE FROM bookmarks WHERE id = :id")
+    suspend fun deleteBookmark(id: Long)
+
+    @Insert
+    suspend fun insertExerciseSession(session: ExerciseSessionEntity): Long
+
+    // In-progress (finished_at IS NULL) first, then most recent.
+    @Query("SELECT * FROM exercise_sessions ORDER BY finished_at IS NULL DESC, created_at DESC")
+    suspend fun allExerciseSessions(): List<ExerciseSessionEntity>
+
+    @Query("SELECT * FROM exercise_sessions WHERE id = :id LIMIT 1")
+    suspend fun exerciseSession(id: Long): ExerciseSessionEntity?
+
+    @Query("UPDATE exercise_sessions SET payload = :payload, correct = :correct, answered = :answered WHERE id = :id")
+    suspend fun updateExerciseSession(id: Long, payload: String, correct: Int, answered: Int)
+
+    @Query("UPDATE exercise_sessions SET finished_at = :finishedAt, payload = :payload, correct = :correct, answered = :answered WHERE id = :id")
+    suspend fun finishExerciseSession(id: Long, finishedAt: Long, payload: String, correct: Int, answered: Int)
+
+    @Query("DELETE FROM exercise_sessions WHERE id = :id")
+    suspend fun deleteExerciseSession(id: Long)
+
+    @Query("DELETE FROM exercise_sessions WHERE finished_at IS NOT NULL AND finished_at < :before")
+    suspend fun pruneFinishedExerciseSessions(before: Long)
 }
 
 @Database(
@@ -308,8 +377,10 @@ interface UserDao {
         CustomReciterEntity::class,
         ImportedSurahEntity::class,
         KhatamEntity::class,
+        BookmarkEntity::class,
+        ExerciseSessionEntity::class,
     ],
-    version = 10,
+    version = 12,
     exportSchema = false,
 )
 abstract class UserDatabase : RoomDatabase() {
@@ -352,9 +423,43 @@ abstract class UserDatabase : RoomDatabase() {
             }
         }
 
+        // v11: adds the bookmarks table (saved āyah ranges with an optional note).
+        private val MIGRATION_10_11 = object : androidx.room.migration.Migration(10, 11) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS bookmarks (" +
+                        "id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, " +
+                        "surah INTEGER NOT NULL, " +
+                        "ayah_from INTEGER NOT NULL, " +
+                        "ayah_to INTEGER NOT NULL, " +
+                        "note TEXT NOT NULL DEFAULT '', " +
+                        "label TEXT NOT NULL DEFAULT 'none', " +
+                        "created_at INTEGER NOT NULL, " +
+                        "updated_at INTEGER NOT NULL DEFAULT 0)",
+                )
+            }
+        }
+
+        // v12: adds the exercise_sessions table (persisted Exercises sessions).
+        private val MIGRATION_11_12 = object : androidx.room.migration.Migration(11, 12) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS exercise_sessions (" +
+                        "id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, " +
+                        "created_at INTEGER NOT NULL, " +
+                        "finished_at INTEGER, " +
+                        "types_csv TEXT NOT NULL DEFAULT '', " +
+                        "total INTEGER NOT NULL DEFAULT 0, " +
+                        "correct INTEGER NOT NULL DEFAULT 0, " +
+                        "answered INTEGER NOT NULL DEFAULT 0, " +
+                        "payload TEXT NOT NULL DEFAULT '')",
+                )
+            }
+        }
+
         fun open(context: Context): UserDatabase =
             Room.databaseBuilder(context, UserDatabase::class.java, "user.db")
-                .addMigrations(MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
+                .addMigrations(MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12)
                 // Pre-7 schemas have no migration path and may be recreated; from 7
                 // on, a missing migration must fail loudly rather than wipe data.
                 .fallbackToDestructiveMigrationFrom(1, 2, 3, 4, 5, 6)
