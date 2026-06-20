@@ -256,6 +256,24 @@
         <item quantity="one">%1$d āyah selected</item>
         <item quantity="other">%1$d āyāt selected</item>
     </plurals>
+    <!-- Selection action sheet (āyah long-press) -->
+    <string name="sel_selected_on_page">%1$s · Page %2$d</string>
+    <string name="sel_action_sabaq">Sabaq</string>
+    <string name="sel_action_copy">Copy</string>
+    <string name="sel_action_share">Share</string>
+    <string name="sel_kicker_memorization">MEMORIZATION</string>
+    <string name="sel_kicker_your_note">YOUR NOTE</string>
+    <string name="sel_kicker_note_bookmark">NOTE &amp; BOOKMARK</string>
+    <string name="sel_kicker_tafsir">TAFSĪR</string>
+    <string name="sel_edit">Edit</string>
+    <string name="sel_add_note_title">Bookmark &amp; add a note</string>
+    <string name="sel_add_note_subtitle">Save this range with a reflection</string>
+    <string name="sel_note_edited">edited %1$s</string>
+    <string name="sel_tafsir_coming_soon">Tafsīr coming soon</string>
+    <string name="sel_reselect_hint">Long-press to reselect</string>
+    <string name="sel_clear">Clear</string>
+    <string name="sel_copied">Copied to clipboard</string>
+    <string name="action_close">Close</string>
     <string name="mushaf_listen_to_selection">Listen to selection</string>
     <string name="mushaf_listen_start">Listen</string>
     <string name="mushaf_speed">Speed</string>

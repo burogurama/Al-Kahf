@@ -259,6 +259,24 @@
         <item quantity="many">%1$d آيةً محدّدة</item>
         <item quantity="other">%1$d آية محدّدة</item>
     </plurals>
+    <!-- Selection action sheet (āyah long-press) -->
+    <string name="sel_selected_on_page">%1$s · صفحة %2$d</string>
+    <string name="sel_action_sabaq">السبق</string>
+    <string name="sel_action_copy">نسخ</string>
+    <string name="sel_action_share">مشاركة</string>
+    <string name="sel_kicker_memorization">الحفظ</string>
+    <string name="sel_kicker_your_note">ملاحظتك</string>
+    <string name="sel_kicker_note_bookmark">ملاحظة وإشارة مرجعية</string>
+    <string name="sel_kicker_tafsir">التفسير</string>
+    <string name="sel_edit">تعديل</string>
+    <string name="sel_add_note_title">احفظ وأضف ملاحظة</string>
+    <string name="sel_add_note_subtitle">احفظ هذا المدى مع تأمّل</string>
+    <string name="sel_note_edited">عُدّلت %1$s</string>
+    <string name="sel_tafsir_coming_soon">التفسير قريبًا</string>
+    <string name="sel_reselect_hint">اضغط مطوّلًا لإعادة التحديد</string>
+    <string name="sel_clear">مسح</string>
+    <string name="sel_copied">نُسخ إلى الحافظة</string>
+    <string name="action_close">إغلاق</string>
     <string name="mushaf_listen_to_selection">الاستماع للتحديد</string>
     <string name="mushaf_listen_start">استمع</string>
     <string name="mushaf_speed">السرعة</string>

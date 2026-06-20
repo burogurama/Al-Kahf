@@ -115,6 +115,14 @@ data class Palette(
     val BookmarkRibbon: Color,
     val BookmarkHighlight: Color,
     val BookmarkHighlightEdge: Color,
+    // Selection sheet (āyah long-press) — warm cream surface tokens scoped to
+    // this surface; deliberately a touch warmer than the shared chrome.
+    val SelSheetChip: Color,
+    val SelSheetCard: Color,
+    val SelSheetCardBorder: Color,
+    val SelSheetNeutralBg: Color,
+    val SelSheetNeutralBorder: Color,
+    val SelSheetDashed: Color,
     // Bookmark label colors (Reflection reuses the accent; Tafsīr the gold tokens).
     val LabelViolet: Color,
     val LabelVioletBg: Color,
@@ -239,6 +247,12 @@ val LightPalette = Palette(
     BookmarkRibbon = Color(0xFFC9A24A),
     BookmarkHighlight = Color(0xFFF2E4BE),
     BookmarkHighlightEdge = Color(0xFFE3CE94),
+    SelSheetChip = Color(0xFFF3ECDD),
+    SelSheetCard = Color(0xFFFAF6EC),
+    SelSheetCardBorder = Color(0xFFEAE0CC),
+    SelSheetNeutralBg = Color(0xFFF0EEE6),
+    SelSheetNeutralBorder = Color(0xFFC9C2B0),
+    SelSheetDashed = Color(0xFFDCCFA8),
     LabelViolet = Color(0xFF9B6FB0),
     LabelVioletBg = Color(0xFFEFE6F4),
     LabelVioletText = Color(0xFF6A4C82),
@@ -364,6 +378,12 @@ val DarkPalette = Palette(
     BookmarkRibbon = Color(0xFFD9A45C),
     BookmarkHighlight = Color(0xFF3E351C),
     BookmarkHighlightEdge = Color(0xFFC9A552),
+    SelSheetChip = Color(0xFF2A251A),
+    SelSheetCard = Color(0xFF221E16),
+    SelSheetCardBorder = Color(0xFF3A3528),
+    SelSheetNeutralBg = Color(0xFF2E2A20),
+    SelSheetNeutralBorder = Color(0xFF4A4636),
+    SelSheetDashed = Color(0xFF463A26),
     LabelViolet = Color(0xFFB98FD0),
     LabelVioletBg = Color(0xFF2E2536),
     LabelVioletText = Color(0xFFC9A9DE),
@@ -498,6 +518,12 @@ val RosePalette = Palette(
     BookmarkRibbon = Color(0xFFC98B6E),
     BookmarkHighlight = Color(0xFFF6E2D2),
     BookmarkHighlightEdge = Color(0xFFE3CCBD),
+    SelSheetChip = Color(0xFFF6E6ED),
+    SelSheetCard = Color(0xFFFBEEF3),
+    SelSheetCardBorder = Color(0xFFEFD6E0),
+    SelSheetNeutralBg = Color(0xFFF3DEE7),
+    SelSheetNeutralBorder = Color(0xFFD6BCC7),
+    SelSheetDashed = Color(0xFFE3CCBD),
     LabelViolet = Color(0xFF9B6FB0),
     LabelVioletBg = Color(0xFFF0E6F4),
     LabelVioletText = Color(0xFF6A4C82),
@@ -634,6 +660,12 @@ object AlkahfColors {
     val BookmarkRibbon get() = palette.value.BookmarkRibbon
     val BookmarkHighlight get() = palette.value.BookmarkHighlight
     val BookmarkHighlightEdge get() = palette.value.BookmarkHighlightEdge
+    val SelSheetChip get() = palette.value.SelSheetChip
+    val SelSheetCard get() = palette.value.SelSheetCard
+    val SelSheetCardBorder get() = palette.value.SelSheetCardBorder
+    val SelSheetNeutralBg get() = palette.value.SelSheetNeutralBg
+    val SelSheetNeutralBorder get() = palette.value.SelSheetNeutralBorder
+    val SelSheetDashed get() = palette.value.SelSheetDashed
     val LabelViolet get() = palette.value.LabelViolet
     val LabelVioletBg get() = palette.value.LabelVioletBg
     val LabelVioletText get() = palette.value.LabelVioletText

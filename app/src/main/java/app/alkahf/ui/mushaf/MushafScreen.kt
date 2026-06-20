@@ -1,5 +1,6 @@
 package app.alkahf.ui.mushaf
 
+import android.widget.Toast
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -84,6 +85,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.pluralStringResource
@@ -96,18 +98,14 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.IntRect
-import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupPositionProvider
-import androidx.compose.ui.window.PopupProperties
 import app.alkahf.AlkahfApplication
 import app.alkahf.R
 import app.alkahf.data.AyahRange
+import app.alkahf.data.Bookmark
 import app.alkahf.data.WirdMarks
 import app.alkahf.data.MushafPage
 import app.alkahf.data.PageAyah
@@ -328,20 +326,22 @@ fun MushafScreen(
     // boundaries. Within a sūrah every id between the ends is a real āyah, and the
     // tap-to-extend logic only grows by ±1, so a selection never crosses sūrahs.
     var selection by remember { mutableStateOf<IntRange?>(null) }
-    // A selection pending a bookmark: holds the id range while the note dialog is open.
+    // A selection pending a *new* bookmark: holds the id range while the note
+    // sheet is open. [editBookmark] is the parallel path for editing an existing
+    // bookmark's note from the selection sheet.
     var bookmarkDraft by remember { mutableStateOf<IntRange?>(null) }
-    // Every āyah id covered by a saved bookmark, so the reader can mark the ranges.
-    // Reloaded after a new bookmark is saved (bump [bookmarkReload]).
+    var editBookmark by remember { mutableStateOf<Bookmark?>(null) }
+    // The user's saved bookmarks. Reloaded after one is added/edited (bump
+    // [bookmarkReload]); the reader marks every covered āyah and the selection
+    // sheet shows the note for an exactly-matching range.
     var bookmarkReload by remember { mutableStateOf(0) }
-    var bookmarkedIds by remember { mutableStateOf<Set<Int>>(emptySet()) }
-    LaunchedEffect(bookmarkReload) {
-        bookmarkedIds = repository.bookmarks()
-            .flatMap { bm -> (bm.from..bm.to).map { bm.surah * 1000 + it } }
-            .toSet()
+    var bookmarks by remember { mutableStateOf<List<Bookmark>>(emptyList()) }
+    LaunchedEffect(bookmarkReload) { bookmarks = repository.bookmarks() }
+    val bookmarkedIds = remember(bookmarks) {
+        bookmarks.flatMap { bm -> (bm.from..bm.to).map { bm.surah * 1000 + it } }.toSet()
     }
-    // Floating action menu for the selection: anchored at the long-press point
-    // in window coordinates (null = closed).
-    var menuAnchor by remember { mutableStateOf<IntOffset?>(null) }
+    // The bottom action sheet for the current selection (opened on long-press).
+    var selectionSheetOpen by remember { mutableStateOf(false) }
     // The range-listening flow (config panel, reciter choice, download confirm)
     // lives in its own controller; the panel opens on long-pressing the headset
     // with a selection.
@@ -361,14 +361,54 @@ fun MushafScreen(
     }
     LaunchedEffect(currentPageNumber) {
         // Keep the selection across page turns so a range can span pages; only the
-        // transient floating menu and audio dock close on a swipe.
-        menuAnchor = null
+        // transient action sheet and audio dock close on a swipe.
+        selectionSheetOpen = false
         rangeController.setOpen(false)
     }
     // The selection is an āyah-id range within one sūrah, so every id between its
     // ends is a real āyah in reading order — list them directly (spans pages).
     val orderedSelectedIds: List<Int> = selection?.let { (it.first..it.last).toList() } ?: emptyList()
     val selectedIds = orderedSelectedIds.toSet()
+    // The selection's sūrah name + plain text, resolved for the action sheet
+    // (header / copy / share). Keyed on the selection so they refresh as it grows.
+    val selSurahName by produceState("", selection) {
+        value = selection?.let { repository.surahNameLatin(it.first / 1000) } ?: ""
+    }
+    // The saved bookmark whose range exactly matches the selection (drives the
+    // sheet's note card vs. its "add a note" invite).
+    val activeBookmark = remember(bookmarks, selection) {
+        val sel = selection ?: return@remember null
+        val surah = sel.first / 1000
+        bookmarks.firstOrNull { it.surah == surah && it.from == sel.first % 1000 && it.to == sel.last % 1000 }
+    }
+    val clipboard = LocalClipboardManager.current
+    // Built fresh from the DB on demand so the copied/shared text is never empty,
+    // even if the user taps immediately after the selection changes.
+    suspend fun selectionShareText(): String {
+        val sel = selection ?: return ""
+        val surah = sel.first / 1000
+        val from = sel.first % 1000
+        val to = sel.last % 1000
+        val arabic = repository.ayahsForRange(surah, from, to).flatMap { it.words }.joinToString(" ")
+        val name = repository.surahNameLatin(surah)
+        val ref = if (from == to) "$name $from" else "$name $from–$to"
+        return "$arabic\n\n— $ref"
+    }
+    fun copySelection() {
+        scope.launch {
+            clipboard.setText(AnnotatedString(selectionShareText()))
+            Toast.makeText(context, R.string.sel_copied, Toast.LENGTH_SHORT).show()
+        }
+    }
+    fun shareSelection() {
+        scope.launch {
+            val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                type = "text/plain"
+                putExtra(android.content.Intent.EXTRA_TEXT, selectionShareText())
+            }
+            context.startActivity(android.content.Intent.createChooser(intent, null))
+        }
+    }
     // The surah whose actions sheet is open (its header was tapped).
     var learnSurah by remember { mutableStateOf<Pair<Int, String>?>(null) }
     // A whole-sūrah listen target for the range dock; null = listen to the
@@ -389,9 +429,11 @@ fun MushafScreen(
         showJump = false
     }
 
-    // Re-pull the current page's memorization states after a bulk change.
+    // Re-pull memorization states after a bulk change for every loaded page, not
+    // just the visible one, so a selection spanning a page boundary refreshes the
+    // medallions on both pages.
     suspend fun reloadMemStates() {
-        currentSession?.let { s ->
+        sessions.values.forEach { s ->
             val st = mushaf.ayahStates(s.page.ayahs.map { it.id })
             s.memStates.clear()
             s.memStates.putAll(st)
@@ -429,13 +471,13 @@ fun MushafScreen(
 
     fun cancelRangeDownload() = rangeController.cancelDownload()
 
-    // Long-pressing an ayah in reading mode opens the floating action menu,
+    // Long-pressing an ayah in reading mode opens the selection action sheet,
     // re-selecting that ayah alone when it lies outside the current selection.
-    val onAyahLongPress: (Int, IntOffset) -> Unit = { ayahId, offset ->
+    val onAyahLongPress: (Int, IntOffset) -> Unit = { ayahId, _ ->
         val sel = selection
         // Long-pressing outside the current selection re-selects that āyah alone.
         if (sel == null || ayahId !in sel) selection = ayahId..ayahId
-        menuAnchor = offset
+        selectionSheetOpen = true
     }
 
     fun toggleAudioDock() {
@@ -601,52 +643,88 @@ fun MushafScreen(
             }
         }
 
-        val anchor = menuAnchor
-        val menuSession = currentSession
-        if (anchor != null && menuSession != null && selectedIds.isNotEmpty()) {
+        val sheetSelection = selection
+        val sheetSession = currentSession
+        if (selectionSheetOpen && sheetSelection != null && sheetSession != null) {
+            val surah = sheetSelection.first / 1000
+            // The selected āyāt share one state, or default to "not started" when
+            // mixed. Read across every loaded page so a page-spanning selection
+            // resolves correctly, not just the visible page's āyāt.
             val currentState = selectedIds
-                .map { menuSession.memStates[it] ?: MemorizationState.NOT_STARTED }
+                .map { id -> sessions.values.firstNotNullOfOrNull { it.memStates[id] } ?: MemorizationState.NOT_STARTED }
                 .distinct()
-                .singleOrNull()
-            SelectionContextMenu(
-                anchor = anchor,
+                .singleOrNull() ?: MemorizationState.NOT_STARTED
+            SelectionSheet(
+                surahName = selSurahName,
+                from = sheetSelection.first % 1000,
+                to = sheetSelection.last % 1000,
+                page = sheetSession.page.number,
                 currentState = currentState,
+                bookmark = activeBookmark,
                 onListen = {
                     playRange(MushafAudioMode.LISTEN)
-                    menuAnchor = null
+                    selectionSheetOpen = false
                 },
-                onSetSabaq = {
-                    // The selection is an id range within one sūrah → derive the
-                    // sūrah and āyah numbers from its ends (works across pages).
-                    selection?.let { sel ->
-                        val surah = sel.first / 1000
-                        scope.launch {
-                            mushaf.setSabaqToRange(surah, sel.first % 1000, sel.last % 1000)
-                            reloadMemStates()
-                        }
+                onSabaq = {
+                    scope.launch {
+                        mushaf.setSabaqToRange(surah, sheetSelection.first % 1000, sheetSelection.last % 1000)
+                        reloadMemStates()
                     }
                     selection = null
-                    menuAnchor = null
+                    selectionSheetOpen = false
                 },
-                onBookmark = {
-                    // Keep the selection visible behind the note dialog; clear on save.
-                    bookmarkDraft = selection
-                    menuAnchor = null
+                onCopy = {
+                    copySelection()
+                    selectionSheetOpen = false
+                },
+                onShare = {
+                    shareSelection()
+                    selectionSheetOpen = false
                 },
                 onSetState = { state ->
+                    // Persist, then reload the page's states so the reader medallions
+                    // and the sheet (which stays open) both reflect the change — the
+                    // observable memStates map drives recomposition.
                     val ids = selectedIds.toList()
-                    // Reflect the change on every loaded page, not just the current
-                    // one, since the selection can span pages.
-                    sessions.values.forEach { s ->
-                        ids.forEach { id -> if (s.memStates.containsKey(id)) s.memStates[id] = state }
-                    }
                     scope.launch {
                         ids.forEach { mushaf.setAyahState(it, state) }
+                        reloadMemStates()
                     }
-                    selection = null
-                    menuAnchor = null
                 },
-                onDismiss = { menuAnchor = null },
+                onEditNote = {
+                    editBookmark = activeBookmark
+                    selectionSheetOpen = false
+                },
+                onAddNote = {
+                    // Keep the selection visible behind the note sheet; clear on save.
+                    bookmarkDraft = selection
+                    selectionSheetOpen = false
+                },
+                onClear = {
+                    selection = null
+                    selectionSheetOpen = false
+                },
+                onDismiss = { selectionSheetOpen = false },
+            )
+        }
+
+        editBookmark?.let { bm ->
+            app.alkahf.ui.bookmarks.BookmarkSheet(
+                surah = bm.surah,
+                from = bm.from,
+                to = bm.to,
+                initialNote = bm.note,
+                initialLabel = bm.label,
+                isEdit = true,
+                onSave = { note, label ->
+                    scope.launch {
+                        repository.updateBookmark(bm.id, note, label)
+                        bookmarkReload++
+                    }
+                    editBookmark = null
+                    selection = null
+                },
+                onDismiss = { editBookmark = null },
             )
         }
 
@@ -1356,7 +1434,7 @@ private fun markerAyahIdAt(
 }
 
 /** Page medallion color in reading mode: by memorization state. */
-private fun memMedallionColor(state: MemorizationState): Color = when (state) {
+internal fun memMedallionColor(state: MemorizationState): Color = when (state) {
     MemorizationState.STRONG -> AlkahfColors.AccentDeep
     MemorizationState.MEMORIZED -> AlkahfColors.AccentLight
     MemorizationState.LEARNING -> AlkahfColors.Learning
@@ -1515,108 +1593,6 @@ private fun recitingLabel(session: SelfTestSession?): String {
     val current = session.currentAyah ?: return stringResource(R.string.mushaf_all_recalled)
     val position = page.ayahs.indexOfFirst { it.id == current.id } + 1
     return stringResource(R.string.mushaf_reciting_ayah, position, page.ayahs.size)
-}
-
-/** Positions a popup so its top edge sits just above [anchor] (window px). */
-private class AnchorPositionProvider(private val anchor: IntOffset) : PopupPositionProvider {
-    override fun calculatePosition(
-        anchorBounds: IntRect,
-        windowSize: IntSize,
-        layoutDirection: LayoutDirection,
-        popupContentSize: IntSize,
-    ): IntOffset {
-        val margin = 12
-        val x = (anchor.x - popupContentSize.width / 2)
-            .coerceIn(margin, (windowSize.width - popupContentSize.width - margin).coerceAtLeast(margin))
-        val above = anchor.y - popupContentSize.height - 16
-        val y = if (above >= margin) {
-            above
-        } else {
-            (anchor.y + 16).coerceAtMost((windowSize.height - popupContentSize.height - margin).coerceAtLeast(margin))
-        }
-        return IntOffset(x, y)
-    }
-}
-
-/**
- * Floating action menu for the current selection, anchored where the user
- * long-pressed: Listen to the range, set it as the sabaq, or expand the state
- * picker to mark the range's memorization state.
- */
-@Composable
-private fun SelectionContextMenu(
-    anchor: IntOffset,
-    currentState: MemorizationState?,
-    onListen: () -> Unit,
-    onSetSabaq: () -> Unit,
-    onBookmark: () -> Unit,
-    onSetState: (MemorizationState) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    Popup(
-        popupPositionProvider = remember(anchor) { AnchorPositionProvider(anchor) },
-        onDismissRequest = onDismiss,
-        properties = PopupProperties(focusable = true),
-    ) {
-        var stateOpen by remember { mutableStateOf(false) }
-        Surface(
-            shape = RoundedCornerShape(16.dp),
-            color = AlkahfColors.Paper,
-            border = BorderStroke(1.dp, AlkahfColors.CardBorder),
-            shadowElevation = 14.dp,
-            modifier = Modifier.width(216.dp),
-        ) {
-            Column(Modifier.padding(vertical = 6.dp)) {
-                MenuItem(label = stringResource(R.string.mushaf_menu_listen), onClick = onListen)
-                MenuItem(label = stringResource(R.string.mushaf_menu_set_sabaq), onClick = onSetSabaq)
-                MenuItem(label = stringResource(R.string.mushaf_menu_bookmark), onClick = onBookmark)
-                HorizontalDivider(
-                    thickness = 1.dp,
-                    color = AlkahfColors.Hairline,
-                    modifier = Modifier.padding(vertical = 4.dp),
-                )
-                MenuItem(
-                    label = stringResource(R.string.mushaf_menu_set_state),
-                    trailing = if (stateOpen) "▲" else "▼",
-                    onClick = { stateOpen = !stateOpen },
-                )
-                if (stateOpen) {
-                    listOf(
-                        MemorizationState.NOT_STARTED to stringResource(R.string.state_not_started),
-                        MemorizationState.LEARNING to stringResource(R.string.state_learning),
-                        MemorizationState.MEMORIZED to stringResource(R.string.state_memorized),
-                        MemorizationState.STRONG to stringResource(R.string.state_strong),
-                    ).forEach { (state, label) ->
-                        StateMenuItem(
-                            label = label,
-                            color = memMedallionColor(state),
-                            selected = state == currentState,
-                            onClick = { onSetState(state) },
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun MenuItem(label: String, trailing: String? = null, onClick: () -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 11.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = label,
-            fontSize = 14.5.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = AlkahfColors.Ink,
-            modifier = Modifier.weight(1f),
-        )
-        if (trailing != null) {
-            Text(text = trailing, fontSize = 11.sp, color = AlkahfColors.InkMuted)
-        }
-    }
 }
 
 @Composable
