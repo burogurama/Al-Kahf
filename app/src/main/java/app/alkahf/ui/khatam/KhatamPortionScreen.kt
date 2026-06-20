@@ -51,7 +51,6 @@ import androidx.compose.ui.unit.sp
 import app.alkahf.AlkahfApplication
 import app.alkahf.R
 import app.alkahf.data.KhatamState
-import app.alkahf.data.toArabicIndic
 import app.alkahf.ui.rememberSurahNamer
 import app.alkahf.ui.theme.AlkahfColors
 import app.alkahf.ui.theme.AmiriQuran
@@ -173,7 +172,7 @@ private fun PortionHeaderCard(state: KhatamState, surahName: (Int) -> String) {
                 )
                 CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
                     Text(
-                        text = stringResource(R.string.khatam_juz_arabic, state.todaysPortionJuz.toArabicIndic()),
+                        text = stringResource(R.string.khatam_juz_arabic, state.todaysPortionJuz.toString()),
                         fontFamily = AmiriQuran,
                         fontSize = 22.sp,
                         color = AlkahfColors.GoldText,

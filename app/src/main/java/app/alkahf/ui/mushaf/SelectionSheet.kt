@@ -65,7 +65,6 @@ import app.alkahf.data.MemorizationState
 import app.alkahf.ui.bookmarks.bookmarkRelative
 import app.alkahf.ui.bookmarks.bookmarkTitle
 import app.alkahf.ui.bookmarks.labelName
-import app.alkahf.ui.exercises.toEasternArabicDigits
 import app.alkahf.ui.theme.AlkahfColors
 
 /**
@@ -122,7 +121,7 @@ fun SelectionSheet(
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
-                        text = toEasternArabicDigits(to),
+                        text = to.toString(),
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
                         color = AlkahfColors.AccentDeep,

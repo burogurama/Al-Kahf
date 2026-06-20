@@ -29,15 +29,6 @@ import app.alkahf.R
 import app.alkahf.data.exercises.ExerciseType
 import app.alkahf.ui.theme.AlkahfColors
 
-/** Converts Western digits in [s] to Eastern Arabic-Indic numerals (muṣḥaf context only). */
-fun toEasternArabicDigits(s: String): String = buildString {
-    for (c in s) append(if (c in '0'..'9') EASTERN_DIGITS[c - '0'] else c)
-}
-
-fun toEasternArabicDigits(n: Int): String = toEasternArabicDigits(n.toString())
-
-private val EASTERN_DIGITS = charArrayOf('٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩')
-
 /** The colour role of a type chip: green (Guess), gold (Finish), sage (Order). */
 data class TypeChipColors(val bg: Color, val ink: Color)
 

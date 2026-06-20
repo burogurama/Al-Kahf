@@ -523,9 +523,8 @@ private fun CorrectOrderRow(position: Int, item: AyatItem) {
                 Modifier.size(26.dp).background(AlkahfColors.Correct, RoundedCornerShape(8.dp)),
                 contentAlignment = Alignment.Center,
             ) {
-                // Eastern Arabic-Indic ordinal — muṣḥaf context.
                 Text(
-                    text = toEasternArabicDigits(position),
+                    text = position.toString(),
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
                     color = AlkahfColors.OnCorrect,

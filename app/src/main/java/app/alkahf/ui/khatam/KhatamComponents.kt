@@ -27,7 +27,6 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.material3.Text
-import app.alkahf.data.toArabicIndic
 import app.alkahf.ui.theme.AlkahfColors
 
 /**
@@ -114,7 +113,7 @@ internal fun JuzMap(
             }
         }
         if (showAxis) {
-            // LTR axis with the row reversed so ticks read ١ ١٠ ٢٠ ٣٠ under the
+            // LTR axis with the row reversed so ticks read 1 10 20 30 under the
             // RTL bars (juzʼ 1 sits at the right edge).
             Row(
                 modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
@@ -122,7 +121,7 @@ internal fun JuzMap(
             ) {
                 listOf(30, 20, 10, 1).forEach { tick ->
                     Text(
-                        text = tick.toArabicIndic(),
+                        text = tick.toString(),
                         fontSize = 10.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = AlkahfColors.InkFainter,
