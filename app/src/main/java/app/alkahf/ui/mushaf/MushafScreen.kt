@@ -1225,7 +1225,6 @@ private fun AyatBody(
     val nowPlayingFill = AlkahfColors.NowPlayingFill
     val wirdFill = AlkahfColors.WirdMarkFill
     val wirdEdge = AlkahfColors.WirdMarkEdge
-    val bookmarkFill = AlkahfColors.BookmarkHighlight
     val bookmarkEdge = AlkahfColors.BookmarkRibbon
 
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
@@ -1296,9 +1295,10 @@ private fun AyatBody(
                             )
                         }
                     }
-                    // Saved bookmarks: a faint gold wash behind any bookmarked āyah,
-                    // with a ribbon edge bar at its start. Drawn beneath the selection
-                    // / now-playing fills so an active selection still wins on top.
+                    // Saved bookmarks: a gold underline beneath any bookmarked āyah,
+                    // per line. Drawn beneath the selection / now-playing fills.
+                    val underlineW = 2.dp.toPx()
+                    val underlineGap = 2.dp.toPx()
                     groupText.spans.map { it.ayahId }.distinct()
                         .filter { it in bookmarkedIds }
                         .forEach { ayahId ->
@@ -1308,7 +1308,6 @@ private fun AyatBody(
                             val end = ayahSpans.maxOf { it.end }
                             val firstLine = layout.getLineForOffset(start)
                             val lastLine = layout.getLineForOffset((end - 1).coerceAtLeast(start))
-                            var entryX = 0f; var entryTop = 0f; var entryBottom = 0f
                             for (line in firstLine..lastLine) {
                                 val lineStart = layout.getLineStart(line)
                                 val lineEnd = layout.getLineEnd(line, visibleEnd = true)
@@ -1318,24 +1317,15 @@ private fun AyatBody(
                                 val bnds = layout.getPathForRange(ls, le).getBounds()
                                 val left = if (end >= lineEnd) layout.getLineLeft(line) else bnds.left
                                 val right = if (start <= lineStart) layout.getLineRight(line) else bnds.right
-                                drawRoundRect(
-                                    color = bookmarkFill,
-                                    topLeft = Offset(left - padH, bnds.top - padV),
-                                    size = androidx.compose.ui.geometry.Size(
-                                        (right - left) + padH * 2,
-                                        bnds.height + padV * 2,
-                                    ),
-                                    cornerRadius = radius,
+                                val y = bnds.bottom + underlineGap
+                                drawLine(
+                                    color = bookmarkEdge,
+                                    start = Offset(left, y),
+                                    end = Offset(right, y),
+                                    strokeWidth = underlineW,
+                                    cap = androidx.compose.ui.graphics.StrokeCap.Round,
                                 )
-                                if (line == firstLine) { entryX = right; entryTop = bnds.top; entryBottom = bnds.bottom }
                             }
-                            val barW = 3.dp.toPx()
-                            drawRoundRect(
-                                color = bookmarkEdge,
-                                topLeft = Offset(entryX - barW / 2, entryTop - padV),
-                                size = androidx.compose.ui.geometry.Size(barW, (entryBottom - entryTop) + padV * 2),
-                                cornerRadius = androidx.compose.ui.geometry.CornerRadius(barW / 2),
-                            )
                         }
                     litIds.forEach { ayahId ->
                         val ayahSpans = groupText.spans.filter { it.ayahId == ayahId }
